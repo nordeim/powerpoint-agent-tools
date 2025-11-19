@@ -1,0 +1,17 @@
+# PowerPoint Agent Tool - Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core dependencies (required)
+python-pptx==0.6.23       # PowerPoint manipulation
+Pillow>=10.0.0            # Image processing
+pandas>=2.0.0             # Data handling for charts (optional)
+
+# Development dependencies (for testing)
+# pytest>=7.0.0           # Test runner (optional)
+# pytest-cov>=4.0.0       # Coverage reporting (optional)
+
+# Note: Python 3.8+ required
+# Note: For PDF export, install LibreOffice separately:
+#   - Ubuntu/Debian: sudo apt install libreoffice-impress
+#   - macOS: brew install --cask libreoffice
+#   - Windows: https://www.libreoffice.org/download
