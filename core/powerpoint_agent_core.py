@@ -124,7 +124,7 @@ class FileLockError(PowerPointAgentError):
 # ============================================================================
 
 class ShapeType(Enum):
-    """Common shape types."""
+    """Common shape types supported by python-pptx."""
     RECTANGLE = MSO_AUTO_SHAPE_TYPE.RECTANGLE
     ROUNDED_RECTANGLE = MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE
     ELLIPSE = MSO_AUTO_SHAPE_TYPE.OVAL
@@ -133,10 +133,6 @@ class ShapeType(Enum):
     ARROW_LEFT = MSO_AUTO_SHAPE_TYPE.LEFT_ARROW
     ARROW_UP = MSO_AUTO_SHAPE_TYPE.UP_ARROW
     ARROW_DOWN = MSO_AUTO_SHAPE_TYPE.DOWN_ARROW
-    LINE = MSO_AUTO_SHAPE_TYPE.LINE_CALLOUT_1
-    CALLOUT = MSO_AUTO_SHAPE_TYPE.RECTANGULAR_CALLOUT
-    STAR = MSO_AUTO_SHAPE_TYPE.STAR_5
-    HEART = MSO_AUTO_SHAPE_TYPE.HEART
 
 
 class ChartType(Enum):
@@ -1261,9 +1257,7 @@ class PowerPointAgent:
             "arrow_right": MSO_AUTO_SHAPE_TYPE.RIGHT_ARROW,
             "arrow_left": MSO_AUTO_SHAPE_TYPE.LEFT_ARROW,
             "arrow_up": MSO_AUTO_SHAPE_TYPE.UP_ARROW,
-            "arrow_down": MSO_AUTO_SHAPE_TYPE.DOWN_ARROW,
-            "star": MSO_AUTO_SHAPE_TYPE.STAR_5,
-            "heart": MSO_AUTO_SHAPE_TYPE.HEART
+            "arrow_down": MSO_AUTO_SHAPE_TYPE.DOWN_ARROW
         }
         
         mso_shape = shape_type_map.get(shape_type.lower(), MSO_AUTO_SHAPE_TYPE.RECTANGLE)
