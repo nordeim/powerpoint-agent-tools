@@ -37,3 +37,12 @@ uv python ppt_replace_image.py --file test.pptx --slide 0 --old-image "logo" --n
 
 # Test PDF export (requires LibreOffice)
 uv python ppt_export_pdf.py --file test.pptx --output test.pdf --json
+
+---
+
+# First, get slide info to find image names
+python3 tools/ppt_get_slide_info.py --file test.pptx --slide 0 --json
+
+# This will show all shapes including images with their actual names
+# Then use the correct image name:
+python3 tools/ppt_replace_image.py --file test.pptx --slide 0 --old-image "actual_name_from_info" --new-image new.jpg --json
