@@ -1188,56 +1188,73 @@ class PowerPointAgent:
         
         for slide in self.prs.slides:
             for shape in slide.shapes:
-                if hasattr(shape, 'text_frame'):
+                # Use has_text_frame method instead of hasattr
+                if not shape.has_text_frame:
+                    continue
+                
+                try:
                     text_frame = shape.text_frame
+                except AttributeError:
+                    continue  # Shape doesn't actually have text frame
+                
+                # Get all text to check if replacement is needed
+                full_text = text_frame.text
+                
+                # Quick check: if find string not in full text, skip
+                if match_case:
+                    if find not in full_text:
+                        continue
+                else:
+                    if find.lower() not in full_text.lower():
+                        continue
+                
+                # Text found - now replace in paragraphs
+                for paragraph in text_frame.paragraphs:
+                    # Get paragraph text
+                    para_text = paragraph.text
                     
-                    # Check if text exists at text_frame level first
-                    full_text = text_frame.text
+                    # Skip if no text
+                    if not para_text:
+                        continue
                     
+                    # Check if find string is in this paragraph
                     if match_case:
-                        if find not in full_text:
-                            continue  # No match, skip this shape
+                        if find not in para_text:
+                            continue
                     else:
-                        if find.lower() not in full_text.lower():
-                            continue  # No match, skip this shape
+                        if find.lower() not in para_text.lower():
+                            continue
                     
-                    # Text exists, now replace in paragraphs
-                    for paragraph in text_frame.paragraphs:
-                        # Check if paragraph has runs
-                        if not paragraph.runs:
-                            # No runs - text at paragraph level (common in placeholders)
-                            if paragraph.text:
-                                old_text = paragraph.text
-                                
-                                if match_case:
-                                    if find in old_text:
-                                        new_text = old_text.replace(find, replace)
-                                        paragraph.text = new_text
-                                        count += old_text.count(find)
-                                else:
-                                    pattern = re.compile(re.escape(find), re.IGNORECASE)
-                                    if pattern.search(old_text):
-                                        new_text = pattern.sub(replace, old_text)
-                                        paragraph.text = new_text
-                                        matches = len(re.findall(pattern, old_text))
-                                        count += matches
+                    # Found in this paragraph - now replace
+                    # Check if paragraph has runs
+                    if len(paragraph.runs) == 0:
+                        # No runs - set text directly on paragraph
+                        if match_case:
+                            new_text = para_text.replace(find, replace)
+                            replacements = para_text.count(find)
                         else:
-                            # Process existing runs
-                            for run in paragraph.runs:
-                                old_text = run.text
-                                
-                                if match_case:
-                                    if find in old_text:
-                                        new_text = old_text.replace(find, replace)
-                                        run.text = new_text
-                                        count += old_text.count(find)
-                                else:
-                                    pattern = re.compile(re.escape(find), re.IGNORECASE)
-                                    new_text = pattern.sub(replace, old_text)
-                                    if new_text != old_text:
-                                        matches = len(re.findall(pattern, old_text))
-                                        count += matches
-                                        run.text = new_text
+                            pattern = re.compile(re.escape(find), re.IGNORECASE)
+                            new_text = pattern.sub(replace, para_text)
+                            replacements = len(re.findall(pattern, para_text))
+                        
+                        paragraph.text = new_text
+                        count += replacements
+                    else:
+                        # Has runs - replace in each run
+                        for run in paragraph.runs:
+                            run_text = run.text
+                            
+                            if match_case:
+                                if find in run_text:
+                                    new_text = run_text.replace(find, replace)
+                                    run.text = new_text
+                                    count += run_text.count(find)
+                            else:
+                                pattern = re.compile(re.escape(find), re.IGNORECASE)
+                                if pattern.search(run_text):
+                                    new_text = pattern.sub(replace, run_text)
+                                    run.text = new_text
+                                    count += len(re.findall(pattern, run_text))
         
         return count
 
