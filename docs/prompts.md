@@ -28,6 +28,12 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review and analyze the attached "system prompt" that is meant to be used in conjunction with the tools set. Then meticulously plan and then create a complete working and validated replacement `system prompt` that incorporates the remaining tools not mentioned/listed.  The original master plan for the project is also attached for your reference and consideration.
+
+You have to think deeper and think harder to deeply explore how best to extend the current agent system prompt to include additional tools not currently included. Then meticulously create an implementation plan to correctly and accurately create a complete drop-in replacement agent system prompt with no placeholder comments. Review and validate your implementation plan before proceeding meticulously to execute it. 
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
