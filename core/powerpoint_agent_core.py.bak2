@@ -1180,7 +1180,17 @@ class PowerPointAgent:
     
     def replace_text(self, find: str, replace: str, 
                     match_case: bool = False) -> int:
-        """Find and replace text across entire presentation."""
+        """
+        Find and replace text across entire presentation.
+        
+        Args:
+            find: Text to find
+            replace: Replacement text
+            match_case: Case-sensitive search
+            
+        Returns:
+            Number of replacements made
+        """
         if not self.prs:
             raise PowerPointAgentError("No presentation loaded")
         
@@ -1189,58 +1199,21 @@ class PowerPointAgent:
         for slide in self.prs.slides:
             for shape in slide.shapes:
                 if hasattr(shape, 'text_frame'):
-                    text_frame = shape.text_frame
-                    
-                    # Check if text exists at text_frame level first
-                    full_text = text_frame.text
-                    
-                    if match_case:
-                        if find not in full_text:
-                            continue  # No match, skip this shape
-                    else:
-                        if find.lower() not in full_text.lower():
-                            continue  # No match, skip this shape
-                    
-                    # Text exists, now replace in paragraphs
-                    for paragraph in text_frame.paragraphs:
-                        # Check if paragraph has runs
-                        if not paragraph.runs:
-                            # No runs - text at paragraph level (common in placeholders)
-                            if paragraph.text:
-                                old_text = paragraph.text
-                                
-                                if match_case:
-                                    if find in old_text:
-                                        new_text = old_text.replace(find, replace)
-                                        paragraph.text = new_text
-                                        count += old_text.count(find)
-                                else:
-                                    pattern = re.compile(re.escape(find), re.IGNORECASE)
-                                    if pattern.search(old_text):
-                                        new_text = pattern.sub(replace, old_text)
-                                        paragraph.text = new_text
-                                        matches = len(re.findall(pattern, old_text))
-                                        count += matches
-                        else:
-                            # Process existing runs
-                            for run in paragraph.runs:
-                                old_text = run.text
-                                
-                                if match_case:
-                                    if find in old_text:
-                                        new_text = old_text.replace(find, replace)
-                                        run.text = new_text
-                                        count += old_text.count(find)
-                                else:
-                                    pattern = re.compile(re.escape(find), re.IGNORECASE)
-                                    new_text = pattern.sub(replace, old_text)
-                                    if new_text != old_text:
-                                        matches = len(re.findall(pattern, old_text))
-                                        count += matches
-                                        run.text = new_text
+                    for paragraph in shape.text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            if match_case:
+                                if find in run.text:
+                                    run.text = run.text.replace(find, replace)
+                                    count += run.text.count(replace)
+                            else:
+                                pattern = re.compile(re.escape(find), re.IGNORECASE)
+                                new_text = pattern.sub(replace, run.text)
+                                if new_text != run.text:
+                                    count += 1
+                                    run.text = new_text
         
         return count
-
+    
     # ========================================================================
     # SHAPE OPERATIONS
     # ========================================================================
