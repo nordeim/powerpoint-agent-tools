@@ -30,8 +30,8 @@ test_p1_tools.py::TestP1Tools::test_workflow_data_presentation PASSED           
 ========================================================= FAILURES =========================================================
 ___________________________________________ TestP1Tools.test_replace_text_simple ___________________________________________
 
-self = <test_p1_tools.TestP1Tools object at 0x7504ef111010>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmp_w4_l24j')
+self = <test_p1_tools.TestP1Tools object at 0x7a0464be8f50>
+tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpaffi4fhh')
 
     def test_replace_text_simple(self, tools_dir, temp_dir):
         """Test simple text replacement."""
@@ -69,8 +69,8 @@ E       assert 0 >= 2
 test_p1_tools.py:547: AssertionError
 __________________________________________ TestP1Tools.test_replace_text_dry_run ___________________________________________
 
-self = <test_p1_tools.TestP1Tools object at 0x7504ef110a10>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpxsbprd46')
+self = <test_p1_tools.TestP1Tools object at 0x7a0464be88f0>
+tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpmi4b_eyd')
 
     def test_replace_text_dry_run(self, tools_dir, temp_dir):
         """Test dry run mode (preview without changes)."""
@@ -109,4 +109,4 @@ test_p1_tools.py:612: AssertionError
 ================================================= short test summary info ==================================================
 FAILED test_p1_tools.py::TestP1Tools::test_replace_text_simple - assert 0 >= 2
 FAILED test_p1_tools.py::TestP1Tools::test_replace_text_dry_run - assert 0 >= 1
-============================================== 2 failed, 16 passed in 32.71s ========
+============================================== 2 failed, 16 passed in 32.86s =======
