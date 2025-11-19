@@ -1,4 +1,40 @@
-$ python3 test_basic_tools.py 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously  review the latest test results below:
+
+$ python3 -c "from core.powerpoint_agent_core import PowerPointAgent; print('✓ Core module imports successfully')"
+✓ Core module imports successfully
+(venv) pete@pop-os:/home/project/powerpoint-agent-tools
+$ python3 tools/ppt_create_new.py --output /tmp/test.pptx --slides 1 --json
+{
+  "status": "success",
+  "file": "/tmp/test.pptx",
+  "slides_created": 1,
+  "slide_indices": [
+    0
+  ],
+  "file_size_bytes": 28217,
+  "slide_dimensions": {
+    "width_inches": 10.0,
+    "height_inches": 7.5,
+    "aspect_ratio": "10.0:7.5"
+  },
+  "available_layouts": [
+    "Title Slide",
+    "Title and Content",
+    "Section Header",
+    "Two Content",
+    "Comparison",
+    "Title Only",
+    "Blank",
+    "Content with Caption",
+    "Picture with Caption",
+    "Title and Vertical Text",
+    "Vertical Title and Text"
+  ],
+  "layout_used": "Title and Content",
+  "template_used": null
+}
+(venv) pete@pop-os:/home/project/powerpoint-agent-tools
+$ python3 test_basic_tools.py -v
 =================================================== test session starts ====================================================
 platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0 -- /opt/venv/bin/python3
 cachedir: .pytest_cache
@@ -8,220 +44,11 @@ plugins: qt-4.5.0, cov-6.3.0, Faker-37.6.0, mock-3.15.0, asyncio-1.1.0, anyio-4.
 asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 collected 8 items                                                                                                          
 
-test_basic_tools.py::TestBasicTools::test_create_new_basic FAILED                                                    [ 12%]
-test_basic_tools.py::TestBasicTools::test_create_new_with_layout FAILED                                              [ 25%]
-test_basic_tools.py::TestBasicTools::test_add_slide FAILED                                                           [ 37%]
-test_basic_tools.py::TestBasicTools::test_set_title FAILED                                                           [ 50%]
-test_basic_tools.py::TestBasicTools::test_add_text_box_percentage FAILED                                             [ 62%]
-test_basic_tools.py::TestBasicTools::test_add_text_box_grid FAILED                                                   [ 75%]
-test_basic_tools.py::TestBasicTools::test_insert_image FAILED                                                        [ 87%]
-test_basic_tools.py::TestBasicTools::test_workflow_create_full_presentation FAILED                                   [100%]
-
-========================================================= FAILURES =========================================================
-___________________________________________ TestBasicTools.test_create_new_basic ___________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfcf67e0>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmp2_2pf7h4')
-
-    def test_create_new_basic(self, tools_dir, temp_dir):
-        """Test creating new presentation."""
-        output = temp_dir / 'test.pptx'
-    
-        result = self.run_tool('ppt_create_new.py', {
-            'output': output,
-            'slides': 3
-        }, tools_dir)
-    
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:73: AssertionError
-________________________________________ TestBasicTools.test_create_new_with_layout ________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfcf6510>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmp8ic1mylz')
-
-    def test_create_new_with_layout(self, tools_dir, temp_dir):
-        """Test creating with specific layout."""
-        output = temp_dir / 'layout_test.pptx'
-    
-        result = self.run_tool('ppt_create_new.py', {
-            'output': output,
-            'slides': 5,
-            'layout': 'Title and Content'
-        }, tools_dir)
-    
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:88: AssertionError
-______________________________________________ TestBasicTools.test_add_slide _______________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfcf60f0>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpwjhuvzoq')
-
-    def test_add_slide(self, tools_dir, temp_dir):
-        """Test adding slide to existing presentation."""
-        # First create presentation
-        filepath = temp_dir / 'add_slide_test.pptx'
-        self.run_tool('ppt_create_new.py', {
-            'output': filepath,
-            'slides': 1
-        }, tools_dir)
-    
-        # Add slide
-        result = self.run_tool('ppt_add_slide.py', {
-            'file': filepath,
-            'layout': 'Title and Content'
-        }, tools_dir)
-    
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:107: AssertionError
-______________________________________________ TestBasicTools.test_set_title _______________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfcf6450>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpjve7ls8j')
-
-    def test_set_title(self, tools_dir, temp_dir):
-        """Test setting slide title."""
-        # Create presentation
-        filepath = temp_dir / 'title_test.pptx'
-        self.run_tool('ppt_create_new.py', {
-            'output': filepath,
-            'slides': 1
-        }, tools_dir)
-    
-        # Set title
-        result = self.run_tool('ppt_set_title.py', {
-            'file': filepath,
-            'slide': 0,
-            'title': 'Test Title',
-            'subtitle': 'Test Subtitle'
-        }, tools_dir)
-    
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:128: AssertionError
-_______________________________________ TestBasicTools.test_add_text_box_percentage ________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfd343e0>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpye4aju43')
-
-    def test_add_text_box_percentage(self, tools_dir, temp_dir):
-        """Test adding text box with percentage positioning."""
-        # Create presentation
-        filepath = temp_dir / 'textbox_test.pptx'
-        self.run_tool('ppt_create_new.py', {
-            'output': filepath,
-            'slides': 1
-        }, tools_dir)
-    
-        # Add text box
-        result = self.run_tool('ppt_add_text_box.py', {
-            'file': filepath,
-            'slide': 0,
-            'text': 'Hello World',
-            'position': {"left": "20%", "top": "30%"},
-            'size': {"width": "60%", "height": "10%"},
-            'font-size': 24,
-            'bold': True
-        }, tools_dir)
-    
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:152: AssertionError
-__________________________________________ TestBasicTools.test_add_text_box_grid ___________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfd34fe0>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmppm389po6')
-
-    def test_add_text_box_grid(self, tools_dir, temp_dir):
-        """Test adding text box with grid positioning."""
-        filepath = temp_dir / 'grid_test.pptx'
-        self.run_tool('ppt_create_new.py', {
-            'output': filepath,
-            'slides': 1
-        }, tools_dir)
-    
-        result = self.run_tool('ppt_add_text_box.py', {
-            'file': filepath,
-            'slide': 0,
-            'text': 'Grid Position',
-            'position': {"grid": "C4"},
-            'size': {"width": "25%", "height": "8%"}
-        }, tools_dir)
-    
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:172: AssertionError
-_____________________________________________ TestBasicTools.test_insert_image _____________________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfd358e0>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpur1y1k25')
-
-    def test_insert_image(self, tools_dir, temp_dir):
-        """Test inserting image."""
-        # Create a simple test image
-        try:
-            from PIL import Image
-    
-            # Create test image
-            img = Image.new('RGB', (100, 100), color='red')
-            image_path = temp_dir / 'test_image.png'
-            img.save(image_path)
-    
-            # Create presentation
-            filepath = temp_dir / 'image_test.pptx'
-            self.run_tool('ppt_create_new.py', {
-                'output': filepath,
-                'slides': 1
-            }, tools_dir)
-    
-            # Insert image
-            result = self.run_tool('ppt_insert_image.py', {
-                'file': filepath,
-                'slide': 0,
-                'image': image_path,
-                'position': {"left": "10%", "top": "10%"},
-                'size': {"width": "30%", "height": "auto"},
-                'alt-text': 'Test Image'
-            }, tools_dir)
-    
->           assert result['returncode'] == 0
-E           assert 1 == 0
-
-test_basic_tools.py:202: AssertionError
-__________________________________ TestBasicTools.test_workflow_create_full_presentation ___________________________________
-
-self = <test_basic_tools.TestBasicTools object at 0x7bb7dfd35e20>
-tools_dir = PosixPath('/home/project/powerpoint-agent-tools/tools'), temp_dir = PosixPath('/tmp/tmpfntqj_38')
-
-    def test_workflow_create_full_presentation(self, tools_dir, temp_dir):
-        """Test complete workflow: create, add slides, set titles, add content."""
-        filepath = temp_dir / 'complete_presentation.pptx'
-    
-        # Step 1: Create presentation
-        result = self.run_tool('ppt_create_new.py', {
-            'output': filepath,
-            'slides': 1,
-            'layout': 'Title Slide'
-        }, tools_dir)
->       assert result['returncode'] == 0
-E       assert 1 == 0
-
-test_basic_tools.py:219: AssertionError
-================================================= short test summary info ==================================================
-FAILED test_basic_tools.py::TestBasicTools::test_create_new_basic - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_create_new_with_layout - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_add_slide - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_set_title - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_add_text_box_percentage - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_add_text_box_grid - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_insert_image - assert 1 == 0
-FAILED test_basic_tools.py::TestBasicTools::test_workflow_create_full_presentation - assert 1 == 0
-==================================================== 8 failed in 7.71s =====================================================
+test_basic_tools.py::TestBasicTools::test_create_new_basic PASSED                                                    [ 12%]
+test_basic_tools.py::TestBasicTools::test_create_new_with_layout PASSED                                              [ 25%]
+test_basic_tools.py::TestBasicTools::test_add_slide PASSED                                                           [ 37%]
+test_basic_tools.py::TestBasicTools::test_set_title PASSED                                                           [ 50%]
+test_basic_tools.py::TestBasicTools::test_add_text_box_percentage PASSED                                             [ 62%]
+test_basic_tools.py::TestBasicTools::test_add_text_box_grid PASSED                                                   [ 75%]
+test_basic_tools.py::TestBasicTools::test_insert_image PASSED                                                        [ 87%]
+test_basic_tools.py::TestBasicTools::test_workflow_create_full_presentation PASSED                                   [100%]
