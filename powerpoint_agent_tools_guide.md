@@ -1,6 +1,6 @@
 ## **Powerpoint Agent Tools**
 
-### **Files Created (8 total):**
+### **Selected P0 Tools (Core):**
 
 | # | File | Lines | Purpose |
 |---|------|-------|---------|
@@ -12,6 +12,16 @@
 | 6 | `tools/ppt_add_text_box.py` | 310 | Add text box with positioning |
 | 7 | `tools/ppt_insert_image.py` | 340 | Insert image into slide |
 | 8 | `test_basic_tools.py` | 280 | Integration tests |
+
+### **Selected P1 Tools (High Priority):**
+
+| # | Tool | Purpose | Business Value |
+|---|------|---------|----------------|
+| 9 | `ppt_add_bullet_list.py` | Add bullet/numbered lists | **High** - Most common content type |
+| 10 | `ppt_add_chart.py` | Add data visualization charts | **Critical** - Business presentations |
+| 11 | `ppt_add_table.py` | Add data tables | **High** - Structured data display |
+| 12 | `ppt_add_shape.py` | Add shapes (boxes, arrows, etc.) | **Medium** - Visual design |
+| 13 | `ppt_replace_text.py` | Find and replace text | **High** - Bulk updates |
 
 ---
 
