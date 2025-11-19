@@ -34,6 +34,10 @@ You have to think deeper and think harder to deeply explore how best to extend t
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, the tools not already shared with you in the bundle set `codebase_files_set.md`, though listed in the `master_plan.md`, do not exist (not created yet). Please deeply and meticulously review the master plan and the tools set shared, then meticulously create a list of the next 10 most needed tools. In the list to be created, include a description of the features for each file and a checklist to validate the tool file after its generation.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
