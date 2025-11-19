@@ -1,0 +1,21 @@
+{
+  "slides": [
+    {
+      "layout": "Title Slide",
+      "title": "My Presentation",
+      "subtitle": "Created from Structure"
+    },
+    {
+      "layout": "Title and Content",
+      "title": "Agenda",
+      "content": [
+        {
+          "type": "bullet_list",
+          "items": ["Introduction", "Main Content", "Conclusion"],
+          "position": {"left": "10%", "top": "25%"},
+          "size": {"width": "80%", "height": "60%"}
+        }
+      ]
+    }
+  ]
+}
