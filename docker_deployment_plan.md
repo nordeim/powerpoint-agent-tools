@@ -1,38 +1,36 @@
-# Implementation Plan - Docker Environment
+# Comprehensive plan to containerize the PowerPoint Agent Tools
 
-I have developed a comprehensive plan to containerize the PowerPoint Agent Tools. This ensures a consistent, reproducible environment across Windows, macOS, and Linux, solving the complex dependency chain of `libreoffice` (for PDF/Image export) and `fonts` which often plague local Python setups.
+This ensures a consistent, reproducible environment across Windows, macOS, and Linux, solving the complex dependency chain of `libreoffice` (for PDF/Image export) and `fonts` which often plague local Python setups.
 
 ## 1. Architecture
-*   **Base Image:** `python:3.11-slim-bookworm` (Stable, small, includes modern LibreOffice repositories).
+*   **Base Image:** `python:3.13-trixie` (Stable and includes modern LibreOffice repositories).
 *   **System Dependencies:** `libreoffice-impress` (headless), `fonts-liberation` (for rendering), `uv` (for fast Python management).
 *   **Volume Strategy:** The host repository is mounted to `/app` inside the container. This allows the AI agent to modify code and generate presentations that persist on the host machine.
 *   **Permissions:** The container will execute as `root` internally to simplify operations, but file ownership on Linux will be managed via standard Docker volume behavior (or simple `chown` if needed in specific environments).
 
-## 2. Deliverables
+## 2. Docker Configuration
 
-### **Docker Configuration**
-1.  **`docker/Dockerfile`**: Multi-stage build definition installing OS deps, Fonts, and Python environment.
-2.  **`docker/.dockerignore`**: Prevents temp files (`__pycache__`, `.git`) from bloating the build context.
+-  **`docker/Dockerfile`**: Multi-stage build definition installing OS deps, Fonts, and Python environment.
+-  **`docker/.dockerignore`**: Prevents temp files (`__pycache__`, `.git`) from bloating the build context.
 
-### **Control Scripts**
-3.  **`scripts/build_docker.sh`** (Linux/Mac) & **`.bat`** (Windows): Compiles the image `ppt-agent-tools:latest`.
-4.  **`scripts/run_docker.sh`** (Linux/Mac) & **`.bat`** (Windows): Launches an interactive shell (`/bin/bash`) with the current directory mounted.
-5.  **`scripts/healthcheck.sh`**: Internal script to verify `python`, `pptx`, and `soffice` (LibreOffice) are operational.
+## 3. Control Scripts
 
-### **Documentation**
-6.  **`DOCKER_GUIDE.md`**: The "Handbook" explaining how to spin up the environment and interact with it.
+-  **`scripts/build_docker.sh`** (Linux/Mac) & **`.bat`** (Windows): Compiles the image `ppt-agent-tools:latest`.
+-  **`scripts/run_docker.sh`** (Linux/Mac) & **`.bat`** (Windows): Launches an interactive shell (`/bin/bash`) with the current directory mounted.
+-  **`scripts/healthcheck.sh`**: Internal script to verify `python`, `pptx`, and `soffice` (LibreOffice) are operational.
 
-## 3. Execution
-I will now generate these 6 artifacts.
+## 4. Documentation
 
-***
+-  **`DOCKER_GUIDE.md`**: The "Handbook" explaining how to spin up the environment and interact with it.
+
+---
 
 ### 1. `docker/Dockerfile`
 
 ```dockerfile
 # Use official Python slim image based on Debian Bookworm
 # Bookworm is required for recent LibreOffice versions
-FROM python:3.11-slim-bookworm
+FROM python:3.13-trixie
 
 # Prevent Python from writing pyc files and buffering stdout
 ENV PYTHONDONTWRITEBYTECODE=1
