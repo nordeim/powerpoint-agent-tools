@@ -38,6 +38,10 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Before meticulously executing your tools set extension sub-plan you just shared, Please meticulously review and deeply analyze the existing  `core/powerpoint_agent_core.py` and `core/__init__.py` shared in the `codebase_files_set.md` to check whether the core file needs any modification or enhancement to support all the existing and the additional tools to be added. Then meticulously update your tools set extension sub-plan. Review and update your updated sub-plan to create the 10 more tools. 
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
