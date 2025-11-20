@@ -326,4 +326,4 @@ tools/ppt_validate_presentation.py
 
 ## Programming guide for extending the above tool collection.
 
-If none of the existing tools in the above list can fulfil your needs, please create new tools as required to complete your task/workflow. Before creating any new tools, please consult the attached coding guides, `CLAUDE.md` and `Project_Analysis_and_Critique.md`, meticulously.
+If none of the existing tools in the above list can fulfil your needs, please create new tools as required to complete your task/workflow. Before creating any new tools, please consult the attached coding guides, `CLAUDE.md`, `Powerpoint_Agent_Tools_Guide.md` and `PowerPoint_Tool_Development_Guide.md`, meticulously.
