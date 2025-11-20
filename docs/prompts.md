@@ -54,6 +54,12 @@ awesome job on meticulous analysis, planning and execution! Please keep up the g
 
 ---
 
+awesome job on meticulous analysis, planning and execution! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically how best to re-imagine a programming guide for creating a new tool when necessary as the actual Powerpoint slide creation workflow demands. The to be programming guide/handboot will complement the briefing document `CLAUDE.md` which sets the right initial context. The programming guide will reference existing tools, `tools/ppt_add_slide.py`, `tools/ppt_add_text_box.py`, `tools/ppt_create_new.py` and `tools/ppt_insert_image.py`, as the template/model for adding/extending any necessary tool in future as needed. Meaning, when a human or AI developer develops new tools as needed by using and following the programming guide, the new tools should fit in with the current architecture and usage pattern. The programming guide should be comprehensive and self-sufficient, meaning no need to examine any of the original tool files or the core file.
+
+Then meticulously create an implementation plan to create the "self-sufficient" programming guide/handbook. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
