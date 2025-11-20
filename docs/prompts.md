@@ -66,6 +66,12 @@ Then meticulously create an implementation plan to create these remaining tools 
 
 ---
 
+awesome job on meticulous analysis, planning and execution! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically how best to re-imagine a Docker container environment for creating new Powerpoint slides or editing an existing one. The Docker environment will be reference/controlled with all the tools and packages loaded ready for a AI coding agent to "bash" shell into it to perform all the necessary manipulating/editing steps and to run the needed commands and tools. Think of it as a self-contained development that can be easily deployed on MS Windows, Mac OS or Linux via the `docker` or `podman` (for Linux) commands. Please create all the necessary Docker config files under the `docker/` sub-folder, and all the necessary scripts to build, run and healthcheck under the `scripts/` sub-folder.
+
+Then meticulously create an implementation plan to create the "self-sufficient" programming guide/handbook. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
