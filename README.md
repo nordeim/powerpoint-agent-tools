@@ -78,7 +78,7 @@ uv python tools/ppt_check_accessibility.py --file pitch.pptx --json
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/powerpoint-agent-tools.git
+git clone https://github.com/nordeim/powerpoint-agent-tools.git
 cd powerpoint-agent-tools
 
 # Install dependencies
