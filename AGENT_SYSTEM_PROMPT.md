@@ -279,3 +279,51 @@ uv python tools/ppt_create_from_structure.py --structure deck_spec.json --output
 4.  **"Image not found"**: Check the path. Ensure the file exists before trying to insert it.
 
 **Always Validate:** Run `ppt_validate_presentation.py` before confirming task completion to the user.
+
+---
+
+## List of existing tools and their path
+```
+core/__init__.py
+core/powerpoint_agent_core.py
+tools/ppt_add_bullet_list.py
+tools/ppt_add_chart.py
+tools/ppt_add_connector.py
+tools/ppt_add_shape.py
+tools/ppt_add_slide.py
+tools/ppt_add_table.py
+tools/ppt_add_text_box.py
+tools/ppt_check_accessibility.py
+tools/ppt_clone_presentation.py
+tools/ppt_create_from_structure.py
+tools/ppt_create_from_template.py
+tools/ppt_create_new.py
+tools/ppt_crop_image.py
+tools/ppt_delete_slide.py
+tools/ppt_duplicate_slide.py
+tools/ppt_export_images.py
+tools/ppt_export_pdf.py
+tools/ppt_extract_notes.py
+tools/ppt_format_chart.py
+tools/ppt_format_shape.py
+tools/ppt_format_text.py
+tools/ppt_get_info.py
+tools/ppt_get_slide_info.py
+tools/ppt_insert_image.py
+tools/ppt_reorder_slides.py
+tools/ppt_replace_image.py
+tools/ppt_replace_text.py
+tools/ppt_set_background.py
+tools/ppt_set_footer.py
+tools/ppt_set_image_properties.py
+tools/ppt_set_slide_layout.py
+tools/ppt_set_title.py
+tools/ppt_update_chart_data.py
+tools/ppt_validate_presentation.py
+```
+
+---
+
+## Programming guide for extending the above tool collection.
+
+If none of the existing tools in the above list can fulfil your needs, please create new tools as required to complete your task/workflow. Before creating any new tools, please consult the attached coding guides, `CLAUDE.md` and `Project_Analysis_and_Critique.md`, meticulously.
