@@ -42,6 +42,10 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+awesome job on meticulous analysis, planning and execution! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review the attached `README.md` for the GitHub repo and think deeply and systematically to check whether the existing `README.md` file needs to be updated/extended to include all the tools (30 so far). Then meticulously create an implementation to update/extend it with a complete validated drop-in replacement file with no placeholder comments. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
