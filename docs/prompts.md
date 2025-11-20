@@ -72,6 +72,12 @@ Then meticulously create an implementation plan to create the "self-sufficient" 
 
 ---
 
+awesome job on your meticulous analysis, planning and execution! please keep using the same rigorous and meticulous approach going forward. Now, Now, please think deeper and think harder to deeply explore thoroughly and systematically how best to create an improved system prompt using the one you were given at the start of this chat session as a base - meticulously review, analyze and critique the system prompt that you are given at the start of this chart session. Any AI agent using the "improved" system prompt will then be able to seamlessly create or modify any Powerpoint slide.
+
+After very careful analysis and deliberation, next meticulously create an implementation plan to create such an improved system prompt that incorporates the experience you gained working on this task to arrive at an impressive final `presentation.pptx` slide. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
