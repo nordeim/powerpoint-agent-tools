@@ -12,6 +12,7 @@ env/
 venv/
 .env
 .venv
+bin/
 
 # PowerPoint Files (Don't bake generated files into the image)
 *.pptx

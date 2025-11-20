@@ -23,8 +23,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install uv for fast package management
 #RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-COPY linux/* /usr/bin
-ENV PATH="/root/.cargo/bin:$PATH"
+# Ensure uv is available in the image before we call it
+# Copy prebuilt uv binary into /app/bin and make executable
+COPY bin/uv /app/bin/uv
+# optionally copy uvx or other helper binaries
+COPY bin/uvx /app/bin/uvx
+RUN chmod +x /app/bin/uv /app/bin/uvx
+ENV PATH="/app/bin:/root/.cargo/bin:$PATH"
 
 # Copy requirements first for caching
 COPY requirements.txt .
