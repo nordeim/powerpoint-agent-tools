@@ -22,7 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast package management
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+#RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+COPY linux/* /usr/bin
 ENV PATH="/root/.cargo/bin:$PATH"
 
 # Copy requirements first for caching
@@ -37,6 +38,9 @@ RUN uv pip install --system -r requirements.txt
 COPY . .
 
 # Set PYTHONPATH so tools can import 'core' without path hacking issues
+#ENV PYTHONPATH="${PYTHONPATH}:/app"
+# Add above ENV line (preferably before COPY . .)
+ARG PYTHONPATH=""
 ENV PYTHONPATH="${PYTHONPATH}:/app"
 
 # Default command is a shell, ready for the Agent
