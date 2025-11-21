@@ -260,9 +260,31 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   }
 }
 {
-  "status": "error",
-  "error": "Size must have at least width or height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 1,
+  "text": "Price Drop: -20%+",
+  "position": {
+    "anchor": "bottom_right",
+    "offset_x": -1.5,
+    "offset_y": -1.5
+  },
+  "size": {
+    "font-size": 18,
+    "color": "#FFFFFF",
+    "bold": true,
+    "width": "40%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 18,
+    "bold": false,
+    "italic": false,
+    "color": null,
+    "alignment": "left"
+  },
+  "slide_shape_count": 5
 }
 {
   "status": "success",
@@ -384,9 +406,28 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   "slide_shape_count": 4
 }
 {
-  "status": "error",
-  "error": "Text box must have explicit width and height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 4,
+  "text": "-24% Liquidity",
+  "position": {
+    "left": "58%",
+    "top": "35%",
+    "width": "25%"
+  },
+  "size": {
+    "width": "25%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 20,
+    "bold": true,
+    "italic": false,
+    "color": "#ED7D31",
+    "alignment": "left"
+  },
+  "slide_shape_count": 5
 }
 {
   "status": "success",
@@ -439,14 +480,51 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   "data_points": 2
 }
 {
-  "status": "error",
-  "error": "Text box must have explicit width and height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 6,
+  "text": "For the first time in seven months, net institutio...",
+  "position": {
+    "left": "15%",
+    "top": "82%",
+    "width": "70%"
+  },
+  "size": {
+    "width": "70%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 18,
+    "bold": false,
+    "italic": false,
+    "color": "#595959",
+    "alignment": "left"
+  },
+  "slide_shape_count": 4
 }
 {
-  "status": "error",
-  "error": "Size must have at least width or height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 7,
+  "text": "00,000 Support Breach",
+  "position": {
+    "left": "10%",
+    "top": "30%"
+  },
+  "size": {
+    "width": "40%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 28,
+    "bold": true,
+    "italic": false,
+    "color": "#C00000",
+    "alignment": "left"
+  },
+  "slide_shape_count": 3
 }
 {
   "status": "success",
@@ -488,9 +566,31 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   }
 }
 {
-  "status": "error",
-  "error": "Size must have at least width or height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 7,
+  "text": "EXTREME FEAR",
+  "position": {
+    "anchor": "center_right",
+    "offset_x": -4.5,
+    "offset_y": 2.5
+  },
+  "size": {
+    "font-size": 12,
+    "color": "#FFFFFF",
+    "bold": true,
+    "width": "40%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 18,
+    "bold": false,
+    "italic": false,
+    "color": null,
+    "alignment": "left"
+  },
+  "slide_shape_count": 6
 }
 {
   "status": "success",
@@ -532,9 +632,31 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   }
 }
 {
-  "status": "error",
-  "error": "Size must have at least width or height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 8,
+  "text": "Historical Pattern: Reset \u2192 Rally",
+  "position": {
+    "anchor": "bottom_right",
+    "offset_x": -1.5,
+    "offset_y": -1.5
+  },
+  "size": {
+    "font-size": 16,
+    "color": "#FFFFFF",
+    "bold": true,
+    "width": "40%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 18,
+    "bold": false,
+    "italic": false,
+    "color": null,
+    "alignment": "left"
+  },
+  "slide_shape_count": 5
 }
 {
   "status": "success",
@@ -556,9 +678,27 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   }
 }
 {
-  "status": "error",
-  "error": "Size must have at least width or height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 10,
+  "text": "Recovery Prerequisites",
+  "position": {
+    "left": "10%",
+    "top": "30%"
+  },
+  "size": {
+    "width": "40%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 24,
+    "bold": true,
+    "italic": false,
+    "color": "#0070C0",
+    "alignment": "left"
+  },
+  "slide_shape_count": 3
 }
 {
   "status": "success",
@@ -601,14 +741,54 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
   }
 }
 {
-  "status": "error",
-  "error": "Text box must have explicit width and height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 10,
+  "text": "The downturn reflects market maturation\u2014not struct...",
+  "position": {
+    "left": "20%",
+    "top": "78%",
+    "width": "60%"
+  },
+  "size": {
+    "font-size": 18,
+    "color": "#FFFFFF",
+    "bold": true,
+    "width": "60%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 18,
+    "bold": false,
+    "italic": false,
+    "color": null,
+    "alignment": "left"
+  },
+  "slide_shape_count": 6
 }
 {
-  "status": "error",
-  "error": "Size must have at least width or height",
-  "error_type": "ValueError"
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 11,
+  "text": "Primary Sources",
+  "position": {
+    "left": "10%",
+    "top": "25%"
+  },
+  "size": {
+    "width": "40%",
+    "height": "20%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 22,
+    "bold": true,
+    "italic": false,
+    "color": "#111111",
+    "alignment": "left"
+  },
+  "slide_shape_count": 3
 }
 {
   "status": "success",
@@ -633,7 +813,7 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
     "color": "#595959",
     "alignment": "left"
   },
-  "slide_shape_count": 3
+  "slide_shape_count": 4
 }
 {
   "status": "success",
