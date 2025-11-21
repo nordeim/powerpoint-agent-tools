@@ -217,7 +217,6 @@ Formatting Tips:
     
     parser.add_argument(
         '--size',
-        required=True,
         type=json.loads,
         help='Size dict (JSON string)'
     )
@@ -280,13 +279,22 @@ Formatting Tips:
             items = [item.strip() for item in items if item.strip()]
         else:
             raise ValueError("Either --items or --items-file required")
+            
+        # Handle optional size and merge from position
+        size = args.size if args.size else {}
+        position = args.position
+        
+        if "width" in position and "width" not in size:
+            size["width"] = position["width"]
+        if "height" in position and "height" not in size:
+            size["height"] = position["height"]
         
         result = add_bullet_list(
             filepath=args.file,
             slide_index=args.slide,
             items=items,
-            position=args.position,
-            size=args.size,
+            position=position,
+            size=size,
             bullet_style=args.bullet_style,
             font_size=args.font_size,
             font_name=args.font_name,
