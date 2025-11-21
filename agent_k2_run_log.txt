@@ -1,0 +1,249 @@
+$ # CONFIGURATION
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT="${SCRIPT_DIR}/bitcoin_market_report_q4_2025.pptx"
+DATA_DIR="${SCRIPT_DIR}/ppt_chart_data"
+EXPORT_DIR="${SCRIPT_DIR}/ppt_export"  # Explicit export directory path
+
+# Create required directories with explicit validation
+mkdir -p "$DATA_DIR"
+mkdir -p "$EXPORT_DIR"  # Pre-create export directory for image thumbnails
+
+# Create chart data files with absolute paths
+LIQUIDITY_DATA="${DATA_DIR}/liquidity_data.json"
+INSTITUTIONAL_DATA="${DATA_DIR}/institutional_data.json"
+
+# ============================================================================
+# STEP 1: Chart Data Preparation
+# ============================================================================
+
+cat > "$LIQUIDITY_DATA" << 'EOF'
+{
+   "categories": ["October 2025", "November 2025"],
+   "series": [
+      {
+         "name": "Market Depth ($ Millions)",
+         "values": [700, 535]
+      }
+   ]
+}
+EOF
+
+cat > "$INSTITUTIONAL_DATA" << 'EOF'
+{
+   "categories": ["Daily Average (BTC)"],
+   "series": [
+      {
+         "name": "Institutional Purchases",
+         "values": [450]
+      },
+      {
+         "name": "Daily Mined Supply",
+         "values": [900]
+      }
+   ]
+}
+, "offset_x": -1.5, "offset_y": -1.5}' --size '{"font-size": 18, "color": "#FFFFFF", "bold": true}' --jsonr": "bottom_right"
+✓ Chart data files created
+✓ Export directory validated: /home/project/powerpoint-agent-tools/ppt_export
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slides_created": 1,
+  "slide_indices": [
+    0
+  ],
+  "file_size_bytes": 28217,
+  "slide_dimensions": {
+    "width_inches": 10.0,
+    "height_inches": 7.5,
+    "aspect_ratio": "10.0:7.5"
+  },
+  "available_layouts": [
+    "Title Slide",
+    "Title and Content",
+    "Section Header",
+    "Two Content",
+    "Comparison",
+    "Title Only",
+    "Blank",
+    "Content with Caption",
+    "Picture with Caption",
+    "Title and Vertical Text",
+    "Vertical Title and Text"
+  ],
+  "layout_used": "Title Slide",
+  "template_used": null
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 1,
+  "layout": "Title and Content",
+  "title_set": "Executive Summary",
+  "total_slides": 2,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 2,
+  "layout": "Title and Content",
+  "title_set": "Key Causes of the Downturn",
+  "total_slides": 3,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 3,
+  "layout": "Title and Content",
+  "title_set": "Panic Selling & Forced Liquidations",
+  "total_slides": 4,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 4,
+  "layout": "Title and Content",
+  "title_set": "Critical Liquidity Shortage",
+  "total_slides": 5,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 5,
+  "layout": "Title and Content",
+  "title_set": "Macroeconomic Headwinds",
+  "total_slides": 6,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 6,
+  "layout": "Title and Content",
+  "title_set": "Institutional Demand Slowdown",
+  "total_slides": 7,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 7,
+  "layout": "Title and Content",
+  "title_set": "Technical Breakdown & Sentiment",
+  "total_slides": 8,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 8,
+  "layout": "Title and Content",
+  "title_set": "Seasonal & Halving Cycle Dynamics",
+  "total_slides": 9,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 9,
+  "layout": "Title and Content",
+  "title_set": "On-Chain Data Insights",
+  "total_slides": 10,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 10,
+  "layout": "Title and Content",
+  "title_set": "Conclusion & Recovery Outlook",
+  "total_slides": 11,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 11,
+  "layout": "Title and Content",
+  "title_set": "Sources & References",
+  "total_slides": 12,
+  "slide_info": {
+    "shape_count": 2,
+    "has_notes": false
+  }
+}
+✓ 12-slide structure created
+✓ Building content layers...
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 0,
+  "title": "Bitcoin Market Analysis: Navigating the Downturn",
+  "subtitle": "Q4 2025 Market Report | November 20, 2025",
+  "layout": "Title Slide",
+  "shape_count": 2
+}
+usage: ppt_add_bullet_list.py [-h] --file FILE --slide SLIDE [--items ITEMS] [--items-file ITEMS_FILE] --position POSITION
+                              --size SIZE [--bullet-style {bullet,numbered,none}] [--font-size FONT_SIZE]
+                              [--font-name FONT_NAME] [--color COLOR] [--line-spacing LINE_SPACING] [--json]
+ppt_add_bullet_list.py: error: the following arguments are required: --size
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 1,
+  "shape_type": "rectangle",
+  "position": {
+    "anchor": "bottom_right",
+    "offset_x": -2,
+    "offset_y": -2
+  },
+  "size": {
+    "width": "25%",
+    "height": "12%"
+  },
+  "styling": {
+    "fill_color": "#ED7D31",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
+{
+  "status": "error",
+  "error": "Size must have at least width or height",
+  "error_type": "ValueError"
+}
+

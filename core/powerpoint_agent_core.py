@@ -892,7 +892,6 @@ class PowerPointAgent:
             # Move to desired position
             xml_slides = self.prs.slides._sldIdLst
             xml_slides.insert(index, xml_slides[-1])
-            xml_slides.remove(xml_slides[-1])
             return index
     
     def delete_slide(self, index: int) -> None:

@@ -1,0 +1,13 @@
+{
+   "categories": ["Daily Average (BTC)"],
+   "series": [
+      {
+         "name": "Institutional Purchases",
+         "values": [450]
+      },
+      {
+         "name": "Daily Mined Supply",
+         "values": [900]
+      }
+   ]
+}
