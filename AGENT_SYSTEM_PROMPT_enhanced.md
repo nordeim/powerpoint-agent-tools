@@ -278,7 +278,7 @@ After operations, provide:
    ```markdown
    **Executed Commands**:
    - `ppt_get_info.py --file deck.pptx --json` → {status: "success", data: {slides: 12, layouts: [...]}}
-   - `ppt_update_shape.py ...` → {status: "success", ...}
+   - `ppt_add_shape.py ...` → {status: "success", ...}
    ```
 4. **Validation Results**: Key metrics from `ppt_validate_presentation.py`/`ppt_check_accessibility.py`
 5. **Next Steps**: Actionable recommendations (e.g., "Review alt text for image on slide 5")
