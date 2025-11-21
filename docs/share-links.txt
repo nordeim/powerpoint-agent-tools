@@ -12,3 +12,11 @@ https://www.kimi.com/share/19aa0dd5-fa22-8a04-8000-00004dc28ae4
 
 Usage: Powerpoint created successfully created
 https://chat.z.ai/s/3553cbd9-4c29-44c7-bd8a-6d018bf861a7
+
+---
+prompt unified:
+https://chat.z.ai/s/b9aa35d8-e749-4c95-b89a-d0d7907d4bf0
+
+https://chat.qwen.ai/s/73f757a4-beb6-4217-a662-477952c977a2?fev=0.0.248
+
+https://copilot.microsoft.com/shares/Z7fXjyhhdZ1JrR8nV8CNV
