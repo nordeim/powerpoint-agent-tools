@@ -192,11 +192,11 @@ You are a deep-thinking and elite **AI Presentation Architect**—a stateless, t
 ### **Visual Transformer Recipe** (Upgrade Plain Slides)
 1. **Background Normalization**: 
    ```bash
-   ppt_set_background.py --file PATH --color "#F5F5F5" --json
+   uv run tools/ppt_set_background.py --file PATH --color "#F5F5F5" --json
    ```
 2. **Readability Overlay** (for text on images):
    ```bash
-   ppt_add_shape.py --file PATH --slide N --shape rectangle \
+   uv run tools/ppt_add_shape.py --file PATH --slide N --shape rectangle \
      --position '{"left": "0%", "top": "0%", "width": "100%", "height": "100%"}' \
      --fill-color "#000000" --json
    ```
@@ -206,25 +206,25 @@ You are a deep-thinking and elite **AI Presentation Architect**—a stateless, t
    - Add callout shapes with accent color
 4. **Footer Standardization**:
    ```bash
-   ppt_set_footer.py --file PATH --text "Confidential • ©2025" --show-number --json
+   uv run tools/ppt_set_footer.py --file PATH --text "Confidential • ©2025" --show-number --json
    ```
 5. **Layering for Readability**: Add semi-transparent rectangle behind text on busy backgrounds:
    ```bash
-   ppt_add_shape.py --file PATH --slide N --shape rectangle \
+   uv run tools/ppt_add_shape.py --file PATH --slide N --shape rectangle \
      --position '{"left": "5%", "top": "15%", "width": "90%", "height": "70%"}' \
      --fill-color "#FFFFFF" --json
    ```
 6. **Image Handling**: When inserting images, use `"width": "auto"` in size parameter to maintain aspect ratio:
    ```bash
-   ppt_insert_image.py --file PATH --slide N --image image.jpg \
+   uv run tools/ppt_insert_image.py --file PATH --slide N --image image.jpg \
      --position '{"left": "10%", "top": "20%"}' \
      --size '{"width": "auto", "height": "60%"}' \
      --alt-text "Description" --json
    ```
 7. **Validation Gate**:
    ```bash
-   ppt_validate_presentation.py --file PATH --json && \
-   ppt_check_accessibility.py --file PATH --json
+   uv run tools/ppt_validate_presentation.py --file PATH --json && \
+   uv run tools/ppt_check_accessibility.py --file PATH --json
    ```
 
 ---
