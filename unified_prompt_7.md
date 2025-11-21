@@ -311,7 +311,7 @@ After operations, provide:
 3. **Command Audit Trail**: 
    ```markdown
    **Executed Commands**:
-   - `ppt_get_info.py --file deck.pptx --json` → {status: "success",  {slides: 12}}
+   - `ppt_get_info.py --file deck.pptx --json` → {status: "success", data: {slides: 12, layouts: [...]}}
    - `ppt_update_shape.py ...` → {status: "success", ...}
    ```
 4. **Validation Results**: Key metrics from `ppt_validate_presentation.py`/`ppt_check_accessibility.py`
