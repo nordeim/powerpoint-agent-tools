@@ -1718,8 +1718,10 @@ class PowerPointAgent:
         """
         Update existing chart data.
         
-        Note: python-pptx has limited chart update support.
-        May require chart recreation in some cases.
+        Args:
+            slide_index: Target slide
+            chart_index: Chart index on slide
+            data: New chart data dict
         """
         slide = self.get_slide(slide_index)
         
@@ -1736,11 +1738,45 @@ class PowerPointAgent:
         if not chart_shape:
             raise ValueError(f"Chart at index {chart_index} not found")
         
-        # Note: Updating chart data in python-pptx is complex
-        # This is a simplified implementation
-        # May need to recreate chart for complex updates
-        pass
-    
+        # Prepare new chart data
+        chart_data = CategoryChartData()
+        chart_data.categories = data.get("categories", [])
+        
+        for series in data.get("series", []):
+            chart_data.add_series(series["name"], series["values"])
+            
+        # Update chart data
+        # Note: replace_data is available in newer python-pptx versions
+        # and is preferred over recreation as it preserves formatting.
+        try:
+            chart_shape.chart.replace_data(chart_data)
+        except AttributeError:
+            # Fallback for older versions or if replace_data fails: Recreate chart
+            # This is a destructive operation and will lose custom formatting
+            print("WARNING: chart.replace_data failed, falling back to recreation (formatting may be lost)")
+            
+            # 1. Extract properties
+            left = chart_shape.left
+            top = chart_shape.top
+            width = chart_shape.width
+            height = chart_shape.height
+            chart_type = chart_shape.chart.chart_type
+            chart_title = chart_shape.chart.chart_title.text_frame.text if chart_shape.chart.has_title else None
+            
+            # 2. Delete existing
+            sp = chart_shape.element
+            sp.getparent().remove(sp)
+            
+            # 3. Create new
+            new_chart_shape = slide.shapes.add_chart(
+                chart_type, left, top, width, height, chart_data
+            )
+            
+            # 4. Restore basic properties
+            if chart_title:
+                new_chart_shape.chart.has_title = True
+                new_chart_shape.chart.chart_title.text_frame.text = chart_title
+
     def format_chart(
         self,
         slide_index: int,
@@ -2046,10 +2082,57 @@ class PowerPointAgent:
     
     def _copy_shape(self, source_shape, target_slide):
         """Copy shape to target slide (helper for duplicate_slide)."""
-        # Note: Shape copying is complex in python-pptx
-        # This is a simplified implementation
-        # Full implementation would need to copy all properties
-        pass
+        # Basic implementation for common shape types
+        
+        # 1. Pictures
+        if source_shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+            try:
+                blob = source_shape.image.blob
+                target_slide.shapes.add_picture(
+                    BytesIO(blob),
+                    source_shape.left, source_shape.top,
+                    source_shape.width, source_shape.height
+                )
+            except Exception as e:
+                print(f"WARNING: Failed to copy picture: {e}")
+                
+        # 2. AutoShapes (Rectangles, Ellipses, etc.) & TextBoxes
+        elif source_shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE or \
+             source_shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
+            try:
+                # Create new shape
+                new_shape = target_slide.shapes.add_shape(
+                    source_shape.auto_shape_type,
+                    source_shape.left, source_shape.top,
+                    source_shape.width, source_shape.height
+                )
+                
+                # Copy text
+                if source_shape.has_text_frame and source_shape.text:
+                    new_shape.text_frame.text = source_shape.text_frame.text
+                    # Note: This loses run-level formatting. 
+                    # A full implementation would iterate paragraphs/runs.
+                
+                # Copy fill (basic)
+                try:
+                    if source_shape.fill.type == 1: # Solid fill
+                        new_shape.fill.solid()
+                        new_shape.fill.fore_color.rgb = source_shape.fill.fore_color.rgb
+                except:
+                    pass
+                    
+            except Exception as e:
+                print(f"WARNING: Failed to copy shape: {e}")
+        
+        # 3. Charts (Complex - Try to recreate if possible, else skip)
+        elif source_shape.shape_type == MSO_SHAPE_TYPE.CHART:
+            # Cloning charts is very hard in python-pptx without low-level XML
+            # For now, we skip to avoid errors
+            print("WARNING: Chart copying not supported in duplicate_slide")
+            
+        else:
+            # Try generic copy for other shapes if possible, or skip
+            pass
     
     def __enter__(self):
         return self
