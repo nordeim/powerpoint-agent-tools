@@ -270,7 +270,6 @@ Chart Selection Guide:
     
     parser.add_argument(
         '--size',
-        required=True,
         type=json.loads,
         help='Size dict (JSON string)'
     )
@@ -299,14 +298,23 @@ Chart Selection Guide:
             data = json.loads(args.data_string)
         else:
             raise ValueError("Either --data or --data-string required")
+            
+        # Handle optional size and merge from position
+        size = args.size if args.size else {}
+        position = args.position
+        
+        if "width" in position and "width" not in size:
+            size["width"] = position["width"]
+        if "height" in position and "height" not in size:
+            size["height"] = position["height"]
         
         result = add_chart(
             filepath=args.file,
             slide_index=args.slide,
             chart_type=args.chart_type,
             data=data,
-            position=args.position,
-            size=args.size,
+            position=position,
+            size=size,
             chart_title=args.title
         )
         

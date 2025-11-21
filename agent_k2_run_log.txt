@@ -42,7 +42,7 @@ cat > "$INSTITUTIONAL_DATA" << 'EOF'
       }
    ]
 }
-, "offset_x": -1.5, "offset_y": -1.5}' --size '{"font-size": 18, "color": "#FFFFFF", "bold": true}' --jsonr": "bottom_right"
+echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==10%", "top": "35%", "width": "80%", "height": 
 ✓ Chart data files created
 ✓ Export directory validated: /home/project/powerpoint-agent-tools/ppt_export
 {
@@ -217,10 +217,28 @@ cat > "$INSTITUTIONAL_DATA" << 'EOF'
   "layout": "Title Slide",
   "shape_count": 2
 }
-usage: ppt_add_bullet_list.py [-h] --file FILE --slide SLIDE [--items ITEMS] [--items-file ITEMS_FILE] --position POSITION
-                              --size SIZE [--bullet-style {bullet,numbered,none}] [--font-size FONT_SIZE]
-                              [--font-name FONT_NAME] [--color COLOR] [--line-spacing LINE_SPACING] [--json]
-ppt_add_bullet_list.py: error: the following arguments are required: --size
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 1,
+  "items_added": 7,
+  "items": [
+    "Bitcoin corrected from >20",
+    "000 to <5",
+    "000 in November 2025",
+    "Macroeconomic pressures and liquidity crunch drove >20% decline",
+    "Rare institutional buying slowdown vs. daily mined supply",
+    "Technical breach of 00K support triggered panic cascade",
+    "Recovery depends on risk sentiment stabilization and renewed inflows"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -246,4 +264,315 @@ ppt_add_bullet_list.py: error: the following arguments are required: --size
   "error": "Size must have at least width or height",
   "error_type": "ValueError"
 }
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 2,
+  "items_added": 5,
+  "items": [
+    "Panic Selling by Short-Term Holders",
+    "Critical Liquidity Crunch",
+    "Macroeconomic Uncertainty",
+    "Institutional Buying Slowdown",
+    "Technical Breakdown & Sentiment Shifts"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 22,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
+                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
+                           [--alignment {left,center,right,justify}] [--json]
+ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 3,
+  "items_added": 4,
+  "items": [
+    "Short-term holders accelerated selling at a loss",
+    "Forced liquidations cascaded through derivatives markets",
+    "Long-term holders took minimal profits\u2014no bear market distribution",
+    "Deleveraging cleared speculative positions from the system"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 3,
+  "shape_type": "arrow_down",
+  "position": {
+    "anchor": "top_right",
+    "offset_x": -3,
+    "offset_y": 3
+  },
+  "size": {
+    "width": "8%",
+    "height": "15%"
+  },
+  "styling": {
+    "fill_color": "#C00000",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
+usage: ppt_add_chart.py [-h] --file FILE --slide SLIDE --chart-type
+                        {column,column_stacked,bar,bar_stacked,line,line_markers,pie,area,scatter} [--data DATA]
+                        [--data-string DATA_STRING] --position POSITION --size SIZE [--title TITLE] [--json]
+ppt_add_chart.py: error: the following arguments are required: --size
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 4,
+  "text": "Market depth fell from 00M+ to ~35M, creating extr...",
+  "position": {
+    "left": "58%",
+    "top": "40%",
+    "width": "35%",
+    "height": "35%"
+  },
+  "size": {
+    "width": "35%",
+    "height": "35%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 18,
+    "bold": false,
+    "italic": false,
+    "color": "#595959",
+    "alignment": "left"
+  },
+  "slide_shape_count": 3
+}
+usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
+                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
+                           [--alignment {left,center,right,justify}] [--json]
+ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 5,
+  "items_added": 4,
+  "items": [
+    "Federal Reserve caution on interest rate cuts rattled risk assets",
+    "Inflation resilience and USD strength pressured Bitcoin",
+    "US-China trade war fears suppressed global risk appetite",
+    "Capital flight from high-risk markets accelerated"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+usage: ppt_add_shape.py [-h] --file FILE --slide SLIDE --shape
+                        {rectangle,rounded_rectangle,ellipse,triangle,arrow_right,arrow_left,arrow_up,arrow_down,star,heart}
+                        --position POSITION --size SIZE [--fill-color FILL_COLOR] [--line-color LINE_COLOR]
+                        [--line-width LINE_WIDTH] [--json]
+ppt_add_shape.py: error: the following arguments are required: --size
+usage: ppt_add_chart.py [-h] --file FILE --slide SLIDE --chart-type
+                        {column,column_stacked,bar,bar_stacked,line,line_markers,pie,area,scatter} [--data DATA]
+                        [--data-string DATA_STRING] --position POSITION --size SIZE [--title TITLE] [--json]
+ppt_add_chart.py: error: the following arguments are required: --size
+{
+  "status": "error",
+  "error": "Text box must have explicit width and height",
+  "error_type": "ValueError"
+}
+usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
+                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
+                           [--alignment {left,center,right,justify}] [--json]
+ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 7,
+  "items_added": 4,
+  "items": [
+    "Psychological 00K level failure triggered retail panic",
+    "Options traders positioned for further downside",
+    "Market sentiment: Extreme Fear",
+    "Many holders now underwater on cost basis"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 7,
+  "shape_type": "rectangle",
+  "position": {
+    "anchor": "center_right",
+    "offset_x": -5,
+    "offset_y": 2
+  },
+  "size": {
+    "width": "15%",
+    "height": "8%"
+  },
+  "styling": {
+    "fill_color": "#C00000",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
+{
+  "status": "error",
+  "error": "Size must have at least width or height",
+  "error_type": "ValueError"
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 8,
+  "items_added": 4,
+  "items": [
+    "November historically Bitcoin's strongest month",
+    "Post-halving volatility patterns show mid-cycle dips",
+    "Current correction may be healthy position clearing",
+    "Consolidation phase likely before potential rebound"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 8,
+  "shape_type": "rectangle",
+  "position": {
+    "anchor": "bottom_right",
+    "offset_x": -2,
+    "offset_y": -2
+  },
+  "size": {
+    "width": "30%",
+    "height": "12%"
+  },
+  "styling": {
+    "fill_color": "#70AD47",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
+{
+  "status": "error",
+  "error": "Size must have at least width or height",
+  "error_type": "ValueError"
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 9,
+  "items_added": 4,
+  "items": [
+    "Coins moving from long-dormant wallets to exchanges",
+    "Indicates capitulation by weaker hands\u2014not institutional exodus",
+    "ETF inflows from traditional finance have slowed significantly",
+    "Selling pressure concentrated in short-term holder cohort"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
+                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
+                           [--alignment {left,center,right,justify}] [--json]
+ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 10,
+  "items_added": 4,
+  "items": [
+    "Stabilization of global risk sentiment",
+    "Renewed institutional capital inflows",
+    "Macroeconomic policy clarity from Fed",
+    "Absorption of current supply overhang"
+  ],
+  "bullet_style": "bullet",
+  "formatting": {
+    "font_size": 20,
+    "font_name": "Calibri",
+    "color": "#111111",
+    "line_spacing": 1.0
+  }
+}
+usage: ppt_add_shape.py [-h] --file FILE --slide SLIDE --shape
+                        {rectangle,rounded_rectangle,ellipse,triangle,arrow_right,arrow_left,arrow_up,arrow_down,star,heart}
+                        --position POSITION --size SIZE [--fill-color FILL_COLOR] [--line-color LINE_COLOR]
+                        [--line-width LINE_WIDTH] [--json]
+ppt_add_shape.py: error: the following arguments are required: --size
+{
+  "status": "error",
+  "error": "Text box must have explicit width and height",
+  "error_type": "ValueError"
+}
+usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
+                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
+                           [--alignment {left,center,right,justify}] [--json]
+ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 11,
+  "text": "Yahoo Finance: Real Reason Behind Bitcoin's Drop\\n...",
+  "position": {
+    "left": "10%",
+    "top": "35%",
+    "width": "80%",
+    "height": "50%"
+  },
+  "size": {
+    "width": "80%",
+    "height": "50%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 12,
+    "bold": false,
+    "italic": false,
+    "color": "#595959",
+    "alignment": "left"
+  },
+  "slide_shape_count": 3
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slides_affected": 12,
+  "type": "color"
+}
+usage: ppt_set_footer.py [-h] --file FILE [--text TEXT] [--show-number] [--show-date] [--json]
+ppt_set_footer.py: error: unrecognized arguments: true false
+✓ Design standards applied
 

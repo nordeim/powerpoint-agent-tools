@@ -73,18 +73,24 @@ def main():
     parser = argparse.ArgumentParser(description="Set PowerPoint footer")
     parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
     parser.add_argument('--text', help='Footer text')
-    parser.add_argument('--show-number', action='store_true', help='Show slide number')
-    parser.add_argument('--show-date', action='store_true', help='Show date')
+    parser.add_argument('--show-number', nargs='?', const='true', default='false', help='Show slide number (optional: true/false)')
+    parser.add_argument('--show-date', nargs='?', const='true', default='false', help='Show date (optional: true/false)')
     parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
     
     args = parser.parse_args()
     
     try:
+        # Helper to parse boolean string/flag
+        def parse_bool(val):
+            if isinstance(val, bool): return val
+            if val is None: return False
+            return str(val).lower() in ('true', 'yes', '1', 'on')
+
         result = set_footer(
             filepath=args.file, 
             text=args.text, 
-            show_number=args.show_number,
-            show_date=args.show_date
+            show_number=parse_bool(args.show_number),
+            show_date=parse_bool(args.show_date)
         )
         print(json.dumps(result, indent=2))
         sys.exit(0)

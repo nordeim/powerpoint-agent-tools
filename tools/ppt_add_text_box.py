@@ -227,14 +227,18 @@ Tips:
     
     parser.add_argument(
         '--bold',
-        action='store_true',
-        help='Bold text'
+        nargs='?',
+        const='true',
+        default='false',
+        help='Bold text (optional: true/false)'
     )
     
     parser.add_argument(
         '--italic',
-        action='store_true',
-        help='Italic text'
+        nargs='?',
+        const='true',
+        default='false',
+        help='Italic text (optional: true/false)'
     )
     
     parser.add_argument(
@@ -267,6 +271,12 @@ Tips:
         if "height" in position and "height" not in size:
             size["height"] = position["height"]
             
+        # Helper to parse boolean string/flag
+        def parse_bool(val):
+            if isinstance(val, bool): return val
+            if val is None: return False
+            return str(val).lower() in ('true', 'yes', '1', 'on')
+
         result = add_text_box(
             filepath=args.file,
             slide_index=args.slide,
@@ -275,8 +285,8 @@ Tips:
             size=size,
             font_name=args.font_name,
             font_size=args.font_size,
-            bold=args.bold,
-            italic=args.italic,
+            bold=parse_bool(args.bold),
+            italic=parse_bool(args.italic),
             color=args.color,
             alignment=args.alignment
         )
