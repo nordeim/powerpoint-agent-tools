@@ -1179,7 +1179,20 @@ class PowerPointAgent:
                 paragraph.font.color.rgb = ColorHelper.from_hex(color)
     
     def replace_text(self, find: str, replace: str, match_case: bool = False) -> int:
-        """Find and replace text - ultra-simple version."""
+        """
+        Find and replace text across entire presentation.
+        
+        Attempts to preserve formatting by replacing within text runs first.
+        Falls back to shape-level replacement if text is split across runs.
+        
+        Args:
+            find: Text to find
+            replace: Replacement text
+            match_case: Case-sensitive search
+            
+        Returns:
+            Number of replacements made
+        """
         if not self.prs:
             raise PowerPointAgentError("No presentation loaded")
         
@@ -1187,29 +1200,66 @@ class PowerPointAgent:
         
         for slide in self.prs.slides:
             for shape in slide.shapes:
+                # Skip shapes that definitely don't have text
+                if not shape.has_text_frame:
+                    continue
+                
                 try:
-                    # Try to get text - if it fails, skip this shape
-                    old_text = shape.text
-                except (AttributeError, Exception):
+                    text_frame = shape.text_frame
+                except Exception:
                     continue
                 
-                # Skip empty text
-                if not old_text:
+                # Strategy 1: Try to replace in individual runs (Preserves Formatting)
+                replacements_in_runs = 0
+                for paragraph in text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        # Check match based on case sensitivity
+                        if match_case:
+                            if find in run.text:
+                                run.text = run.text.replace(find, replace)
+                                replacements_in_runs += 1
+                        else:
+                            if find.lower() in run.text.lower():
+                                pattern = re.compile(re.escape(find), re.IGNORECASE)
+                                # Check if it actually changes anything
+                                if pattern.search(run.text):
+                                    new_text = pattern.sub(replace, run.text)
+                                    run.text = new_text
+                                    replacements_in_runs += 1
+                
+                if replacements_in_runs > 0:
+                    count += replacements_in_runs
                     continue
                 
-                # Replace based on case sensitivity
-                if match_case:
-                    if find in old_text:
-                        new_text = old_text.replace(find, replace)
-                        shape.text = new_text
-                        count += old_text.count(find)
-                else:
-                    if find.lower() in old_text.lower():
-                        pattern = re.compile(re.escape(find), re.IGNORECASE)
-                        matches = re.findall(pattern, old_text)
-                        new_text = pattern.sub(replace, old_text)
-                        shape.text = new_text
-                        count += len(matches)
+                # Strategy 2: Fallback to Shape-level replacement (May lose formatting)
+                # Only if we didn't find it in runs, but it might exist across runs
+                try:
+                    full_text = shape.text
+                    if not full_text:
+                        continue
+                        
+                    should_replace = False
+                    if match_case:
+                        if find in full_text:
+                            should_replace = True
+                    else:
+                        if find.lower() in full_text.lower():
+                            should_replace = True
+                    
+                    if should_replace:
+                        # This is destructive to formatting, but ensures replacement happens
+                        if match_case:
+                            new_text = full_text.replace(find, replace)
+                            shape.text = new_text
+                            count += full_text.count(find)
+                        else:
+                            pattern = re.compile(re.escape(find), re.IGNORECASE)
+                            matches = re.findall(pattern, full_text)
+                            new_text = pattern.sub(replace, full_text)
+                            shape.text = new_text
+                            count += len(matches)
+                except Exception:
+                    continue
         
         return count
 
