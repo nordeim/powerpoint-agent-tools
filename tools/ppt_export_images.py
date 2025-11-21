@@ -97,30 +97,29 @@ def export_images(
     # or presentation_01.png, presentation_02.png for multiple pages
     base_name = filepath.stem
     
-    # Find exported images
+    # Find exported images using a robust pattern match
+    # LibreOffice naming can vary (e.g. file.png, file_01.png, file_1.png)
+    candidates = sorted(output_dir.glob(f"{base_name}*.{format_ext}"))
+    
     exported_files = []
     
-    # Check for single file (1 slide)
-    single_file = output_dir / f"{base_name}.{format_ext}"
-    if single_file.exists() and slide_count == 1:
-        # Rename to include slide number
-        new_name = output_dir / f"{prefix}001.{format_ext}"
-        single_file.rename(new_name)
-        exported_files.append(new_name)
-    else:
-        # Check for multiple files
-        for i in range(1, slide_count + 1):
-            # LibreOffice uses _01, _02, etc. format
-            old_file = output_dir / f"{base_name}_{i:02d}.{format_ext}"
-            
-            if old_file.exists():
-                # Rename with custom prefix
-                new_file = output_dir / f"{prefix}{i:03d}.{format_ext}"
-                if old_file != new_file:
-                    if new_file.exists():
-                        new_file.unlink()
-                    old_file.rename(new_file)
-                exported_files.append(new_file)
+    if not candidates:
+        # Try without base_name prefix just in case (unlikely but possible if LO behaves weirdly)
+        pass
+    
+    # Rename found files sequentially
+    for i, old_file in enumerate(candidates):
+        new_file = output_dir / f"{prefix}{i+1:03d}.{format_ext}"
+        
+        # Handle case where source and dest are same (e.g. prefix is same as original name start)
+        if old_file != new_file:
+            # If target exists (from previous run), remove it to avoid collision/confusion
+            if new_file.exists():
+                new_file.unlink()
+            old_file.rename(new_file)
+            exported_files.append(new_file)
+        else:
+            exported_files.append(old_file)
     
     if len(exported_files) == 0:
         raise PowerPointAgentError(
