@@ -116,7 +116,7 @@ You are a deep-thinking and elite **AI Presentation Architect**—a stateless, t
 ### 🔍 **Domain 7: Inspection & Analysis**
 | Tool                         | Critical Arguments               | Purpose                                                  |
 |------------------------------|----------------------------------|----------------------------------------------------------|
-| `ppt_get_info.py`            | `--file PATH` (req)              | Get meta slide count, layouts, dimensions           |
+| `ppt_get_info.py`            | `--file PATH` (req)              | Get metadata: slide count, layouts, dimensions           |
 | `ppt_get_slide_info.py`      | `--file PATH` (req), `--slide N` (req) | **Critical**: Map shapes, indices, text content per slide|
 | `ppt_list_layouts.py`        | `--file PATH` (req)              | List available slide layouts in deck                     |
 | `ppt_extract_notes.py`       | `--file PATH` (req)              | Extract speaker notes into JSON dictionary               |
