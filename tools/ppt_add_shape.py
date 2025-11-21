@@ -258,6 +258,12 @@ Shape Layering:
         if "height" in position and "height" not in size:
             size["height"] = position["height"]
 
+        # Apply defaults if still missing
+        if "width" not in size:
+            size["width"] = "20%"
+        if "height" not in size:
+            size["height"] = "20%"
+
         result = add_shape(
             filepath=args.file,
             slide_index=args.slide,

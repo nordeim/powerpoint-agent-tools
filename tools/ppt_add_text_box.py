@@ -271,6 +271,12 @@ Tips:
         if "height" in position and "height" not in size:
             size["height"] = position["height"]
             
+        # Apply defaults if still missing
+        if "width" not in size:
+            size["width"] = "40%"
+        if "height" not in size:
+            size["height"] = "20%"
+            
         # Helper to parse boolean string/flag
         def parse_bool(val):
             if isinstance(val, bool): return val

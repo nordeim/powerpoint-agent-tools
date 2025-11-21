@@ -284,10 +284,31 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
     "line_spacing": 1.0
   }
 }
-usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
-                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
-                           [--alignment {left,center,right,justify}] [--json]
-ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 3,
+  "text": "Price Range: 20,000 \u2192 5,000",
+  "position": {
+    "left": "10%",
+    "top": "30%",
+    "width": "80%",
+    "height": "10%"
+  },
+  "size": {
+    "width": "80%",
+    "height": "10%"
+  },
+  "formatting": {
+    "font_name": "Calibri",
+    "font_size": 24,
+    "bold": true,
+    "italic": false,
+    "color": "#0070C0",
+    "alignment": "left"
+  },
+  "slide_shape_count": 3
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -327,10 +348,16 @@ ppt_add_text_box.py: error: unrecognized arguments: true
     "line_width": 1.0
   }
 }
-usage: ppt_add_chart.py [-h] --file FILE --slide SLIDE --chart-type
-                        {column,column_stacked,bar,bar_stacked,line,line_markers,pie,area,scatter} [--data DATA]
-                        [--data-string DATA_STRING] --position POSITION --size SIZE [--title TITLE] [--json]
-ppt_add_chart.py: error: the following arguments are required: --size
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 4,
+  "chart_type": "column",
+  "chart_title": "Market Depth Collapse",
+  "categories": 2,
+  "series": 1,
+  "data_points": 2
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -354,12 +381,13 @@ ppt_add_chart.py: error: the following arguments are required: --size
     "color": "#595959",
     "alignment": "left"
   },
-  "slide_shape_count": 3
+  "slide_shape_count": 4
 }
-usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
-                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
-                           [--alignment {left,center,right,justify}] [--json]
-ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "error",
+  "error": "Text box must have explicit width and height",
+  "error_type": "ValueError"
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -379,24 +407,47 @@ ppt_add_text_box.py: error: unrecognized arguments: true
     "line_spacing": 1.0
   }
 }
-usage: ppt_add_shape.py [-h] --file FILE --slide SLIDE --shape
-                        {rectangle,rounded_rectangle,ellipse,triangle,arrow_right,arrow_left,arrow_up,arrow_down,star,heart}
-                        --position POSITION --size SIZE [--fill-color FILL_COLOR] [--line-color LINE_COLOR]
-                        [--line-width LINE_WIDTH] [--json]
-ppt_add_shape.py: error: the following arguments are required: --size
-usage: ppt_add_chart.py [-h] --file FILE --slide SLIDE --chart-type
-                        {column,column_stacked,bar,bar_stacked,line,line_markers,pie,area,scatter} [--data DATA]
-                        [--data-string DATA_STRING] --position POSITION --size SIZE [--title TITLE] [--json]
-ppt_add_chart.py: error: the following arguments are required: --size
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 5,
+  "shape_type": "rectangle",
+  "position": {
+    "left": "5%",
+    "top": "25%",
+    "width": "90%",
+    "height": "60%"
+  },
+  "size": {
+    "width": "90%",
+    "height": "60%"
+  },
+  "styling": {
+    "fill_color": "#F5F5F5",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 6,
+  "chart_type": "bar",
+  "chart_title": "Institutional Demand vs. Supply",
+  "categories": 1,
+  "series": 2,
+  "data_points": 2
+}
 {
   "status": "error",
   "error": "Text box must have explicit width and height",
   "error_type": "ValueError"
 }
-usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
-                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
-                           [--alignment {left,center,right,justify}] [--json]
-ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "error",
+  "error": "Size must have at least width or height",
+  "error_type": "ValueError"
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -504,10 +555,11 @@ ppt_add_text_box.py: error: unrecognized arguments: true
     "line_spacing": 1.0
   }
 }
-usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
-                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
-                           [--alignment {left,center,right,justify}] [--json]
-ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "error",
+  "error": "Size must have at least width or height",
+  "error_type": "ValueError"
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -527,20 +579,37 @@ ppt_add_text_box.py: error: unrecognized arguments: true
     "line_spacing": 1.0
   }
 }
-usage: ppt_add_shape.py [-h] --file FILE --slide SLIDE --shape
-                        {rectangle,rounded_rectangle,ellipse,triangle,arrow_right,arrow_left,arrow_up,arrow_down,star,heart}
-                        --position POSITION --size SIZE [--fill-color FILL_COLOR] [--line-color LINE_COLOR]
-                        [--line-width LINE_WIDTH] [--json]
-ppt_add_shape.py: error: the following arguments are required: --size
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "slide_index": 10,
+  "shape_type": "rectangle",
+  "position": {
+    "left": "15%",
+    "top": "75%",
+    "width": "70%",
+    "height": "10%"
+  },
+  "size": {
+    "width": "70%",
+    "height": "10%"
+  },
+  "styling": {
+    "fill_color": "#2A9D8F",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
 {
   "status": "error",
   "error": "Text box must have explicit width and height",
   "error_type": "ValueError"
 }
-usage: ppt_add_text_box.py [-h] --file FILE --slide SLIDE --text TEXT --position POSITION [--size SIZE]
-                           [--font-name FONT_NAME] [--font-size FONT_SIZE] [--bold] [--italic] [--color COLOR]
-                           [--alignment {left,center,right,justify}] [--json]
-ppt_add_text_box.py: error: unrecognized arguments: true
+{
+  "status": "error",
+  "error": "Size must have at least width or height",
+  "error_type": "ValueError"
+}
 {
   "status": "success",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
@@ -572,7 +641,15 @@ ppt_add_text_box.py: error: unrecognized arguments: true
   "slides_affected": 12,
   "type": "color"
 }
-usage: ppt_set_footer.py [-h] --file FILE [--text TEXT] [--show-number] [--show-date] [--json]
-ppt_set_footer.py: error: unrecognized arguments: true false
+{
+  "status": "success",
+  "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "footer_text": "Confidential \u2022 Q4 2025 Bitcoin Analysis",
+  "settings": {
+    "show_number": true,
+    "show_date": false
+  },
+  "slides_updated": 0
+}
 ✓ Design standards applied
 

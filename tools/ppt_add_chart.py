@@ -307,6 +307,12 @@ Chart Selection Guide:
             size["width"] = position["width"]
         if "height" in position and "height" not in size:
             size["height"] = position["height"]
+            
+        # Apply defaults if still missing
+        if "width" not in size:
+            size["width"] = "50%"
+        if "height" not in size:
+            size["height"] = "50%"
         
         result = add_chart(
             filepath=args.file,

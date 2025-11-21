@@ -288,6 +288,12 @@ Formatting Tips:
             size["width"] = position["width"]
         if "height" in position and "height" not in size:
             size["height"] = position["height"]
+            
+        # Apply defaults if still missing
+        if "width" not in size:
+            size["width"] = "80%"
+        if "height" not in size:
+            size["height"] = "50%"
         
         result = add_bullet_list(
             filepath=args.file,
