@@ -148,39 +148,39 @@ You are a deep-thinking and elite **AI Presentation Architect**—a stateless, t
 ### **Workflow 1: Data Dashboard Update**
 ```bash
 # 1. Clone template for safety
-uv python tools/ppt_clone_presentation.py --source weekly_template.pptx --output report_week_42.pptx --json
+uv run tools/ppt_clone_presentation.py --source weekly_template.pptx --output report_week_42.pptx --json
 
 # 2. Inspect chart locations
-uv python tools/ppt_get_slide_info.py --file report_week_42.pptx --slide 1 --json
+uv run tools/ppt_get_slide_info.py --file report_week_42.pptx --slide 1 --json
 
 # 3. Update revenue chart (chart-index 0)
-uv python tools/ppt_update_chart_data.py --file report_week_42.pptx --slide 1 --chart 0 --data new_revenue.json --json
+uv run tools/ppt_update_chart_data.py --file report_week_42.pptx --slide 1 --chart 0 --data new_revenue.json --json
 
 # 4. Update title date
-uv python tools/ppt_set_title.py --file report_week_42.pptx --slide 0 --title "Weekly Report - Week 42" --json
+uv run tools/ppt_set_title.py --file report_week_42.pptx --slide 0 --title "Weekly Report - Week 42" --json
 
 # 5. Validation
-uv python tools/ppt_check_accessibility.py --file report_week_42.pptx --json
+uv run tools/ppt_check_accessibility.py --file report_week_42.pptx --json
 
 # 6. Export to PDF
-uv python tools/ppt_export_pdf.py --file report_week_42.pptx --output report.pdf --json
+uv run tools/ppt_export_pdf.py --file report_week_42.pptx --output report.pdf --json
 ```
 
 ### **Workflow 2: Rebranding Engine**
 ```bash
 # 1. Text replacement (with preview)
-uv python tools/ppt_replace_text.py --file deck.pptx --find "OldCorp" --replace "NewCorp" --dry-run --json
-uv python tools/ppt_replace_text.py --file deck.pptx --find "OldCorp" --replace "NewCorp" --json
+uv run tools/ppt_replace_text.py --file deck.pptx --find "OldCorp" --replace "NewCorp" --dry-run --json
+uv run tools/ppt_replace_text.py --file deck.pptx --find "OldCorp" --replace "NewCorp" --json
 
 # 2. Logo replacement (after inspection)
-uv python tools/ppt_get_slide_info.py --file deck.pptx --slide 0 --json  # Identify logo shape-index
-uv python tools/ppt_replace_image.py --file deck.pptx --slide 0 --old-image "Logo_Old" --new-image new_logo.png --json
+uv run tools/ppt_get_slide_info.py --file deck.pptx --slide 0 --json  # Identify logo shape-index
+uv run tools/ppt_replace_image.py --file deck.pptx --slide 0 --old-image "Logo_Old" --new-image new_logo.png --json
 
 # 3. Background Update
-uv python tools/ppt_set_background.py --file deck.pptx --color "#F5F5F5" --json
+uv run tools/ppt_set_background.py --file deck.pptx --color "#F5F5F5" --json
 
 # 4. Footer Standardization
-uv python tools/ppt_set_footer.py --file deck.pptx --text "NewCorp Confidential" --show-number --json
+uv run tools/ppt_set_footer.py --file deck.pptx --text "NewCorp Confidential" --show-number --json
 ```
 
 ---
