@@ -2821,6 +2821,99 @@ if __name__ == "__main__":
 
 ```
 
+# tools/ppt_add_connector.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Add Connector Tool
+Draw a line between two shapes
+
+Usage:
+    uv python ppt_add_connector.py --file deck.pptx --slide 0 --from-shape 0 --to-shape 1 --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def add_connector(
+    filepath: Path,
+    slide_index: int,
+    from_shape: int,
+    to_shape: int,
+    connector_type: str = "straight"
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= slide_index < total:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            
+        agent.add_connector(
+            slide_index=slide_index,
+            from_shape=from_shape,
+            to_shape=to_shape,
+            connector_type=connector_type
+        )
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "connection": {
+            "from": from_shape,
+            "to": to_shape,
+            "type": connector_type
+        }
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Add connector between shapes")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
+    parser.add_argument('--from-shape', required=True, type=int, help='Start shape index')
+    parser.add_argument('--to-shape', required=True, type=int, help='End shape index')
+    parser.add_argument('--type', default='straight', help='Connector type (straight)')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = add_connector(
+            filepath=args.file,
+            slide_index=args.slide,
+            from_shape=args.from_shape,
+            to_shape=args.to_shape,
+            connector_type=args.type
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
 # tools/ppt_add_shape.py
 ```py
 #!/usr/bin/env python3
@@ -3991,6 +4084,156 @@ if __name__ == "__main__":
 
 ```
 
+# tools/ppt_check_accessibility.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Check Accessibility Tool
+Run WCAG 2.1 accessibility checks on presentation
+
+Usage:
+    uv python ppt_check_accessibility.py --file presentation.pptx --json
+
+Exit Codes:
+    0: Success (even if issues found - check 'status')
+    1: Error occurred (file not found, etc)
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError
+)
+
+
+def check_accessibility(filepath: Path) -> Dict[str, Any]:
+    """Run accessibility checks."""
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath, acquire_lock=False)  # Read-only check
+        result = agent.check_accessibility()
+        result["file"] = str(filepath)
+    
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check PowerPoint accessibility (WCAG 2.1)",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file path'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        default=True,
+        help='Output JSON response (default)'
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        result = check_accessibility(filepath=args.file)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+        
+    except Exception as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+        print(json.dumps(error_result, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_clone_presentation.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Clone Presentation Tool
+Create an exact copy of a presentation
+
+Usage:
+    uv python ppt_clone_presentation.py --source base.pptx --output new_deck.pptx --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import PowerPointAgent
+
+
+def clone_presentation(source: Path, output: Path) -> Dict[str, Any]:
+    
+    if not source.exists():
+        raise FileNotFoundError(f"Source file not found: {source}")
+    
+    # Validate output path
+    if not output.suffix.lower() == '.pptx':
+        output = output.with_suffix('.pptx')
+
+    # Uses agent to open and save-as, effectively cloning
+    with PowerPointAgent(source) as agent:
+        agent.open(source, acquire_lock=False) # Read-only open
+        agent.save(output)
+        
+    return {
+        "status": "success",
+        "source": str(source),
+        "output": str(output),
+        "size_bytes": output.stat().st_size
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Clone PowerPoint presentation")
+    parser.add_argument('--source', required=True, type=Path, help='Source file')
+    parser.add_argument('--output', required=True, type=Path, help='Destination file')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = clone_presentation(source=args.source, output=args.output)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
 # tools/ppt_create_from_structure.py
 ```py
 #!/usr/bin/env python3
@@ -4879,6 +5122,265 @@ if __name__ == "__main__":
 
 ```
 
+# tools/ppt_crop_image.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Crop Image Tool
+Crop an existing image on a slide
+
+Usage:
+    uv python ppt_crop_image.py --file deck.pptx --slide 0 --shape 1 --left 0.1 --right 0.1 --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+
+def crop_image(
+    filepath: Path,
+    slide_index: int,
+    shape_index: int,
+    left: float = 0.0,
+    right: float = 0.0,
+    top: float = 0.0,
+    bottom: float = 0.0
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+        
+    if not (0.0 <= left <= 1.0 and 0.0 <= right <= 1.0 and 0.0 <= top <= 1.0 and 0.0 <= bottom <= 1.0):
+        raise ValueError("Crop values must be between 0.0 and 1.0")
+
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= slide_index < total:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            
+        slide = agent.prs.slides[slide_index]
+        
+        if not 0 <= shape_index < len(slide.shapes):
+             raise ValueError(f"Shape index {shape_index} out of range")
+             
+        shape = slide.shapes[shape_index]
+        
+        if shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+            raise ValueError(f"Shape {shape_index} is not a picture")
+            
+        # Apply crop
+        # python-pptx handles crop as a percentage of original size trimmed from edges
+        if left > 0: shape.crop_left = left
+        if right > 0: shape.crop_right = right
+        if top > 0: shape.crop_top = top
+        if bottom > 0: shape.crop_bottom = bottom
+        
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "shape_index": shape_index,
+        "crop_applied": {
+            "left": left,
+            "right": right,
+            "top": top,
+            "bottom": bottom
+        }
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description="Crop PowerPoint image")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
+    parser.add_argument('--shape', required=True, type=int, help='Shape index (0-based)')
+    parser.add_argument('--left', type=float, default=0.0, help='Crop from left (0.0-1.0)')
+    parser.add_argument('--right', type=float, default=0.0, help='Crop from right (0.0-1.0)')
+    parser.add_argument('--top', type=float, default=0.0, help='Crop from top (0.0-1.0)')
+    parser.add_argument('--bottom', type=float, default=0.0, help='Crop from bottom (0.0-1.0)')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = crop_image(
+            filepath=args.file, 
+            slide_index=args.slide, 
+            shape_index=args.shape,
+            left=args.left,
+            right=args.right,
+            top=args.top,
+            bottom=args.bottom
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_delete_slide.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Delete Slide Tool
+Remove a slide from the presentation
+
+Usage:
+    uv python ppt_delete_slide.py --file presentation.pptx --index 1 --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def delete_slide(filepath: Path, index: int) -> Dict[str, Any]:
+    """Delete slide at index."""
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total_slides = agent.get_slide_count()
+        if not 0 <= index < total_slides:
+            raise SlideNotFoundError(f"Index {index} out of range (0-{total_slides-1})")
+            
+        agent.delete_slide(index)
+        agent.save()
+        
+        new_count = agent.get_slide_count()
+    
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "deleted_index": index,
+        "remaining_slides": new_count
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Delete PowerPoint slide")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--index', required=True, type=int, help='Slide index to delete (0-based)')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = delete_slide(filepath=args.file, index=args.index)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_duplicate_slide.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Duplicate Slide Tool
+Clone an existing slide
+
+Usage:
+    uv python ppt_duplicate_slide.py --file presentation.pptx --index 0 --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def duplicate_slide(filepath: Path, index: int) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= index < total:
+            raise SlideNotFoundError(f"Index {index} out of range (0-{total-1})")
+            
+        new_index = agent.duplicate_slide(index)
+        agent.save()
+        
+        # Get info about new slide
+        info = agent.get_slide_info(new_index)
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "source_index": index,
+        "new_slide_index": new_index,
+        "total_slides": new_index + 1,
+        "layout": info["layout"]
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Duplicate PowerPoint slide")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--index', required=True, type=int, help='Source slide index (0-based)')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = duplicate_slide(filepath=args.file, index=args.index)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
 # tools/ppt_export_images.py
 ```py
 #!/usr/bin/env python3
@@ -5426,6 +5928,66 @@ if __name__ == "__main__":
 
 ```
 
+# tools/ppt_extract_notes.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Extract Notes Tool
+Get speaker notes from all slides
+
+Usage:
+    uv python ppt_extract_notes.py --file presentation.pptx --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import PowerPointAgent
+
+
+def extract_notes(filepath: Path) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath, acquire_lock=False)
+        notes = agent.extract_notes()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "notes_found": len(notes),
+        "notes": notes # Dict {slide_index: text}
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Extract speaker notes")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = extract_notes(filepath=args.file)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
 # tools/ppt_format_chart.py
 ```py
 #!/usr/bin/env python3
@@ -5639,6 +6201,107 @@ Chart Formatting Limitations:
         else:
             print(f"❌ Error: {e}", file=sys.stderr)
         
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_format_shape.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Format Shape Tool
+Update fill color, line color, and line width of an existing shape
+
+Usage:
+    uv python ppt_format_shape.py --file presentation.pptx --slide 0 --shape 1 --fill-color "#FF0000" --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def format_shape(
+    filepath: Path,
+    slide_index: int,
+    shape_index: int,
+    fill_color: str = None,
+    line_color: str = None,
+    line_width: float = None
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    if all(v is None for v in [fill_color, line_color, line_width]):
+        raise ValueError("At least one formatting option required")
+
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= slide_index < total:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            
+        agent.format_shape(
+            slide_index=slide_index,
+            shape_index=shape_index,
+            fill_color=fill_color,
+            line_color=line_color,
+            line_width=line_width
+        )
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "shape_index": shape_index,
+        "formatting": {
+            "fill_color": fill_color,
+            "line_color": line_color,
+            "line_width": line_width
+        }
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Format PowerPoint shape")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
+    parser.add_argument('--shape', required=True, type=int, help='Shape index (0-based)')
+    parser.add_argument('--fill-color', help='Fill hex color')
+    parser.add_argument('--line-color', help='Line hex color')
+    parser.add_argument('--line-width', type=float, help='Line width in points')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = format_shape(
+            filepath=args.file, 
+            slide_index=args.slide, 
+            shape_index=args.shape,
+            fill_color=args.fill_color,
+            line_color=args.line_color,
+            line_width=args.line_width
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
         sys.exit(1)
 
 
@@ -6546,6 +7209,79 @@ if __name__ == "__main__":
 
 ```
 
+# tools/ppt_reorder_slides.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Reorder Slides Tool
+Move a slide to a new position
+
+Usage:
+    uv python ppt_reorder_slides.py --file presentation.pptx --from-index 3 --to-index 1 --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def reorder_slides(filepath: Path, from_index: int, to_index: int) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= from_index < total:
+            raise SlideNotFoundError(f"Source index {from_index} out of range")
+        if not 0 <= to_index < total:
+            raise SlideNotFoundError(f"Target index {to_index} out of range")
+            
+        agent.reorder_slides(from_index, to_index)
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "moved_from": from_index,
+        "moved_to": to_index,
+        "total_slides": total
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Reorder PowerPoint slides")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--from-index', required=True, type=int, help='Current slide index')
+    parser.add_argument('--to-index', required=True, type=int, help='New slide index')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = reorder_slides(filepath=args.file, from_index=args.from_index, to_index=args.to_index)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
 # tools/ppt_replace_image.py
 ```py
 #!/usr/bin/env python3
@@ -7059,6 +7795,381 @@ if __name__ == "__main__":
 
 ```
 
+# tools/ppt_set_background.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Set Background Tool
+Set slide background to color or image
+
+Usage:
+    uv python ppt_set_background.py --file deck.pptx --color "#FFFFFF" --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, ColorHelper
+)
+
+def set_background(
+    filepath: Path,
+    color: str = None,
+    image: Path = None,
+    slide_index: int = None
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+        
+    if not color and not image:
+        raise ValueError("Must specify either --color or --image")
+
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        # Determine target slides
+        if slide_index is not None:
+             target_slides = [agent.prs.slides[slide_index]]
+        else:
+             target_slides = agent.prs.slides
+             
+        for slide in target_slides:
+            bg = slide.background
+            fill = bg.fill
+            
+            if color:
+                fill.solid()
+                fill.fore_color.rgb = ColorHelper.from_hex(color)
+            elif image:
+                if not image.exists():
+                    raise FileNotFoundError(f"Image not found: {image}")
+                # Note: python-pptx background image support is limited in some versions
+                # but user_picture is the standard method
+                fill.user_picture(str(image))
+                
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slides_affected": len(target_slides),
+        "type": "color" if color else "image"
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description="Set PowerPoint background")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', type=int, help='Slide index (optional, defaults to all)')
+    parser.add_argument('--color', help='Hex color code')
+    parser.add_argument('--image', type=Path, help='Background image path')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = set_background(
+            filepath=args.file, 
+            slide_index=args.slide, 
+            color=args.color,
+            image=args.image
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_set_footer.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Set Footer Tool
+Configure slide footer, date, and slide number
+
+Usage:
+    uv python ppt_set_footer.py --file deck.pptx --text "Confidential" --show-number --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import PowerPointAgent
+
+def set_footer(
+    filepath: Path,
+    text: str = None,
+    show_number: bool = False,
+    show_date: bool = False,
+    apply_to_master: bool = True
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        # In python-pptx, footer visibility is often controlled via the master
+        # or individual slide layouts.
+        
+        if apply_to_master:
+             masters = agent.prs.slide_masters
+             for master in masters:
+                 # Update layouts in master
+                 for layout in master.slide_layouts:
+                     # Iterate shapes to find placeholders
+                     for shape in layout.placeholders:
+                         if shape.is_placeholder:
+                             # Footer type is 15, Slide Number is 16, Date is 14
+                             if shape.placeholder_format.type == 15 and text: # Footer
+                                 shape.text = text
+                             
+        # Also attempt to set on individual slides for immediate visibility
+        count = 0
+        for slide in agent.prs.slides:
+            # This is simplified; robustness varies by template
+            # We try to find standard placeholders
+            for shape in slide.placeholders:
+                 if shape.placeholder_format.type == 15 and text:
+                     shape.text = text
+                     count += 1
+                     
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "footer_text": text,
+        "settings": {
+            "show_number": show_number,
+            "show_date": show_date
+        },
+        "slides_updated": count
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description="Set PowerPoint footer")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--text', help='Footer text')
+    parser.add_argument('--show-number', action='store_true', help='Show slide number')
+    parser.add_argument('--show-date', action='store_true', help='Show date')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = set_footer(
+            filepath=args.file, 
+            text=args.text, 
+            show_number=args.show_number,
+            show_date=args.show_date
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_set_image_properties.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Set Image Properties Tool
+Set alt text and transparency for images
+
+Usage:
+    uv python ppt_set_image_properties.py --file deck.pptx --slide 0 --shape 1 --alt-text "Logo" --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def set_image_properties(
+    filepath: Path,
+    slide_index: int,
+    shape_index: int,
+    alt_text: str = None,
+    transparency: float = None
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    if alt_text is None and transparency is None:
+        raise ValueError("At least alt-text or transparency must be set")
+
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= slide_index < total:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            
+        agent.set_image_properties(
+            slide_index=slide_index,
+            shape_index=shape_index,
+            alt_text=alt_text,
+            transparency=transparency
+        )
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "shape_index": shape_index,
+        "properties": {
+            "alt_text": alt_text,
+            "transparency": transparency
+        }
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Set PowerPoint image properties")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
+    parser.add_argument('--shape', required=True, type=int, help='Shape index (0-based)')
+    parser.add_argument('--alt-text', help='Alt text for accessibility')
+    parser.add_argument('--transparency', type=float, help='Transparency (0.0-1.0)')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = set_image_properties(
+            filepath=args.file, 
+            slide_index=args.slide, 
+            shape_index=args.shape,
+            alt_text=args.alt_text,
+            transparency=args.transparency
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_set_slide_layout.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Set Slide Layout Tool
+Change the layout of an existing slide
+
+Usage:
+    uv python ppt_set_slide_layout.py --file presentation.pptx --slide 0 --layout "Title Only" --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError, LayoutNotFoundError
+)
+
+
+def set_slide_layout(filepath: Path, slide_index: int, layout_name: str) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= slide_index < total:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            
+        # Get available layouts to validate/fuzzy match
+        available = agent.get_available_layouts()
+        if layout_name not in available:
+            # Try fuzzy match
+            layout_lower = layout_name.lower()
+            for avail in available:
+                if layout_lower in avail.lower():
+                    layout_name = avail
+                    break
+            else:
+                 raise LayoutNotFoundError(f"Layout '{layout_name}' not found. Available: {available}")
+
+        agent.set_slide_layout(slide_index, layout_name)
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "new_layout": layout_name
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Set PowerPoint slide layout")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
+    parser.add_argument('--layout', required=True, help='New layout name')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        result = set_slide_layout(filepath=args.file, slide_index=args.slide, layout_name=args.layout)
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
 # tools/ppt_set_title.py
 ```py
 #!/usr/bin/env python3
@@ -7228,6 +8339,110 @@ Slide Index:
         
         sys.exit(1)
 
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_update_chart_data.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Update Chart Data Tool
+Update the data of an existing chart
+
+Usage:
+    uv python ppt_update_chart_data.py --file deck.pptx --slide 0 --chart 0 --data new_data.json --json
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+from pptx.chart.data import CategoryChartData
+
+def update_chart_data(
+    filepath: Path,
+    slide_index: int,
+    chart_index: int,
+    data: Dict[str, Any]
+) -> Dict[str, Any]:
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+        
+    if "categories" not in data or "series" not in data:
+        raise ValueError("Data JSON must contain 'categories' and 'series'")
+
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        total = agent.get_slide_count()
+        if not 0 <= slide_index < total:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            
+        slide = agent.prs.slides[slide_index]
+        
+        # Find the chart
+        charts = [shape for shape in slide.shapes if shape.has_chart]
+        if not 0 <= chart_index < len(charts):
+             raise ValueError(f"Chart index {chart_index} out of range. Slide has {len(charts)} charts.")
+             
+        chart = charts[chart_index].chart
+        
+        # Create new chart data
+        chart_data = CategoryChartData()
+        chart_data.categories = data["categories"]
+        
+        for series in data["series"]:
+            chart_data.add_series(series["name"], series["values"])
+            
+        # Replace data
+        chart.replace_data(chart_data)
+        
+        agent.save()
+        
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "chart_index": chart_index,
+        "data_points": sum(len(s["values"]) for s in data["series"])
+    }
+
+def main():
+    parser = argparse.ArgumentParser(description="Update PowerPoint chart data")
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
+    parser.add_argument('--chart', required=True, type=int, help='Chart index (0-based)')
+    parser.add_argument('--data', required=True, type=Path, help='JSON data file')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    
+    args = parser.parse_args()
+    
+    try:
+        with open(args.data, 'r') as f:
+            data_content = json.load(f)
+            
+        result = update_chart_data(
+            filepath=args.file, 
+            slide_index=args.slide, 
+            chart_index=args.chart,
+            data=data_content
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
