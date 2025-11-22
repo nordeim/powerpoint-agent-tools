@@ -20,3 +20,8 @@ https://chat.z.ai/s/b9aa35d8-e749-4c95-b89a-d0d7907d4bf0
 https://chat.qwen.ai/s/73f757a4-beb6-4217-a662-477952c977a2?fev=0.0.248
 
 https://copilot.microsoft.com/shares/Z7fXjyhhdZ1JrR8nV8CNV
+
+---
+
+new tool:
+https://copilot.microsoft.com/shares/LT6LiA8NizDAcB9kkCxbj
