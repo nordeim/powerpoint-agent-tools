@@ -1,0 +1,1275 @@
+Creating presentation from comprehensive structure...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slides_created": 12,
+  "content_added": {
+    "text_boxes": 19,
+    "images": 0,
+    "charts": 0,
+    "tables": 0,
+    "shapes": 0
+  },
+  "errors": [],
+  "error_count": 0,
+  "file_size_bytes": 42087
+}
+Applying corporate background styling...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slides_affected": 12,
+  "type": "color"
+}
+Setting professional footer with slide numbers...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "footer_text": "Confidential \u2022 Bitcoin Market Analysis \u2022 November 2025",
+  "settings": {
+    "show_number": true,
+    "show_date": false
+  },
+  "slides_updated": 0
+}
+Enhancing title slide typography...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 0,
+  "layout": "Title Slide",
+  "shape_count": 2,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Bitcoin Market Analysis"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Subtitle 2",
+      "has_text": true,
+      "text": ""
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 0,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 44,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 0,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 28,
+    "color": "#595959",
+    "bold": null,
+    "italic": null
+  }
+}
+Applying consistent title styling across slides...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 1,
+  "layout": "Title and Content",
+  "shape_count": 3,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Executive Summary"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Sharp correction from $120K+ to sub-$95K driven by multi-factor convergence\nShort-term holder panic "
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 1,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 2,
+  "layout": "Title and Content",
+  "shape_count": 3,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Key Drivers of the Downturn"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Panic Selling by Short-Term Holders\nLiquidity Crunch & Market Depth Erosion\nMacroeconomic Uncertaint"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 2,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 3,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Panic Selling Analysis"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Short-term holders triggered cascading liquidations below $100K support. Long-term holders maintaine"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Price drop: $120,000 \u2192 $95,000 in rapid succession\nForced liquidations amplified initial selling pre"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 3,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 4,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Liquidity Crunch Impact"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Market depth fell from $700M to $535M, increasing vulnerability to large trades and volatility spike"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "24% decline in market depth over 4 weeks\nSpot market buying activity significantly reduced\nInstituti"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 4,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 5,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Macroeconomic Pressures"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Federal Reserve's cautious stance on rate cuts rattled risk assets. Strong dollar and inflation resi"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Fed delaying rate cuts despite market expectations\nStrong USD and persistent inflation data\nRenewed "
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 5,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 6,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Institutional Demand Shift"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Net institutional purchases fell below daily mined supply for first time in 7 months. Large players "
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "ETF flows and institutional buying slowed significantly\nDaily mined supply: ~900 BTC vs institutiona"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 6,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 7,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Technical & Sentiment Breakdown"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Breach of $100K support triggered retail panic and algorithmic selling. Options markets positioned f"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "$100K psychological support broken decisively\nOptions traders positioned for continued downside\nMark"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 7,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 8,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Seasonal & Cycle Context"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "November historically strong for Bitcoin post-halving. Current correction may represent healthy rese"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "November typically Bitcoin's strongest monthly performance\nPost-halving volatility normal in mid-cyc"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 8,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 9,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "On-Chain Market Structure"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "On-chain data shows coins moving from dormant wallets to exchanges - indicating capitulation by weak"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Increased movement from long-dormant wallets to exchanges\nCapitulation pattern typical of late-cycle"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 9,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 10,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Conclusion & Outlook"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "The correction reflects multi-factor convergence rather than single cause. Recovery requires renewed"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Not indicative of bear market cycle top based on holder behavior\nHealthy consolidation phase after r"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 10,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 11,
+  "layout": "Title and Content",
+  "shape_count": 3,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "References & Sources"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "1. Yahoo Finance \u2022 2. CNN Business \u2022 3. Business Insider \u2022 4. Ki-Ecke\n5. The Motley Fool \u2022 6. 99 Bit"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 11,
+  "shape_index": 0,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 36,
+    "color": "#0070C0",
+    "bold": true,
+    "italic": null
+  }
+}
+Applying body text styling for optimal readability...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 1,
+  "layout": "Title and Content",
+  "shape_count": 3,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Executive Summary"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Sharp correction from $120K+ to sub-$95K driven by multi-factor convergence\nShort-term holder panic "
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 1,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 2,
+  "layout": "Title and Content",
+  "shape_count": 3,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Key Drivers of the Downturn"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Panic Selling by Short-Term Holders\nLiquidity Crunch & Market Depth Erosion\nMacroeconomic Uncertaint"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 2,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 3,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Panic Selling Analysis"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Short-term holders triggered cascading liquidations below $100K support. Long-term holders maintaine"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Price drop: $120,000 \u2192 $95,000 in rapid succession\nForced liquidations amplified initial selling pre"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 3,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 4,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Liquidity Crunch Impact"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Market depth fell from $700M to $535M, increasing vulnerability to large trades and volatility spike"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "24% decline in market depth over 4 weeks\nSpot market buying activity significantly reduced\nInstituti"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 4,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 5,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Macroeconomic Pressures"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Federal Reserve's cautious stance on rate cuts rattled risk assets. Strong dollar and inflation resi"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Fed delaying rate cuts despite market expectations\nStrong USD and persistent inflation data\nRenewed "
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 5,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 6,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Institutional Demand Shift"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Net institutional purchases fell below daily mined supply for first time in 7 months. Large players "
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "ETF flows and institutional buying slowed significantly\nDaily mined supply: ~900 BTC vs institutiona"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 6,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 7,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Technical & Sentiment Breakdown"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "Breach of $100K support triggered retail panic and algorithmic selling. Options markets positioned f"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "$100K psychological support broken decisively\nOptions traders positioned for continued downside\nMark"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 7,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 8,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Seasonal & Cycle Context"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "November historically strong for Bitcoin post-halving. Current correction may represent healthy rese"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "November typically Bitcoin's strongest monthly performance\nPost-halving volatility normal in mid-cyc"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 8,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 9,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "On-Chain Market Structure"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "On-chain data shows coins moving from dormant wallets to exchanges - indicating capitulation by weak"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Increased movement from long-dormant wallets to exchanges\nCapitulation pattern typical of late-cycle"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 9,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 10,
+  "layout": "Title and Content",
+  "shape_count": 4,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "Conclusion & Outlook"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "The correction reflects multi-factor convergence rather than single cause. Recovery requires renewed"
+    },
+    {
+      "index": 3,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Not indicative of bear market cycle top based on holder behavior\nHealthy consolidation phase after r"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 10,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 11,
+  "layout": "Title and Content",
+  "shape_count": 3,
+  "shapes": [
+    {
+      "index": 0,
+      "type": "PLACEHOLDER (14)",
+      "name": "Title 1",
+      "has_text": true,
+      "text": "References & Sources"
+    },
+    {
+      "index": 1,
+      "type": "PLACEHOLDER (14)",
+      "name": "Content Placeholder 2",
+      "has_text": true,
+      "text": ""
+    },
+    {
+      "index": 2,
+      "type": "TEXT_BOX (17)",
+      "name": "TextBox 3",
+      "has_text": true,
+      "text": "1. Yahoo Finance \u2022 2. CNN Business \u2022 3. Business Insider \u2022 4. Ki-Ecke\n5. The Motley Fool \u2022 6. 99 Bit"
+    }
+  ],
+  "has_notes": false
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 11,
+  "shape_index": 1,
+  "formatting_applied": {
+    "font_name": "Arial",
+    "font_size": 18,
+    "color": "#111111",
+    "bold": null,
+    "italic": null
+  }
+}
+Adding visual emphasis with accent callout shapes...
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 1,
+  "shape_type": "rectangle",
+  "position": {
+    "left": "9%",
+    "top": "24%",
+    "width": "82%",
+    "height": "62%"
+  },
+  "size": {
+    "width": "82%",
+    "height": "62%"
+  },
+  "styling": {
+    "fill_color": "#ED7D31",
+    "line_color": null,
+    "line_width": 1.0
+  }
+}
+{
+  "status": "success",
+  "file": "bitcoin_market_analysis.pptx",
+  "slide_index": 1,
+  "shape_index": 1,
+  "formatting": {
+    "fill_color": "#ED7D31",
+    "line_color": "#C65911",
+    "line_width": 2.0
+  }
+}
+Running comprehensive validation checks...
+{
+  "status": "valid",
+  "file": "bitcoin_market_analysis.pptx",
+  "total_issues": 0,
+  "summary": {
+    "empty_slides": 0,
+    "slides_without_titles": 0,
+    "missing_alt_text": 0,
+    "low_contrast": 0,
+    "low_resolution_images": 0,
+    "large_images": 0
+  },
+  "details": {
+    "validation": {
+      "status": "valid",
+      "total_issues": 0,
+      "issues": {
+        "empty_slides": [],
+        "text_overflow": [],
+        "inconsistent_fonts": [
+          "Arial",
+          "Calibri"
+        ],
+        "slides_without_titles": []
+      }
+    },
+    "accessibility": {
+      "status": "accessible",
+      "total_issues": 0,
+      "issues": {
+        "missing_alt_text": [],
+        "low_contrast": [],
+        "missing_titles": [],
+        "reading_order_issues": [],
+        "large_file_size_warning": false
+      },
+      "wcag_level": "AA"
+    },
+    "assets": {
+      "status": "valid",
+      "total_issues": 0,
+      "issues": {
+        "low_resolution_images": [],
+        "large_images": [],
+        "total_embedded_size": 0,
+        "external_links": []
+      }
+    }
+  },
+  "recommendations": []
+}
+{
+  "status": "accessible",
+  "total_issues": 0,
+  "issues": {
+    "missing_alt_text": [],
+    "low_contrast": [],
+    "missing_titles": [],
+    "reading_order_issues": [],
+    "large_file_size_warning": false
+  },
+  "wcag_level": "AA",
+  "file": "bitcoin_market_analysis.pptx"
+}
+Creating backup copy for version control...
+{
+  "status": "success",
+  "source": "bitcoin_market_analysis.pptx",
+  "output": "bitcoin_market_analysis_final.pptx",
+  "size_bytes": 43812
+}
+✅ Professional Bitcoin Market Analysis presentation created successfully!
+📁 Final file: bitcoin_market_analysis_final.pptx
+📊 Validation passed: Structure, accessibility, and design standards met
