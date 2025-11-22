@@ -78,6 +78,10 @@ After very careful analysis and deliberation, next meticulously create an implem
 
 ---
 
+awesome job on meticulous analysis, planning and execution! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically how best to re-imagine a complete working drop-in replacement file for all files that need fixing. Please highlight any other tool files that you suspect may be having issues as well. Then meticulously create an implementation plan to create the complete working replacement files for all files that need fixing/rework, include in your plan an integrated checklist for each file. Review and validate your implementation plan before proceeding meticulously to execute it. Make sure you generate a working replacement file with no placeholder comments.
+
+---
+
 awesome job on your meticulous analysis, planning and execution! please keep using the same rigorous and meticulous approach going forward. Now, please meticulously review new errors in `agent_k2_run_log.txt` from progressive partial `agent_k2.sh` execution.
 
 $ ls -lt agent_k2.sh agent_k2_run_log.txt bitcoin_market_report_q4_2025.pptx ppt_chart_data/
