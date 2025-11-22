@@ -1,0 +1,65 @@
+[
+  {
+    "status": "valid",
+    "file": "bitcoin_market_report_nov2024_v2.pptx",
+    "total_issues": 0,
+    "summary": {
+      "empty_slides": 0,
+      "slides_without_titles": 0,
+      "missing_alt_text": 0,
+      "low_contrast": 0,
+      "low_resolution_images": 0,
+      "large_images": 0
+    },
+    "details": {
+      "validation": {
+        "status": "valid",
+        "total_issues": 0,
+        "issues": {
+          "empty_slides": [],
+          "text_overflow": [],
+          "inconsistent_fonts": [
+            "Calibri"
+          ],
+          "slides_without_titles": []
+        }
+      },
+      "accessibility": {
+        "status": "accessible",
+        "total_issues": 0,
+        "issues": {
+          "missing_alt_text": [],
+          "low_contrast": [],
+          "missing_titles": [],
+          "reading_order_issues": [],
+          "large_file_size_warning": false
+        },
+        "wcag_level": "AA"
+      },
+      "assets": {
+        "status": "valid",
+        "total_issues": 0,
+        "issues": {
+          "low_resolution_images": [],
+          "large_images": [],
+          "total_embedded_size": 0,
+          "external_links": []
+        }
+      }
+    },
+    "recommendations": []
+  },
+  {
+    "status": "accessible",
+    "total_issues": 0,
+    "issues": {
+      "missing_alt_text": [],
+      "low_contrast": [],
+      "missing_titles": [],
+      "reading_order_issues": [],
+      "large_file_size_warning": false
+    },
+    "wcag_level": "AA",
+    "file": "bitcoin_market_report_nov2024_v2.pptx"
+  }
+]
