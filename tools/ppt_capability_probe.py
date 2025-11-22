@@ -211,6 +211,7 @@ def detect_slide_dimensions(prs) -> Dict[str, Any]:
         "width_pixels": width_pixels,
         "height_pixels": height_pixels,
         "aspect_ratio": aspect_ratio,
+        "aspect_ratio_float": round(ratio, 4),
         "dpi_estimate": dpi_estimate
     }
 
@@ -281,6 +282,30 @@ def analyze_placeholder(shape, slide_width: float, slide_height: float, instanti
         }
 
 
+def _add_transient_slide(prs, layout):
+    """
+    Helper to safely add and remove a transient slide for deep analysis.
+    Yields the slide object, then ensures cleanup in finally block.
+    """
+    slide = None
+    added_index = -1
+    try:
+        slide = prs.slides.add_slide(layout)
+        added_index = len(prs.slides) - 1
+        yield slide
+    finally:
+        if added_index != -1 and added_index < len(prs.slides):
+            try:
+                # Defensive check: ensure we are deleting the slide we added
+                # In a single-threaded atomic read, this should always be true
+                rId = prs.slides._sldIdLst[added_index].rId
+                prs.part.drop_rel(rId)
+                del prs.slides._sldIdLst[added_index]
+            except Exception:
+                # If cleanup fails, we can't do much but suppress to avoid masking analysis errors
+                pass
+
+
 def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: float, deep: bool, warnings: List[str], timeout_start: Optional[float] = None, timeout_seconds: Optional[int] = None, max_layouts: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Detect all layouts, optionally instantiating them for accurate positions.
@@ -316,6 +341,17 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
     if max_layouts and len(layouts_to_process) > max_layouts:
         layouts_to_process = layouts_to_process[:max_layouts]
 
+    # Capture original indices before slicing if needed, but since we slice from 0, 
+    # enumerate index matches original index for the subset. 
+    # However, to be robust against future changes where we might filter differently,
+    # let's capture the real index from the full list if possible, or just rely on the fact
+    # that we are iterating the main list.
+    
+    # Since we can't easily get the "original index" from the layout object itself without 
+    # iterating the full list again, and we know we are just slicing the top, 
+    # the current enumeration is correct for "index in the file".
+    # But let's be explicit about "original_index" for clarity.
+    
     for idx, layout in enumerate(layouts_to_process):
         # Timeout check
         if timeout_start and timeout_seconds:
@@ -325,6 +361,7 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
 
         layout_info = {
             "index": idx,
+            "original_index": idx, # Since we slice from 0, this is the same.
             "name": layout.name,
             "placeholder_count": len(layout.placeholders),
             "master_index": master_map.get(id(layout), None)
@@ -332,38 +369,38 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
         
         if deep:
             try:
-                temp_slide = prs.slides.add_slide(layout)
-                
-                # Map instantiated placeholders by idx for lookup
-                instantiated_map = {}
-                for shape in temp_slide.placeholders:
-                    try:
-                        instantiated_map[shape.placeholder_format.idx] = shape
-                    except:
-                        pass
-                
-                placeholders = []
-                # Iterate layout placeholders (source of truth for existence)
-                for layout_ph in layout.placeholders:
-                    try:
-                        ph_idx = layout_ph.placeholder_format.idx
-                        if ph_idx in instantiated_map:
-                            # Use instantiated shape for accurate position
-                            ph_info = analyze_placeholder(instantiated_map[ph_idx], slide_width, slide_height, instantiated=True)
-                        else:
-                            # Fallback to layout shape (e.g. master placeholders not instantiated)
-                            ph_info = analyze_placeholder(layout_ph, slide_width, slide_height, instantiated=False)
-                        placeholders.append(ph_info)
-                    except:
-                        pass
-                
-                # Safer deletion by index
-                added_idx = len(prs.slides) - 1
-                rId = prs.slides._sldIdLst[added_idx].rId
-                prs.part.drop_rel(rId)
-                del prs.slides._sldIdLst[added_idx]
-                
-                layout_info["placeholders"] = placeholders
+                # Use helper for safe transient slide lifecycle
+                instantiation_success = False
+                for temp_slide in _add_transient_slide(prs, layout):
+                    instantiation_success = True
+                    
+                    # Map instantiated placeholders by idx for lookup
+                    instantiated_map = {}
+                    for shape in temp_slide.placeholders:
+                        try:
+                            instantiated_map[shape.placeholder_format.idx] = shape
+                        except:
+                            pass
+                    
+                    placeholders = []
+                    # Iterate layout placeholders (source of truth for existence)
+                    for layout_ph in layout.placeholders:
+                        try:
+                            ph_idx = layout_ph.placeholder_format.idx
+                            if ph_idx in instantiated_map:
+                                # Use instantiated shape for accurate position
+                                ph_info = analyze_placeholder(instantiated_map[ph_idx], slide_width, slide_height, instantiated=True)
+                            else:
+                                # Fallback to layout shape (e.g. master placeholders not instantiated)
+                                ph_info = analyze_placeholder(layout_ph, slide_width, slide_height, instantiated=False)
+                            placeholders.append(ph_info)
+                        except:
+                            pass
+                    
+                    layout_info["placeholders"] = placeholders
+
+                if not instantiation_success:
+                     raise Exception("Transient slide creation failed")
                 
             except Exception as e:
                 warnings.append(f"Could not instantiate layout '{layout.name}': {str(e)}")
@@ -531,38 +568,67 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         elif type_name == 'DATE':
             date_type_code = type_code
     
+    per_master_stats = {}
+    
     for layout in layouts:
         layout_ref = {"index": layout['index'], "name": layout['name']}
+        m_idx = layout.get('master_index')
         
+        if m_idx is not None:
+            if m_idx not in per_master_stats:
+                per_master_stats[m_idx] = {
+                    "master_index": m_idx,
+                    "layout_count": 0,
+                    "has_footer_layouts": 0,
+                    "has_slide_number_layouts": 0,
+                    "has_date_layouts": 0
+                }
+            per_master_stats[m_idx]["layout_count"] += 1
+        
+        layout_has_footer = False
+        layout_has_slide_number = False
+        layout_has_date = False
+
         if 'placeholders' in layout:
             for ph in layout['placeholders']:
                 if footer_type_code and ph.get('type_code') == footer_type_code:
                     has_footer = True
+                    layout_has_footer = True
                     if layout_ref not in layouts_with_footer:
                         layouts_with_footer.append(layout_ref)
                 
                 if slide_number_type_code and ph.get('type_code') == slide_number_type_code:
                     has_slide_number = True
+                    layout_has_slide_number = True
                     if layout_ref not in layouts_with_slide_number:
                         layouts_with_slide_number.append(layout_ref)
                 
                 if date_type_code and ph.get('type_code') == date_type_code:
                     has_date = True
+                    layout_has_date = True
                     if layout_ref not in layouts_with_date:
                         layouts_with_date.append(layout_ref)
                         
         elif 'placeholder_types' in layout:
             if 'FOOTER' in layout['placeholder_types']:
                 has_footer = True
+                layout_has_footer = True
                 layouts_with_footer.append(layout_ref)
             
             if 'SLIDE_NUMBER' in layout['placeholder_types']:
                 has_slide_number = True
+                layout_has_slide_number = True
                 layouts_with_slide_number.append(layout_ref)
             
             if 'DATE' in layout['placeholder_types']:
                 has_date = True
+                layout_has_date = True
                 layouts_with_date.append(layout_ref)
+        
+        if m_idx is not None:
+            if layout_has_footer: per_master_stats[m_idx]["has_footer_layouts"] += 1
+            if layout_has_slide_number: per_master_stats[m_idx]["has_slide_number_layouts"] += 1
+            if layout_has_date: per_master_stats[m_idx]["has_date_layouts"] += 1
     
     recommendations = []
     
@@ -595,6 +661,7 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         "layouts_with_date": layouts_with_date,
         "total_layouts": len(layouts),
         "total_master_slides": len(prs.slide_masters),
+        "per_master": list(per_master_stats.values()),
         "recommendations": recommendations
     }
 
@@ -727,6 +794,7 @@ def probe_presentation(
             "file": str(filepath),
             "probed_at": datetime.now().isoformat(),
             "tool_version": "1.1.0",
+            "schema_version": "capability_probe.v1.1.0",
             "operation_id": operation_id,
             "deep_analysis": deep,
             "atomic_verified": verify_atomic,
