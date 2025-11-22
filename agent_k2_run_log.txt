@@ -1013,13 +1013,36 @@ Accessibility Result: {
   "status": "success",
   "input_file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
   "output_file": "/home/project/powerpoint-agent-tools/bitcoin_report_q4_2025.pdf",
-  "input_size_bytes": 56521,
+  "input_size_bytes": 56518,
   "input_size_mb": 0.05,
   "output_size_bytes": 92500,
   "output_size_mb": 0.09,
   "size_ratio": 1.64
 }
-null
+{
+  "status": "success",
+  "input_file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
+  "output_dir": "/home/project/powerpoint-agent-tools/ppt_export",
+  "format": "png",
+  "slides_exported": 12,
+  "files": [
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_001.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_002.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_003.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_004.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_005.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_006.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_007.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_008.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_009.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_010.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_011.png",
+    "/home/project/powerpoint-agent-tools/ppt_export/slide_012.png"
+  ],
+  "total_size_bytes": 934240,
+  "total_size_mb": 0.89,
+  "average_size_mb": 0.07
+}
 ✓ PDF and PNG exports created to validated directories
 
 ==================================================
