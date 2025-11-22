@@ -111,19 +111,14 @@ def build_placeholder_type_map() -> Dict[int, str]:
     """
     type_map = {}
     
-    known_types = [
-        'TITLE', 'BODY', 'CENTER_TITLE', 'SUBTITLE', 'DATE', 
-        'SLIDE_NUMBER', 'FOOTER', 'HEADER', 'OBJECT', 'CHART',
-        'TABLE', 'CLIP_ART', 'PICTURE', 'MEDIA_CLIP', 'ORG_CHART'
-    ]
-    
-    for type_name in known_types:
-        try:
-            enum_value = getattr(PP_PLACEHOLDER, type_name, None)
-            if enum_value is not None:
-                type_map[int(enum_value)] = type_name
-        except:
-            pass
+    for name in dir(PP_PLACEHOLDER):
+        if name.isupper():
+            try:
+                value = getattr(PP_PLACEHOLDER, name)
+                if isinstance(value, int):
+                    type_map[value] = name
+            except:
+                pass
     
     return type_map
 
@@ -829,6 +824,7 @@ Changes in v1.1.0:
   - Multiple masters support
   - Top-level warnings/info arrays
   - Comprehensive validation
+  - Edge Cases (locked files, large templates, timeouts)
 
 Version: 1.1.0
 Requires: core/powerpoint_agent_core.py v1.1.0+
@@ -878,15 +874,18 @@ Requires: core/powerpoint_agent_core.py v1.1.0+
     parser.add_argument(
         '--json',
         action='store_true',
-        default=True,
         dest='output_json',
-        help='Output JSON format (default: true, mutually exclusive with --summary)'
+        help='Output JSON format (default if --summary is not used)'
     )
     
     args = parser.parse_args()
     
-    if args.summary and args.output_json and len(sys.argv) > 3:
-        pass
+    # Default to JSON if neither is specified
+    if not args.summary and not args.output_json:
+        args.output_json = True
+        
+    if args.summary and args.output_json:
+        parser.error("Cannot use both --summary and --json")
     
     try:
         result = probe_presentation(
