@@ -75,8 +75,57 @@ def export_images(
         agent.open(filepath, acquire_lock=False)
         slide_count = agent.get_slide_count()
     
-    # Use LibreOffice to export
-    # LibreOffice exports all slides when converting to image format
+    # Use PDF-intermediate workflow for better reliability
+    # 1. Export to PDF
+    base_name = filepath.stem
+    pdf_path = output_dir / f"{base_name}.pdf"
+    
+    # Use LibreOffice to export to PDF
+    cmd_pdf = [
+        'soffice' if shutil.which('soffice') else 'libreoffice',
+        '--headless',
+        '--convert-to', 'pdf',
+        '--outdir', str(output_dir),
+        str(filepath)
+    ]
+    
+    result_pdf = subprocess.run(cmd_pdf, capture_output=True, text=True, timeout=120)
+    
+    if result_pdf.returncode != 0:
+        raise PowerPointAgentError(
+            f"PDF export failed: {result_pdf.stderr}\n"
+            f"Command: {' '.join(cmd_pdf)}"
+        )
+        
+    # 2. Convert PDF to Images using pdftoppm (if available)
+    if shutil.which('pdftoppm'):
+        # pdftoppm -png -r 150 input.pdf output_prefix
+        cmd_img = [
+            'pdftoppm',
+            f"-{format_ext}",
+            '-r', '150',  # 150 DPI
+            str(pdf_path),
+            str(output_dir / base_name)
+        ]
+        
+        result_img = subprocess.run(cmd_img, capture_output=True, text=True, timeout=120)
+        
+        if result_img.returncode != 0:
+             # Fallback to direct export if pdftoppm fails
+             print(f"Warning: pdftoppm failed, falling back to LibreOffice direct export: {result_img.stderr}", file=sys.stderr)
+             _export_direct(filepath, output_dir, format_ext)
+        
+        # Clean up PDF
+        if pdf_path.exists():
+            pdf_path.unlink()
+            
+    else:
+        # Fallback to direct export if pdftoppm not installed
+        print("Warning: pdftoppm not found, using LibreOffice direct export (may be incomplete)", file=sys.stderr)
+        _export_direct(filepath, output_dir, format_ext)
+
+def _export_direct(filepath: Path, output_dir: Path, format_ext: str):
+    """Direct export using LibreOffice (legacy method)."""
     cmd = [
         'soffice' if shutil.which('soffice') else 'libreoffice',
         '--headless',

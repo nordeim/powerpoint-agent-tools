@@ -1069,7 +1069,8 @@ class PowerPointAgent:
         for shape in slide.shapes:
             if shape.is_placeholder:
                 ph_type = shape.placeholder_format.type
-                if ph_type == 1:  # Title
+                # Title can be TITLE (1) or CENTER_TITLE (3)
+                if ph_type == 1 or ph_type == 3:
                     title_shape = shape
                 elif ph_type == 2:  # Subtitle
                     subtitle_shape = shape
@@ -1895,9 +1896,12 @@ class PowerPointAgent:
             # Check for title
             has_title = False
             for shape in slide.shapes:
-                if shape.is_placeholder and shape.placeholder_format.type == 1:
-                    if shape.has_text_frame and shape.text_frame.text.strip():
-                        has_title = True
+                if shape.is_placeholder:
+                    ph_type = shape.placeholder_format.type
+                    # Check for TITLE (1) or CENTER_TITLE (3)
+                    if ph_type == 1 or ph_type == 3:
+                        if shape.has_text_frame and shape.text_frame.text.strip():
+                            has_title = True
             
             if not has_title:
                 issues["slides_without_titles"].append(idx)
