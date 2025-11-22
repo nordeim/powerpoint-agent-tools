@@ -14,6 +14,7 @@ venv/
 .venv
 bin/
 backup/
+templates/
 
 # PowerPoint Files (Don't bake generated files into the image)
 *.pptx

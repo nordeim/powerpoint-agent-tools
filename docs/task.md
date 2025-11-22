@@ -2,72 +2,76 @@
 
 **Objective**: Meticulously create feedback files for four AI agents (`k`, `g`, `q`, `z`) regarding their presentation generation scripts, including implementation plans for remediation.
 
-- [ ] Create `feedback_k.md` (Agent K) <!-- id: 0 -->
-- [ ] Create `feedback_g.md` (Agent G) <!-- id: 1 -->
-- [ ] Create `feedback_q.md` (Agent Q) <!-- id: 2 -->
-- [x] Create `feedback_z.md` (Agent Z) <!-- id: 3 -->
+- [ ] Create [feedback_k.md](file:///home/pete/.gemini/antigravity/brain/bcffcfd8-a03f-4ec4-9709-84852e699e37/feedback_k.md) (Agent K) <!-- id: 0 -->
+- [ ] Create [feedback_g.md](file:///home/pete/.gemini/antigravity/brain/bcffcfd8-a03f-4ec4-9709-84852e699e37/feedback_g.md) (Agent G) <!-- id: 1 -->
+- [ ] Create [feedback_q.md](file:///home/pete/.gemini/antigravity/brain/bcffcfd8-a03f-4ec4-9709-84852e699e37/feedback_q.md) (Agent Q) <!-- id: 2 -->
+- [x] Create [feedback_z.md](file:///home/pete/.gemini/antigravity/brain/bcffcfd8-a03f-4ec4-9709-84852e699e37/feedback_z.md) (Agent Z) <!-- id: 3 -->
 - [x] Debug Agent K2 Error <!-- id: 4 -->
-    - [x] Analyze `agent_k2_run_log.txt`
-    - [x] Review `agent_k2.sh`
+    - [x] Analyze [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
+    - [x] Review [agent_k2.sh](file:///home/project/powerpoint-agent-tools/agent_k2.sh)
     - [x] Inspect failing tool source code
 - [x] Debug Agent K2 Error <!-- id: 4 -->
-    - [x] Analyze `agent_k2_run_log.txt`
-    - [x] Review `agent_k2.sh`
+    - [x] Analyze [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
+    - [x] Review [agent_k2.sh](file:///home/project/powerpoint-agent-tools/agent_k2.sh)
     - [x] Inspect failing tool source code
     - [x] Create analysis report
 - [x] Debug Agent K2 Error (Round 2) <!-- id: 5 -->
-    - [x] Analyze new `agent_k2_run_log.txt`
+    - [x] Analyze new [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
     - [x] Identify failing tools
     - [x] Create analysis report
 - [x] Validate System Prompt Alignment <!-- id: 6 -->
-    - [x] Review `AGENT_SYSTEM_PROMPT_enhanced.md`
-    - [x] Compare with `ppt_add_bullet_list.py` changes
-    - [x] Compare with `ppt_add_text_box.py` changes
+    - [x] Review [AGENT_SYSTEM_PROMPT_enhanced.md](file:///home/project/powerpoint-agent-tools/AGENT_SYSTEM_PROMPT_enhanced.md)
+    - [x] Compare with [ppt_add_bullet_list.py](file:///home/project/powerpoint-agent-tools/tools/ppt_add_bullet_list.py) changes
+    - [x] Compare with [ppt_add_text_box.py](file:///home/project/powerpoint-agent-tools/tools/ppt_add_text_box.py) changes
     - [x] Report findings
 - [x] Debug Agent K2 Error (Round 3) <!-- id: 7 -->
-    - [x] Analyze new `agent_k2_run_log.txt`
+    - [x] Analyze new [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
     - [x] Identify failing tools
     - [x] Create analysis report
 - [x] Debug Agent K2 Error (Round 4) <!-- id: 8 -->
-    - [x] Analyze new `agent_k2_run_log.txt`
+    - [x] Analyze new [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
     - [x] Identify failing tools
     - [x] Create analysis report
 - [x] System Prompt Alignment Check <!-- id: 15 -->
-    - [x] Review `AGENT_SYSTEM_PROMPT_enhanced.md`
+    - [x] Review [AGENT_SYSTEM_PROMPT_enhanced.md](file:///home/project/powerpoint-agent-tools/AGENT_SYSTEM_PROMPT_enhanced.md)
     - [x] Compare with recent code changes
     - [x] Create Alignment Report with recommendations
 - [x] Update System Prompt <!-- id: 16 -->
-    - [x] Add formatting args to `ppt_add_bullet_list.py` signature
+    - [x] Add formatting args to [ppt_add_bullet_list.py](file:///home/project/powerpoint-agent-tools/tools/ppt_add_bullet_list.py) signature
     - [x] Add Output Parsing best practice
     - [x] Add Title Slide support note
     - [x] Add Font Consistency directive
 - [x] Final Visual & Quality Review <!-- id: 17 -->
-    - [x] Analyze `agent_k2_run_log.txt`
+    - [x] Analyze [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
     - [x] Inspect PPTX structure for visual defects
     - [x] Determine if script or tool enhancements are needed
     - [x] Create Final Review Report
 - [ ] Agent Q Final Review <!-- id: 18 -->
-    - [ ] Analyze `agent_q_run_log.txt`
+    - [ ] Analyze [agent_q_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_q_run_log.txt)
     - [ ] Inspect PPTX structure
     - [ ] Create Final Review Report
 - [x] System Prompt Alignment Check (Round 3 & 4) <!-- id: 9 -->
-    - [x] Review `AGENT_SYSTEM_PROMPT_enhanced.md`
+    - [x] Review [AGENT_SYSTEM_PROMPT_enhanced.md](file:///home/project/powerpoint-agent-tools/AGENT_SYSTEM_PROMPT_enhanced.md)
     - [x] Analyze impact of Round 3 & 4 changes
     - [x] Create alignment report
 - [x] Debug Agent K2 Error (Round 5) <!-- id: 10 -->
-    - [x] Analyze new `agent_k2_run_log.txt`
+    - [x] Analyze new [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
     - [x] Identify failing tools
     - [x] Create analysis report
 - [x] Debug Agent K2 Error (Round 6) <!-- id: 11 -->
-    - [x] Analyze new `agent_k2_run_log.txt`
+    - [x] Analyze new [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt)
     - [x] Identify failing tools
     - [x] Create analysis report
 - [x] Final Quality Review of Agent K2 Execution <!-- id: 12 -->
-    - [x] Analyze `agent_k2_run_log.txt` for errors/warnings
-    - [x] Review `agent_k2.sh` for design/logic issues
+    - [x] Analyze [agent_k2_run_log.txt](file:///home/project/powerpoint-agent-tools/agent_k2_run_log.txt) for errors/warnings
+    - [x] Review [agent_k2.sh](file:///home/project/powerpoint-agent-tools/agent_k2.sh) for design/logic issues
     - [x] Analyze Validation & Accessibility results
     - [x] Determine Fix Strategy (Script vs Tools)
     - [x] Create Final Report
-- [x] Refine `ppt_capability_probe.py` <!-- id: 19 -->
+- [x] Refine [ppt_capability_probe.py](file:///home/project/powerpoint-agent-tools/tools/ppt_capability_probe.py) <!-- id: 19 -->
     - [x] Implement fixes from review (JSON contract, Enums, Deep Mode)
     - [x] Validate fixes (Enum coverage, Mutual exclusivity)
+    - [x] Round 3: Per-master theme, scheme color fallback, timeout flag
+    - [x] Round 4: Error consistency, summary richness, font precedence
+    - [x] Round 5: EMU coordinates, instantiation flags, capability hints
+    - [x] Round 6: Cleanup, metadata enhancement, summary clarity
