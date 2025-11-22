@@ -114,9 +114,10 @@ def build_placeholder_type_map() -> Dict[int, str]:
     for name in dir(PP_PLACEHOLDER):
         if name.isupper():
             try:
-                value = getattr(PP_PLACEHOLDER, name)
-                if isinstance(value, int):
-                    type_map[value] = name
+                member = getattr(PP_PLACEHOLDER, name)
+                code = member if isinstance(member, int) else getattr(member, "value", None)
+                if code is not None:
+                    type_map[int(code)] = name
             except:
                 pass
     
@@ -280,7 +281,7 @@ def analyze_placeholder(shape, slide_width: float, slide_height: float, instanti
         }
 
 
-def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: float, deep: bool, warnings: List[str]) -> List[Dict[str, Any]]:
+def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: float, deep: bool, warnings: List[str], timeout_start: Optional[float] = None, timeout_seconds: Optional[int] = None, max_layouts: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Detect all layouts, optionally instantiating them for accurate positions.
     
@@ -293,32 +294,74 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
         slide_height: Slide height in inches
         deep: If True, instantiate layouts for accurate positions
         warnings: List to append warnings to
+        timeout_start: Start time for timeout check
+        timeout_seconds: Max seconds allowed
+        max_layouts: Maximum number of layouts to analyze
         
     Returns:
         List of layout information dicts
     """
     layouts = []
     
-    for idx, layout in enumerate(prs.slide_layouts):
+    # Build mapping: layout id -> master index
+    master_map = {}
+    try:
+        for m_idx, master in enumerate(prs.slide_masters):
+            for l in master.slide_layouts:
+                master_map[id(l)] = m_idx
+    except:
+        pass
+
+    layouts_to_process = list(prs.slide_layouts)
+    if max_layouts and len(layouts_to_process) > max_layouts:
+        layouts_to_process = layouts_to_process[:max_layouts]
+
+    for idx, layout in enumerate(layouts_to_process):
+        # Timeout check
+        if timeout_start and timeout_seconds:
+            if (time.perf_counter() - timeout_start) > timeout_seconds:
+                warnings.append(f"Probe exceeded {timeout_seconds}s timeout during layout analysis")
+                break
+
         layout_info = {
             "index": idx,
             "name": layout.name,
-            "placeholder_count": len(layout.placeholders)
+            "placeholder_count": len(layout.placeholders),
+            "master_index": master_map.get(id(layout), None)
         }
         
         if deep:
             try:
                 temp_slide = prs.slides.add_slide(layout)
                 
-                placeholders = []
-                for shape in temp_slide.shapes:
-                    if shape.is_placeholder:
-                        ph_info = analyze_placeholder(shape, slide_width, slide_height, instantiated=True)
-                        placeholders.append(ph_info)
+                # Map instantiated placeholders by idx for lookup
+                instantiated_map = {}
+                for shape in temp_slide.placeholders:
+                    try:
+                        instantiated_map[shape.placeholder_format.idx] = shape
+                    except:
+                        pass
                 
-                rId = prs.slides._sldIdLst[-1].rId
+                placeholders = []
+                # Iterate layout placeholders (source of truth for existence)
+                for layout_ph in layout.placeholders:
+                    try:
+                        ph_idx = layout_ph.placeholder_format.idx
+                        if ph_idx in instantiated_map:
+                            # Use instantiated shape for accurate position
+                            ph_info = analyze_placeholder(instantiated_map[ph_idx], slide_width, slide_height, instantiated=True)
+                        else:
+                            # Fallback to layout shape (e.g. master placeholders not instantiated)
+                            ph_info = analyze_placeholder(layout_ph, slide_width, slide_height, instantiated=False)
+                        placeholders.append(ph_info)
+                    except:
+                        pass
+                
+                # Safer deletion by index
+                added_idx = len(prs.slides) - 1
+                rId = prs.slides._sldIdLst[added_idx].rId
                 prs.part.drop_rel(rId)
-                del prs.slides._sldIdLst[-1]
+                del prs.slides._sldIdLst[added_idx]
                 
                 layout_info["placeholders"] = placeholders
                 
@@ -368,7 +411,14 @@ def extract_theme_colors(prs, warnings: List[str]) -> Dict[str, str]:
     
     try:
         slide_master = prs.slide_masters[0]
-        color_scheme = slide_master.theme.theme_color_scheme
+        # Use getattr for safety if theme is missing
+        theme = getattr(slide_master, 'theme', None)
+        if not theme:
+            raise AttributeError("No theme found on slide master")
+            
+        color_scheme = getattr(theme, 'theme_color_scheme', None)
+        if not color_scheme:
+            raise AttributeError("No color scheme found in theme")
         
         color_attrs = [
             'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
@@ -379,7 +429,9 @@ def extract_theme_colors(prs, warnings: List[str]) -> Dict[str, str]:
             try:
                 color = getattr(color_scheme, color_name, None)
                 if color:
-                    colors[color_name] = rgb_to_hex(color)
+                    # Check if it's an RGBColor (has .r, .g, .b)
+                    if hasattr(color, 'r'):
+                        colors[color_name] = rgb_to_hex(color)
             except:
                 pass
         
@@ -407,17 +459,26 @@ def extract_theme_fonts(prs, warnings: List[str]) -> Dict[str, str]:
     
     try:
         slide_master = prs.slide_masters[0]
-        theme = slide_master.theme
+        theme = getattr(slide_master, 'theme', None)
         
-        try:
-            font_scheme = theme.font_scheme
-            
-            if hasattr(font_scheme, 'major_font') and hasattr(font_scheme.major_font, 'latin'):
-                fonts['heading'] = font_scheme.major_font.latin
-            
-            if hasattr(font_scheme, 'minor_font') and hasattr(font_scheme.minor_font, 'latin'):
-                fonts['body'] = font_scheme.minor_font.latin
-        except:
+        if theme:
+            font_scheme = getattr(theme, 'font_scheme', None)
+            if font_scheme:
+                major = getattr(font_scheme, 'major_font', None)
+                minor = getattr(font_scheme, 'minor_font', None)
+                
+                if major:
+                    latin = getattr(major, 'latin', None)
+                    if latin:
+                        # Try to get typeface if it's an object, otherwise use as string
+                        fonts['heading'] = getattr(latin, 'typeface', str(latin))
+                
+                if minor:
+                    latin = getattr(minor, 'latin', None)
+                    if latin:
+                        fonts['body'] = getattr(latin, 'typeface', str(latin))
+
+        if not fonts:
             warnings.append("Theme font scheme API unavailable, using fallback detection")
             
             for shape in slide_master.shapes:
@@ -582,7 +643,8 @@ def probe_presentation(
     filepath: Path,
     deep: bool = False,
     verify_atomic: bool = True,
-    max_layouts: Optional[int] = None
+    max_layouts: Optional[int] = None,
+    timeout_seconds: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Probe presentation and return comprehensive capability report.
@@ -627,10 +689,17 @@ def probe_presentation(
     all_layouts = list(prs.slide_layouts)
     if max_layouts and len(all_layouts) > max_layouts:
         info.append(f"Limited analysis to first {max_layouts} of {len(all_layouts)} layouts")
-        all_layouts = all_layouts[:max_layouts]
-        prs.slide_layouts._sldLayoutLst = prs.slide_layouts._sldLayoutLst[:max_layouts]
     
-    layouts = detect_layouts_with_instantiation(prs, slide_width, slide_height, deep, warnings)
+    layouts = detect_layouts_with_instantiation(
+        prs, 
+        slide_width, 
+        slide_height, 
+        deep, 
+        warnings, 
+        timeout_start=start_time, 
+        timeout_seconds=timeout_seconds,
+        max_layouts=max_layouts
+    )
     
     theme_colors = extract_theme_colors(prs, warnings)
     theme_fonts = extract_theme_fonts(prs, warnings)
@@ -870,6 +939,13 @@ Requires: core/powerpoint_agent_core.py v1.1.0+
         type=int,
         help='Maximum layouts to analyze (for large templates)'
     )
+
+    parser.add_argument(
+        '--timeout',
+        type=int,
+        default=30,
+        help='Timeout in seconds for analysis (default: 30)'
+    )
     
     parser.add_argument(
         '--json',
@@ -892,7 +968,8 @@ Requires: core/powerpoint_agent_core.py v1.1.0+
             filepath=args.file,
             deep=args.deep,
             verify_atomic=args.verify_atomic,
-            max_layouts=args.max_layouts
+            max_layouts=args.max_layouts,
+            timeout_seconds=args.timeout
         )
         
         if args.summary:

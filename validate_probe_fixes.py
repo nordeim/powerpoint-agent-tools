@@ -6,22 +6,22 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 
 def test_enum_coverage():
     print("Testing Enum Coverage...")
-    # Simulate the current implementation's known_types
-    known_types = [
-        'TITLE', 'BODY', 'CENTER_TITLE', 'SUBTITLE', 'DATE', 
-        'SLIDE_NUMBER', 'FOOTER', 'HEADER', 'OBJECT', 'CHART',
-        'TABLE', 'CLIP_ART', 'PICTURE', 'MEDIA_CLIP', 'ORG_CHART'
-    ]
+    from tools.ppt_capability_probe import PLACEHOLDER_TYPE_MAP
     
     missing = []
     for name in dir(PP_PLACEHOLDER):
-        if name.isupper() and name not in known_types:
-            missing.append(name)
+        if name.isupper():
+            # Get the value to check if it's in the map
+            val = getattr(PP_PLACEHOLDER, name)
+            code = val.value if hasattr(val, 'value') else val
+            
+            if isinstance(code, int) and code not in PLACEHOLDER_TYPE_MAP:
+                missing.append(name)
     
     if missing:
-        print(f"❌ Current implementation misses these enum members: {missing}")
+        print(f"❌ Tool implementation misses these enum members: {missing}")
     else:
-        print("✅ Current implementation covers all enum members.")
+        print("✅ Tool implementation covers all enum members.")
 
 def test_mutual_exclusivity():
     print("\nTesting Mutual Exclusivity...")
