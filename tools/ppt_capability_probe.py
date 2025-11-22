@@ -497,6 +497,11 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     return colors
 
 
+def _font_name(font_obj):
+    """Helper to safely get typeface from font object."""
+    return getattr(font_obj, 'typeface', str(font_obj)) if font_obj else None
+
+
 def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     """
     Extract theme fonts from presentation or master using proper font scheme API.
@@ -527,29 +532,35 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
                 
                 if major:
                     latin = getattr(major, 'latin', None)
-                    if latin:
-                        fonts['heading'] = getattr(latin, 'typeface', str(latin))
-                    
-                    # Try to get East Asian / Complex Script
                     ea = getattr(major, 'east_asian', None)
-                    if ea:
-                        fonts['heading_east_asian'] = getattr(ea, 'typeface', str(ea))
                     cs = getattr(major, 'complex_script', None)
+                    
+                    # Precedence: Latin > East Asian > Complex Script
+                    heading_font = _font_name(latin) or _font_name(ea) or _font_name(cs)
+                    if heading_font:
+                        fonts['heading'] = heading_font
+                    
+                    # Also capture specific scripts if available
+                    if ea:
+                        fonts['heading_east_asian'] = _font_name(ea)
                     if cs:
-                        fonts['heading_complex'] = getattr(cs, 'typeface', str(cs))
+                        fonts['heading_complex'] = _font_name(cs)
                 
                 if minor:
                     latin = getattr(minor, 'latin', None)
-                    if latin:
-                        fonts['body'] = getattr(latin, 'typeface', str(latin))
-                    
-                    # Try to get East Asian / Complex Script
                     ea = getattr(minor, 'east_asian', None)
-                    if ea:
-                        fonts['body_east_asian'] = getattr(ea, 'typeface', str(ea))
                     cs = getattr(minor, 'complex_script', None)
+                    
+                    # Precedence: Latin > East Asian > Complex Script
+                    body_font = _font_name(latin) or _font_name(ea) or _font_name(cs)
+                    if body_font:
+                        fonts['body'] = body_font
+                    
+                    # Also capture specific scripts if available
+                    if ea:
+                        fonts['body_east_asian'] = _font_name(ea)
                     if cs:
-                        fonts['body_complex'] = getattr(cs, 'typeface', str(cs))
+                        fonts['body_complex'] = _font_name(cs)
 
         if not fonts:
             # Only warn if we are processing the primary master (passed as Presentation)
@@ -931,6 +942,14 @@ def format_summary(probe_result: Dict[str, Any]) -> str:
     lines.append(f"  {'✓' if caps['has_slide_number_placeholders'] else '✗'} Slide Number Placeholders: {len(caps['layouts_with_slide_number'])} layout(s)")
     lines.append(f"  {'✓' if caps['has_date_placeholders'] else '✗'} Date Placeholders: {len(caps['layouts_with_date'])} layout(s)")
     lines.append("")
+
+    if 'per_master' in caps:
+        lines.append("Master Slides:")
+        for m in caps['per_master']:
+            lines.append(f"  Master {m['master_index']}: {m['layout_count']} layouts")
+            lines.append(f"    Footer: {'Yes' if m['has_footer_layouts'] else 'No'} | Slide #: {'Yes' if m['has_slide_number_layouts'] else 'No'} | Date: {'Yes' if m['has_date_layouts'] else 'No'}")
+        lines.append("")
+    lines.append("")
     
     lines.append("Available Layouts:")
     for layout in probe_result['layouts']:
@@ -1121,7 +1140,8 @@ Requires: core/powerpoint_agent_core.py v1.1.0+
                 "tool_version": "1.1.0",
                 "operation_id": str(uuid.uuid4()),
                 "probed_at": datetime.now().isoformat()
-            }
+            },
+            "warnings": []
         }
         
         print(json.dumps(error_result, indent=2))
