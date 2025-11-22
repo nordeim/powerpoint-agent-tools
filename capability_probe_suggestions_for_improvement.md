@@ -97,3 +97,160 @@ Direct answer: The output passes schema and capability validation; no blocking i
   - **Action:** Include layout_count_total and layout_count_analyzed consistently, even when deep_analysis is false.  
 - **Optional:** Include a compact “placeholder_map” per layout (type -> count) in essential mode to make downstream decisions lighter without deep positions.
 
+---
+
+# Meticulous review and critique of latest tool implementation
+
+You’ve clearly hardened the probe, but let’s walk through the actionable recommendations one by one and identify precise code changes to bring the implementation fully in line.
+
+---
+
+## 1. Standardize capability layout references
+
+**Current:**  
+In `analyze_capabilities()`, you build `layout_ref = {"index": layout['index'], "name": layout['name']}`. This omits `original_index` and `master_index`.
+
+**Issue:**  
+Downstream consumers lose traceability when layouts are truncated or multi-master decks are used.
+
+**Change:**  
+Expand `layout_ref` to include both `original_index` and `master_index`.
+
+```python
+layout_ref = {
+    "index": layout['index'],
+    "original_index": layout.get('original_index', layout['index']),
+    "name": layout['name'],
+    "master_index": layout.get('master_index')
+}
+```
+
+---
+
+## 2. Enhance recommendations symmetry
+
+**Current:**  
+Recommendations only enumerate footer availability. Slide number and date placeholders are flagged but not enumerated when present.
+
+**Issue:**  
+Asymmetry in guidance; downstream automation gets less context for slide numbers and dates.
+
+**Change:**  
+Add enumerations for slide number and date placeholders when present.
+
+```python
+if has_slide_number:
+    layout_names = [l['name'] for l in layouts_with_slide_number]
+    recommendations.append(
+        f"Slide number placeholders available on {len(layouts_with_slide_number)} layout(s): {', '.join(layout_names)}"
+    )
+
+if has_date:
+    layout_names = [l['name'] for l in layouts_with_date]
+    recommendations.append(
+        f"Date placeholders available on {len(layouts_with_date)} layout(s): {', '.join(layout_names)}"
+    )
+```
+
+---
+
+## 3. Surface semantic theme colors when RGB unavailable
+
+**Current:**  
+In `extract_theme_colors()`, you already fallback to `schemeColor:<name>` when RGB is not available, but you suppress warnings.
+
+**Issue:**  
+Agents may not realize they’re consuming semantic references instead of hex values.
+
+**Change:**  
+Keep `schemeColor:<name>` values, but add a consolidated warning once.
+
+```python
+non_rgb_found = False
+...
+if hasattr(color, 'r'):
+    colors[color_name] = rgb_to_hex(color)
+else:
+    colors[color_name] = f"schemeColor:{color_name}"
+    non_rgb_found = True
+...
+if not colors:
+    warnings.append("Theme color scheme unavailable or empty")
+elif non_rgb_found:
+    warnings.append("Theme colors include scheme references without explicit RGB")
+```
+
+---
+
+## 4. Add quick audit metadata fields
+
+**Current:**  
+Metadata includes timeout_seconds, but layout_count_total/layout_count_analyzed are only added in some variants.
+
+**Issue:**  
+Inconsistency; auditors can’t quickly see how many layouts were processed.
+
+**Change:**  
+Always include both fields in metadata, regardless of deep/essential mode.
+
+```python
+layout_count_total = len(all_layouts)
+layout_count_analyzed = len(layouts)
+
+result = {
+    "status": "success",
+    "metadata": {
+        ...
+        "layout_count_total": layout_count_total,
+        "layout_count_analyzed": layout_count_analyzed,
+    },
+    ...
+}
+```
+
+---
+
+## 5. Optional: Include compact placeholder_map per layout
+
+**Current:**  
+Essential mode only lists `placeholder_types` array.
+
+**Issue:**  
+Downstream agents must parse arrays to count roles; a map would be lighter.
+
+**Change:**  
+Add a `placeholder_map` dict in essential mode.
+
+```python
+placeholder_map = {}
+for shape in layout.placeholders:
+    try:
+        ph_type_name = get_placeholder_type_name(shape.placeholder_format.type)
+        placeholder_map[ph_type_name] = placeholder_map.get(ph_type_name, 0) + 1
+    except Exception:
+        pass
+
+layout_info["placeholder_types"] = list(placeholder_map.keys())
+layout_info["placeholder_map"] = placeholder_map
+```
+
+---
+
+## Consolidated critique
+
+- **Strengths:** JSON contract is consistent; deep-mode instantiation is safe; theme/font fallbacks are robust; atomic verification is enforced.  
+- **Gaps:** Capability layout references lack full indices; recommendations are asymmetric; theme color warnings are suppressed; metadata audit fields inconsistent; essential mode lacks compact maps.  
+- **Fix priority:** Standardize layout references and metadata fields first (critical for traceability). Then add symmetric recommendations and theme warnings (important for usability). Placeholder_map is optional but valuable for performance.
+
+---
+
+## Next steps
+
+- Apply the above diffs to `analyze_capabilities()`, `extract_theme_colors()`, and `probe_presentation()`.  
+- Re-run regression tests to confirm:
+  - Capability layout entries include original_index/master_index.  
+  - Recommendations list footer, slide number, and date when present.  
+  - Warnings include “Theme colors include scheme references…” when applicable.  
+  - Metadata always shows layout_count_total/layout_count_analyzed.  
+  - Essential mode layouts include placeholder_map.  
+

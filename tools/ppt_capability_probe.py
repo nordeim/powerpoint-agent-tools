@@ -435,18 +435,23 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
                 layout_info["placeholder_expected"] = len(layout.placeholders)
                 layout_info["placeholder_instantiated"] = len(placeholders)
                 layout_info["_warning"] = "Using template positions (instantiation failed)"
-        else:
+            placeholder_map = {}
             placeholder_types = []
             for shape in layout.placeholders:
                 try:
                     ph_type = shape.placeholder_format.type
                     ph_type_name = get_placeholder_type_name(ph_type)
+                    
+                    # Build map
+                    placeholder_map[ph_type_name] = placeholder_map.get(ph_type_name, 0) + 1
+                    
                     if ph_type_name not in placeholder_types:
                         placeholder_types.append(ph_type_name)
                 except:
                     pass
             
             layout_info["placeholder_types"] = placeholder_types
+            layout_info["placeholder_map"] = placeholder_map
         
         layouts.append(layout_info)
     
@@ -638,7 +643,12 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
     per_master_stats = {}
     
     for layout in layouts:
-        layout_ref = {"index": layout['index'], "name": layout['name']}
+        layout_ref = {
+            "index": layout['index'],
+            "original_index": layout.get('original_index', layout['index']),
+            "name": layout['name'],
+            "master_index": layout.get('master_index')
+        }
         m_idx = layout.get('master_index')
         
         if m_idx is not None:
@@ -717,6 +727,17 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
     if not has_date:
         recommendations.append(
             "No date placeholders - dates must be added manually if needed"
+        )
+    else:
+        layout_names = [l['name'] for l in layouts_with_date]
+        recommendations.append(
+            f"Date placeholders available on {len(layouts_with_date)} layout(s): {', '.join(layout_names)}"
+        )
+
+    if has_slide_number:
+        layout_names = [l['name'] for l in layouts_with_slide_number]
+        recommendations.append(
+            f"Slide number placeholders available on {len(layouts_with_slide_number)} layout(s): {', '.join(layout_names)}"
         )
     
     return {
@@ -890,6 +911,8 @@ def probe_presentation(
             "atomic_verified": verify_atomic,
             "duration_ms": duration_ms,
             "timeout_seconds": timeout_seconds,
+            "layout_count_total": len(all_layouts),
+            "layout_count_analyzed": len(layouts),
             "library_versions": get_library_versions(),
             "checksum": checksum_before if verify_atomic else "verification_skipped"
         },
