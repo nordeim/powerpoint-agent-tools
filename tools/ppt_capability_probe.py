@@ -262,6 +262,10 @@ def analyze_placeholder(shape, slide_width: float, slide_height: float, instanti
                 "left": f"{left_percent:.1f}%",
                 "top": f"{top_percent:.1f}%"
             },
+            "position_emu": {
+                "left": left_emu,
+                "top": top_emu
+            },
             "size_inches": {
                 "width": round(width_inches, 2),
                 "height": round(height_inches, 2)
@@ -269,6 +273,10 @@ def analyze_placeholder(shape, slide_width: float, slide_height: float, instanti
             "size_percent": {
                 "width": f"{width_percent:.1f}%",
                 "height": f"{height_percent:.1f}%"
+            },
+            "size_emu": {
+                "width": width_emu,
+                "height": height_emu
             },
             "position_source": "instantiated" if instantiated else "template"
         }
@@ -403,7 +411,11 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
                         except:
                             pass
                     
+                    
                     layout_info["placeholders"] = placeholders
+                    layout_info["instantiation_complete"] = len(placeholders) == len(layout.placeholders)
+                    layout_info["placeholder_expected"] = len(layout.placeholders)
+                    layout_info["placeholder_instantiated"] = len(placeholders)
 
                 if not instantiation_success:
                      raise Exception("Transient slide creation failed")
@@ -420,6 +432,9 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
                         pass
                 
                 layout_info["placeholders"] = placeholders
+                layout_info["instantiation_complete"] = False
+                layout_info["placeholder_expected"] = len(layout.placeholders)
+                layout_info["placeholder_instantiated"] = len(placeholders)
                 layout_info["_warning"] = "Using template positions (instantiation failed)"
         else:
             placeholder_types = []
@@ -713,6 +728,9 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         "total_layouts": len(layouts),
         "total_master_slides": len(prs.slide_masters),
         "per_master": list(per_master_stats.values()),
+        "per_master": list(per_master_stats.values()),
+        "footer_support_mode": "placeholder" if has_footer else "fallback_textbox",
+        "slide_number_strategy": "placeholder" if has_slide_number else "textbox",
         "recommendations": recommendations
     }
 
