@@ -116,6 +116,7 @@ def export_images(
              _export_direct(filepath, output_dir, format_ext)
         
         # Clean up PDF
+        # Clean up PDF
         if pdf_path.exists():
             pdf_path.unlink()
             
@@ -123,6 +124,10 @@ def export_images(
         # Fallback to direct export if pdftoppm not installed
         print("Warning: pdftoppm not found, using LibreOffice direct export (may be incomplete)", file=sys.stderr)
         _export_direct(filepath, output_dir, format_ext)
+
+    # 3. Process and rename files
+    return _scan_and_process_results(filepath, output_dir, format_ext, prefix)
+
 
 def _export_direct(filepath: Path, output_dir: Path, format_ext: str):
     """Direct export using LibreOffice (legacy method)."""
@@ -141,28 +146,31 @@ def _export_direct(filepath: Path, output_dir: Path, format_ext: str):
             f"Image export failed: {result.stderr}\n"
             f"Command: {' '.join(cmd)}"
         )
-    
-    # LibreOffice creates files named: presentation.png for single page
-    # or presentation_01.png, presentation_02.png for multiple pages
+
+
+def _scan_and_process_results(
+    filepath: Path,
+    output_dir: Path,
+    format_ext: str,
+    prefix: str
+) -> Dict[str, Any]:
+    """Find, rename, and report exported images."""
+    # LibreOffice/pdftoppm creates files named: presentation.png or presentation-1.png
     base_name = filepath.stem
     
     # Find exported images using a robust pattern match
-    # LibreOffice naming can vary (e.g. file.png, file_01.png, file_1.png)
+    # Match base_name*.ext
     candidates = sorted(output_dir.glob(f"{base_name}*.{format_ext}"))
     
     exported_files = []
-    
-    if not candidates:
-        # Try without base_name prefix just in case (unlikely but possible if LO behaves weirdly)
-        pass
     
     # Rename found files sequentially
     for i, old_file in enumerate(candidates):
         new_file = output_dir / f"{prefix}{i+1:03d}.{format_ext}"
         
-        # Handle case where source and dest are same (e.g. prefix is same as original name start)
+        # Handle case where source and dest are same
         if old_file != new_file:
-            # If target exists (from previous run), remove it to avoid collision/confusion
+            # If target exists (from previous run), remove it
             if new_file.exists():
                 new_file.unlink()
             old_file.rename(new_file)
