@@ -192,4 +192,3 @@ if not colors:
   - A small “capability summary” block in `info` (e.g., “footer=placeholder, slide_numbers=textbox”) to aid quick scan.
 - Keep the current defensive approach to internal pptx structures; it's pragmatic and well-contained.
 
-If you want, I can generate a cleaned, patched v1.1.1 file with all changes applied and a minimal regression test harness.

@@ -66,7 +66,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 try:
     from pptx import Presentation
     from pptx.enum.shapes import PP_PLACEHOLDER
-    from pptx.util import Inches
 except ImportError:
     print(json.dumps({
         "status": "error",
@@ -75,7 +74,7 @@ except ImportError:
     }, indent=2))
     sys.exit(1)
 
-from core.powerpoint_agent_core import PowerPointAgent, PowerPointAgentError
+from core.powerpoint_agent_core import PowerPointAgentError
 
 
 def get_library_versions() -> Dict[str, str]:
@@ -505,6 +504,8 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
         
         if not colors:
             warnings.append("Theme color scheme unavailable or empty")
+        elif any(c.startswith("schemeColor:") for c in colors.values()):
+            warnings.append("Theme colors include scheme references without explicit RGB")
             
     except Exception as e:
         warnings.append(f"Theme color extraction failed: {str(e)}")
@@ -728,7 +729,6 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         "total_layouts": len(layouts),
         "total_master_slides": len(prs.slide_masters),
         "per_master": list(per_master_stats.values()),
-        "per_master": list(per_master_stats.values()),
         "footer_support_mode": "placeholder" if has_footer else "fallback_textbox",
         "slide_number_strategy": "placeholder" if has_slide_number else "textbox",
         "recommendations": recommendations
@@ -889,8 +889,9 @@ def probe_presentation(
             "deep_analysis": deep,
             "atomic_verified": verify_atomic,
             "duration_ms": duration_ms,
-            "library_versions": library_versions,
-            "checksum": checksum_after if verify_atomic else None
+            "timeout_seconds": timeout_seconds,
+            "library_versions": get_library_versions(),
+            "checksum": checksum_before if verify_atomic else "verification_skipped"
         },
         "slide_dimensions": dimensions,
         "layouts": layouts,
@@ -972,7 +973,8 @@ def format_summary(probe_result: Dict[str, Any]) -> str:
     lines.append("Available Layouts:")
     for layout in probe_result['layouts']:
         ph_count = layout['placeholder_count']
-        lines.append(f"  [{layout['index']}] {layout['name']} ({ph_count} placeholder{'s' if ph_count != 1 else ''})")
+        display_idx = layout.get('original_index', layout['index'])
+        lines.append(f"  [{display_idx}] {layout['name']} ({ph_count} placeholder{'s' if ph_count != 1 else ''})")
         
         if 'placeholder_types' in layout:
             types_str = ', '.join(layout['placeholder_types'])
