@@ -215,33 +215,26 @@ class ExportFormat(Enum):
     JPG = "jpg"
     PPTX = "pptx"
 
-# Placeholder type mapping for human-readable output
-# Uses numeric keys for maximum compatibility across python-pptx versions
-# Only includes commonly available placeholder types
-PLACEHOLDER_TYPE_NAMES = {
-    1: "TITLE",           # Title placeholder
-    2: "CONTENT",         # Body/content placeholder
-    3: "CENTER_TITLE",    # Centered title (title slides)
-    4: "SUBTITLE",        # Subtitle (also used for footer in some layouts)
-    7: "OBJECT",          # Object placeholder
-    8: "CHART",           # Chart placeholder
-    9: "TABLE",           # Table placeholder
-    13: "SLIDE_NUMBER",   # Slide number placeholder
-    16: "DATE",           # Date placeholder
-    18: "PICTURE",        # Picture placeholder
-}
 
-def get_placeholder_type_name(ph_type_value):
-    """
-    Safely get human-readable name for placeholder type.
-    
-    Args:
-        ph_type_value: Numeric placeholder type value
-        
-    Returns:
-        Human-readable string name or "UNKNOWN_X" if not recognized
-    """
-    return PLACEHOLDER_TYPE_NAMES.get(ph_type_value, f"UNKNOWN_{ph_type_value}")
+# Placeholder type mapping for human-readable output
+# Source: python-pptx documentation and MSO constants
+PLACEHOLDER_TYPE_NAMES = {
+    PP_PLACEHOLDER.TITLE: "TITLE",                          # 1
+    PP_PLACEHOLDER.BODY: "CONTENT",                         # 2
+    PP_PLACEHOLDER.CENTER_TITLE: "CENTER_TITLE",           # 3
+    PP_PLACEHOLDER.SUBTITLE: "SUBTITLE",                    # 4
+    PP_PLACEHOLDER.DATE: "DATE",                           # 16
+    PP_PLACEHOLDER.SLIDE_NUMBER: "SLIDE_NUMBER",           # 13
+    PP_PLACEHOLDER.FOOTER: "FOOTER",                       # 4
+    PP_PLACEHOLDER.HEADER: "HEADER",                       # 15
+    PP_PLACEHOLDER.OBJECT: "OBJECT",                       # 7
+    PP_PLACEHOLDER.CHART: "CHART",                         # 8
+    PP_PLACEHOLDER.TABLE: "TABLE",                         # 9
+    PP_PLACEHOLDER.CLIP_ART: "CLIP_ART",                  # 10
+    PP_PLACEHOLDER.PICTURE: "PICTURE",                     # 18
+    PP_PLACEHOLDER.MEDIA_CLIP: "MEDIA_CLIP",              # 16
+    PP_PLACEHOLDER.ORG_CHART: "ORG_CHART",                # 11
+}
 
 # Standard slide dimensions (16:9 widescreen)
 SLIDE_WIDTH_INCHES = 10.0
@@ -2036,9 +2029,9 @@ class PowerPointAgent:
             
             if shape.is_placeholder:
                 ph_type = shape.placeholder_format.type
-                ph_type_name = get_placeholder_type_name(ph_type)
+                ph_type_name = PLACEHOLDER_TYPE_NAMES.get(ph_type, f"UNKNOWN_{ph_type}")
                 shape_type_str = f"PLACEHOLDER ({ph_type_name})"
-
+            
             shape_info = {
                 "index": idx,
                 "type": shape_type_str,

@@ -66,31 +66,37 @@ declare -a EXECUTION_LOG
 declare -a WARNINGS_LOG
 declare -a VALIDATION_RESULTS
 
-# Helper Functions
+# ═══════════════════════════════════════════════════════════════════════════
+# SECTION 1: SETUP & CONFIGURATION (CORRECTED)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ... (keep existing variables) ...
+
+# Helper Functions (CORRECTED - stderr for logs, stdout for JSON)
 log_step() {
     TOTAL_STEPS=$((TOTAL_STEPS + 1))
-    echo ""
-    echo "────────────────────────────────────────────────────────────────────────"
-    echo "STEP $TOTAL_STEPS: $1"
-    echo "────────────────────────────────────────────────────────────────────────"
+    echo "" >&2
+    echo "────────────────────────────────────────────────────────────────────────" >&2
+    echo "STEP $TOTAL_STEPS: $1" >&2
+    echo "────────────────────────────────────────────────────────────────────────" >&2
 }
 
 log_success() {
     COMPLETED_STEPS=$((COMPLETED_STEPS + 1))
-    echo "✅ $1"
+    echo "✅ $1" >&2
     EXECUTION_LOG+=("{\"step\": $TOTAL_STEPS, \"status\": \"success\", \"message\": \"$1\", \"timestamp\": \"$(date -Iseconds)\"}")
 }
 
 log_warning() {
     WARNINGS_COUNT=$((WARNINGS_COUNT + 1))
-    echo "⚠️  WARNING: $1"
+    echo "⚠️  WARNING: $1" >&2
     WARNINGS_LOG+=("{\"step\": $TOTAL_STEPS, \"message\": \"$1\", \"timestamp\": \"$(date -Iseconds)\"}")
 }
 
 log_error() {
     ERRORS_COUNT=$((ERRORS_COUNT + 1))
-    echo "❌ ERROR: $1"
-    echo "   Attempting recovery..."
+    echo "❌ ERROR: $1" >&2
+    echo "   Attempting recovery..." >&2
 }
 
 execute_tool() {
@@ -98,8 +104,8 @@ execute_tool() {
     local description=$2
     shift 2
     
-    echo "🔧 Executing: $tool_name"
-    echo "   Purpose: $description"
+    echo "🔧 Executing: $tool_name" >&2
+    echo "   Purpose: $description" >&2
     
     local output
     local exit_code
@@ -111,14 +117,23 @@ execute_tool() {
     fi
     
     if [ $exit_code -eq 0 ]; then
-        log_success "$description completed"
+        log_success "$description completed" >&2
         echo "$output"
         return 0
     else
-        log_error "$description failed (exit code: $exit_code)"
+        log_error "$description failed (exit code: $exit_code)" >&2
         echo "$output" >&2
         return 1
     fi
+}
+
+# Safe JSON extraction helper
+extract_json_field() {
+    local json_output="$1"
+    local field_path="$2"
+    local default="${3:-N/A}"
+    
+    echo "$json_output" | jq -r "$field_path // \"$default\"" 2>/dev/null || echo "$default"
 }
 
 # Checkpoint System (for rollback capability)
@@ -126,7 +141,7 @@ create_checkpoint() {
     local checkpoint_name=$1
     if [ -f "$OUTPUT_FILE" ]; then
         cp "$OUTPUT_FILE" "${OUTPUT_FILE}.checkpoint_${checkpoint_name}"
-        echo "💾 Checkpoint created: $checkpoint_name"
+        echo "💾 Checkpoint created: $checkpoint_name" >&2
     fi
 }
 
@@ -203,13 +218,13 @@ BULLETS_OUTPUT=$(execute_tool "ppt_add_bullet_list.py" "Add summary bullets" \
     --font-size 20 \
     --json)
 
-# Check readability score
-READABILITY_SCORE=$(echo "$BULLETS_OUTPUT" | jq -r '.readability.score // "N/A"')
-READABILITY_GRADE=$(echo "$BULLETS_OUTPUT" | jq -r '.readability.grade // "N/A"')
-echo "   📊 Readability: Score $READABILITY_SCORE (Grade: $READABILITY_GRADE)"
+# Check readability score (CORRECTED)
+READABILITY_SCORE=$(extract_json_field "$BULLETS_OUTPUT" '.readability.score')
+READABILITY_GRADE=$(extract_json_field "$BULLETS_OUTPUT" '.readability.grade')
+echo "   📊 Readability: Score $READABILITY_SCORE (Grade: $READABILITY_GRADE)" >&2
 
 if echo "$BULLETS_OUTPUT" | jq -e '.warnings' > /dev/null 2>&1; then
-    echo "$BULLETS_OUTPUT" | jq -r '.warnings[]' | while read -r warning; do
+    echo "$BULLETS_OUTPUT" | jq -r '.warnings[]' 2>/dev/null | while read -r warning; do
         log_warning "Slide 1: $warning"
     done
 fi
