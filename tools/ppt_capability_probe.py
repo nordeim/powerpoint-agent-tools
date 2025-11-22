@@ -359,9 +359,15 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
                 warnings.append(f"Probe exceeded {timeout_seconds}s timeout during layout analysis")
                 break
 
+        # Use actual index from the presentation's layout list for robustness
+        try:
+            original_idx = prs.slide_layouts.index(layout)
+        except ValueError:
+            original_idx = idx # Fallback if something weird happens
+
         layout_info = {
             "index": idx,
-            "original_index": idx, # Since we slice from 0, this is the same.
+            "original_index": original_idx, 
             "name": layout.name,
             "placeholder_count": len(layout.placeholders),
             "master_index": master_map.get(id(layout), None)
@@ -433,29 +439,35 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
     return layouts
 
 
-def extract_theme_colors(prs, warnings: List[str]) -> Dict[str, str]:
+def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     """
-    Extract theme colors from presentation using proper color scheme API.
+    Extract theme colors from presentation or master using proper color scheme API.
     
     Args:
-        prs: Presentation object
+        master_or_prs: Presentation or SlideMaster object
         warnings: List to append warnings to
         
     Returns:
-        Dict mapping color names to hex codes
+        Dict mapping color names to hex codes or scheme references
     """
     colors = {}
     
     try:
-        slide_master = prs.slide_masters[0]
+        # Handle both Presentation (use first master) and SlideMaster objects
+        if hasattr(master_or_prs, 'slide_masters'):
+            slide_master = master_or_prs.slide_masters[0]
+        else:
+            slide_master = master_or_prs
+
         # Use getattr for safety if theme is missing
         theme = getattr(slide_master, 'theme', None)
         if not theme:
-            raise AttributeError("No theme found on slide master")
+            # Don't raise, just return empty to allow partial extraction
+            return {}
             
         color_scheme = getattr(theme, 'theme_color_scheme', None)
         if not color_scheme:
-            raise AttributeError("No color scheme found in theme")
+            return {}
         
         color_attrs = [
             'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
@@ -469,6 +481,10 @@ def extract_theme_colors(prs, warnings: List[str]) -> Dict[str, str]:
                     # Check if it's an RGBColor (has .r, .g, .b)
                     if hasattr(color, 'r'):
                         colors[color_name] = rgb_to_hex(color)
+                    else:
+                        # Fallback for scheme-based colors
+                        colors[color_name] = f"schemeColor:{color_name}"
+                        # We don't warn here to avoid spamming warnings for every color
             except:
                 pass
         
@@ -481,12 +497,12 @@ def extract_theme_colors(prs, warnings: List[str]) -> Dict[str, str]:
     return colors
 
 
-def extract_theme_fonts(prs, warnings: List[str]) -> Dict[str, str]:
+def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     """
-    Extract theme fonts from presentation using proper font scheme API.
+    Extract theme fonts from presentation or master using proper font scheme API.
     
     Args:
-        prs: Presentation object
+        master_or_prs: Presentation or SlideMaster object
         warnings: List to append warnings to
         
     Returns:
@@ -495,7 +511,12 @@ def extract_theme_fonts(prs, warnings: List[str]) -> Dict[str, str]:
     fonts = {}
     
     try:
-        slide_master = prs.slide_masters[0]
+        # Handle both Presentation (use first master) and SlideMaster objects
+        if hasattr(master_or_prs, 'slide_masters'):
+            slide_master = master_or_prs.slide_masters[0]
+        else:
+            slide_master = master_or_prs
+
         theme = getattr(slide_master, 'theme', None)
         
         if theme:
@@ -507,16 +528,34 @@ def extract_theme_fonts(prs, warnings: List[str]) -> Dict[str, str]:
                 if major:
                     latin = getattr(major, 'latin', None)
                     if latin:
-                        # Try to get typeface if it's an object, otherwise use as string
                         fonts['heading'] = getattr(latin, 'typeface', str(latin))
+                    
+                    # Try to get East Asian / Complex Script
+                    ea = getattr(major, 'east_asian', None)
+                    if ea:
+                        fonts['heading_east_asian'] = getattr(ea, 'typeface', str(ea))
+                    cs = getattr(major, 'complex_script', None)
+                    if cs:
+                        fonts['heading_complex'] = getattr(cs, 'typeface', str(cs))
                 
                 if minor:
                     latin = getattr(minor, 'latin', None)
                     if latin:
                         fonts['body'] = getattr(latin, 'typeface', str(latin))
+                    
+                    # Try to get East Asian / Complex Script
+                    ea = getattr(minor, 'east_asian', None)
+                    if ea:
+                        fonts['body_east_asian'] = getattr(ea, 'typeface', str(ea))
+                    cs = getattr(minor, 'complex_script', None)
+                    if cs:
+                        fonts['body_complex'] = getattr(cs, 'typeface', str(cs))
 
         if not fonts:
-            warnings.append("Theme font scheme API unavailable, using fallback detection")
+            # Only warn if we are processing the primary master (passed as Presentation)
+            # or if it's the first master, to avoid noise
+            if hasattr(master_or_prs, 'slide_masters'):
+                 warnings.append("Theme font scheme API unavailable, using fallback detection")
             
             for shape in slide_master.shapes:
                 if hasattr(shape, 'text_frame') and shape.text_frame.paragraphs:
@@ -529,7 +568,8 @@ def extract_theme_fonts(prs, warnings: List[str]) -> Dict[str, str]:
         
         if not fonts:
             fonts = {"heading": "Calibri", "body": "Calibri"}
-            warnings.append("Using default fonts (Calibri) - theme unavailable")
+            if hasattr(master_or_prs, 'slide_masters'):
+                warnings.append("Using default fonts (Calibri) - theme unavailable")
             
     except Exception as e:
         fonts = {"heading": "Calibri", "body": "Calibri"}
@@ -768,10 +808,31 @@ def probe_presentation(
         max_layouts=max_layouts
     )
     
+    # Check if analysis was cut short by timeout
+    analysis_complete = True
+    if timeout_seconds and (time.perf_counter() - start_time) > timeout_seconds:
+        analysis_complete = False
+    
+    # Extract theme info (primary master)
     theme_colors = extract_theme_colors(prs, warnings)
     theme_fonts = extract_theme_fonts(prs, warnings)
     
+    # Extract per-master theme info
+    theme_per_master = []
+    try:
+        for m_idx, master in enumerate(prs.slide_masters):
+            m_colors = extract_theme_colors(master, []) # Don't collect warnings for secondary masters to avoid noise
+            m_fonts = extract_theme_fonts(master, [])
+            theme_per_master.append({
+                "master_index": m_idx,
+                "colors": m_colors,
+                "fonts": m_fonts
+            })
+    except:
+        pass
+    
     capabilities = analyze_capabilities(layouts, prs)
+    capabilities["analysis_complete"] = analysis_complete
     
     duration_ms = int((time.perf_counter() - start_time) * 1000)
     
@@ -806,7 +867,8 @@ def probe_presentation(
         "layouts": layouts,
         "theme": {
             "colors": theme_colors,
-            "fonts": theme_fonts
+            "fonts": theme_fonts,
+            "per_master": theme_per_master
         },
         "capabilities": capabilities,
         "warnings": warnings,
@@ -815,6 +877,8 @@ def probe_presentation(
     
     is_valid, missing_fields = validate_output(result)
     if not is_valid:
+        result["status"] = "error"
+        result["error_type"] = "SchemaValidationError"
         warnings.append(f"Output validation found missing fields: {', '.join(missing_fields)}")
     
     return result
