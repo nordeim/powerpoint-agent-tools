@@ -833,7 +833,7 @@ echo "✓ Design standards applied"false --jsonysis" \--color "#FFFFFF" --json==
 }
 ✓ Design standards applied
 
---
+---
 
 $ # ============================================================================
 # STEP 16: Professional Polish - Visual Layering
@@ -948,10 +948,10 @@ Running mandatory validation checks...
 Validation Result: {
   "status": "warnings",
   "file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
-  "total_issues": 2,
+  "total_issues": 1,
   "summary": {
     "empty_slides": 0,
-    "slides_without_titles": 1,
+    "slides_without_titles": 0,
     "missing_alt_text": 0,
     "low_contrast": 0,
     "low_resolution_images": 0,
@@ -959,8 +959,8 @@ Validation Result: {
   },
   "details": {
     "validation": {
-      "status": "issues_found",
-      "total_issues": 1,
+      "status": "valid",
+      "total_issues": 0,
       "issues": {
         "empty_slides": [],
         "text_overflow": [],
@@ -968,9 +968,7 @@ Validation Result: {
           "Calibri",
           "Arial"
         ],
-        "slides_without_titles": [
-          0
-        ]
+        "slides_without_titles": []
       }
     },
     "accessibility": {
@@ -998,16 +996,7 @@ Validation Result: {
       }
     }
   },
-  "recommendations": [
-    {
-      "priority": "medium",
-      "issue": "Slides without titles",
-      "action": "Add titles using ppt_set_title.py",
-      "affected_slides": [
-        0
-      ]
-    }
-  ]
+  "recommendations": []
 }
 Accessibility Result: {
   "status": "issues_found",
@@ -1029,25 +1018,13 @@ Accessibility Result: {
   "status": "success",
   "input_file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
   "output_file": "/home/project/powerpoint-agent-tools/bitcoin_report_q4_2025.pdf",
-  "input_size_bytes": 56529,
+  "input_size_bytes": 56572,
   "input_size_mb": 0.05,
-  "output_size_bytes": 112673,
+  "output_size_bytes": 113247,
   "output_size_mb": 0.11,
-  "size_ratio": 1.99
+  "size_ratio": 2.0
 }
-{
-  "status": "success",
-  "input_file": "/home/project/powerpoint-agent-tools/bitcoin_market_report_q4_2025.pptx",
-  "output_dir": "/home/project/powerpoint-agent-tools/ppt_export",
-  "format": "png",
-  "slides_exported": 1,
-  "files": [
-    "/home/project/powerpoint-agent-tools/ppt_export/slide_001.png"
-  ],
-  "total_size_bytes": 4318,
-  "total_size_mb": 0.0,
-  "average_size_mb": 0.0
-}
+null
 ✓ PDF and PNG exports created to validated directories
 
 ==================================================
