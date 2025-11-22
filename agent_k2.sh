@@ -169,7 +169,7 @@ echo "Accessibility Result: $ACCESSIBILITY"
 
 # Extract slide count for confirmation
 INFO=$(uv run tools/ppt_get_info.py --file "$OUTPUT" --json)
-SLIDE_COUNT=$(echo "$INFO" | grep -o '"slides":[0-9]*' | grep -o '[0-9]*')
+SLIDE_COUNT=$(echo "$INFO" | grep -o '"slide_count": *[0-9]*' | grep -o '[0-9]*')
 echo "✓ Final deck contains $SLIDE_COUNT slides"
 
 # ============================================================================

@@ -600,7 +600,8 @@ class AccessibilityChecker:
             has_title = False
             for shape in slide.shapes:
                 if shape.is_placeholder:
-                    if shape.placeholder_format.type == 1:  # Title
+                    # Check for TITLE (1) or CENTER_TITLE (3)
+                    if shape.placeholder_format.type == 1 or shape.placeholder_format.type == 3:
                         if shape.has_text_frame and shape.text_frame.text.strip():
                             has_title = True
                             break
@@ -1129,7 +1130,8 @@ class PowerPointAgent:
             
             # Set bullet style
             if bullet_style == "bullet":
-                p.font.name = "Arial"
+                # Use bullet character (default)
+                pass
             elif bullet_style == "numbered":
                 # Note: python-pptx has limited numbered list support
                 p.text = f"{idx + 1}. {item}"
