@@ -132,6 +132,12 @@ Now, please meticulously review and analyze @CLAUDE.md , @PowerPoint_Tool_Develo
 
 ---
 
+awesome job on meticulous analysis, planning and execution! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically how best to apply precise targeted fix to @ppt_capability_probe.py to incorporate your suggested improvements. Always remember to design tests to validate any of your findings, do not assume anything to avoid inadvertently introducing other bugs or regression errors. So the mantra for you is meticulously review, design tests to confirm findings and formulated fixes. then create implementation plan with integrated checklist. After making changes/edits to each code file, thoroughly review the resulting version against the checklist. Before wrapping up any task, design a test to validate the correctness and accuracy of each updated file to avoid regression. Regression is a real threat whenever updates are made, so you need to be extremely thorough and meticulous.
+
+Then meticulously create an implementation plan to patch the tool. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:

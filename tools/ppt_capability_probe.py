@@ -3,7 +3,7 @@
 PowerPoint Capability Probe Tool
 Detect and report presentation template capabilities, layouts, and theme properties
 
-Version 1.1.0 - QA Fixes & Production Hardening
+Version 1.1.1 - Schema Alignment & Strict Validation
 
 This tool provides comprehensive introspection of PowerPoint presentations to detect:
 - Available layouts and their placeholders (with accurate runtime positions)
@@ -26,6 +26,7 @@ Changes in v1.1.0:
 - Added: Multiple masters support
 - Added: Edge case handling (locked files, large templates, timeouts)
 - Added: Comprehensive validation before output
+- Updated: v1.1.1 - Aligned with schema v1.1.1 and added strict validation
 
 Usage:
     # Basic probe (essential info)
@@ -75,6 +76,7 @@ except ImportError:
     sys.exit(1)
 
 from core.powerpoint_agent_core import PowerPointAgentError
+from core.strict_validator import validate_against_schema
 
 
 def get_library_versions() -> Dict[str, str]:
@@ -925,8 +927,8 @@ def probe_presentation(
         "metadata": {
             "file": str(filepath),
             "probed_at": datetime.now().isoformat(),
-            "tool_version": "1.1.0",
-            "schema_version": "capability_probe.v1.1.0",
+            "tool_version": "1.1.1",
+            "schema_version": "capability_probe.v1.1.1",
             "operation_id": operation_id,
             "deep_analysis": deep,
             "analysis_mode": "deep" if deep else "essential",
@@ -966,6 +968,19 @@ def probe_presentation(
         result["error_type"] = "SchemaValidationError"
         warnings.append(f"Output validation found missing fields: {', '.join(missing_fields)}")
     
+    # Strict Schema Validation
+    try:
+        schema_path = Path(__file__).parent.parent / "schemas" / "capability_probe.v1.1.1.schema.json"
+        validate_against_schema(result, str(schema_path))
+    except Exception as e:
+        # If strict validation fails, we still return the result but mark it as error
+        # or just append a warning if we want to be lenient. 
+        # Given "strict" goal, let's mark as error if it wasn't already.
+        if result["status"] == "success":
+            result["status"] = "error"
+            result["error_type"] = "StrictSchemaValidationError"
+        warnings.append(f"Strict schema validation failed: {str(e)}")
+    
     return result
 
 
@@ -982,7 +997,7 @@ def format_summary(probe_result: Dict[str, Any]) -> str:
     lines = []
     
     lines.append("═══════════════════════════════════════════════════════════════")
-    lines.append("PowerPoint Capability Probe Report v1.1.0")
+    lines.append("PowerPoint Capability Probe Report v1.1.1")
     lines.append("═══════════════════════════════════════════════════════════════")
     lines.append("")
     
@@ -1074,7 +1089,7 @@ def format_summary(probe_result: Dict[str, Any]) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Probe PowerPoint presentation capabilities (v1.1.0)",
+        description="Probe PowerPoint presentation capabilities (v1.1.1)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1093,7 +1108,7 @@ Examples:
   # Large template with layout limit
   uv run tools/ppt_capability_probe.py --file big_template.pptx --max-layouts 20 --json
 
-Output Schema (v1.1.0):
+Output Schema (v1.1.1):
   {
     "status": "success",                    // Always present for automation
     "metadata": {
@@ -1121,7 +1136,7 @@ Changes in v1.1.0:
   - Comprehensive validation
   - Edge Cases (locked files, large templates, timeouts)
 
-Version: 1.1.0
+Version: 1.1.1
 Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
@@ -1212,7 +1227,7 @@ Requires: core/powerpoint_agent_core.py v1.1.0+
             "error_type": type(e).__name__,
             "metadata": {
                 "file": str(args.file) if args.file else None,
-                "tool_version": "1.1.0",
+                "tool_version": "1.1.1",
                 "operation_id": str(uuid.uuid4()),
                 "probed_at": datetime.now().isoformat()
             },
