@@ -512,7 +512,7 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
         if not colors:
             warnings.append("Theme color scheme unavailable or empty")
         elif non_rgb_found:
-            warnings.append("Theme colors include scheme references without explicit RGB")
+            warnings.append("Theme colors include non-RGB scheme references; semantic schemeColor values returned")
             
     except Exception as e:
         warnings.append(f"Theme color extraction failed: {str(e)}")
@@ -916,6 +916,7 @@ def probe_presentation(
             "timeout_seconds": timeout_seconds,
             "layout_count_total": len(all_layouts),
             "layout_count_analyzed": len(layouts),
+            "warnings_count": len(warnings),
             "library_versions": get_library_versions(),
             "checksum": checksum_before if verify_atomic else "verification_skipped"
         },

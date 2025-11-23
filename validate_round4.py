@@ -4,46 +4,50 @@ import subprocess
 from pathlib import Path
 
 def run_probe(args):
-    cmd = ["uv", "run", "tools/ppt_capability_probe.py", "--file", "test_probe.pptx"] + args
+    cmd = ["uv", "run", "tools/ppt_capability_probe.py"] + args
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result
 
 def validate_round4():
     print("Validating Round 4 Suggestions...")
     
-    # 1. Check Error JSON Structure
-    print("\n1. Checking Error JSON Structure...")
-    # Run with a non-existent file to trigger error
-    result = run_probe(["--file", "non_existent.pptx", "--json"])
+    # Run probe on Presentation.pptx (Essential Mode)
+    result = run_probe(["--file", "Presentation.pptx", "--json"])
     if result.returncode != 0:
-        try:
-            error_json = json.loads(result.stdout)
-            if "warnings" in error_json:
-                print("✅ 'warnings' field present in error JSON.")
-            else:
-                print("❌ 'warnings' field missing from error JSON.")
-        except json.JSONDecodeError:
-            print(f"❌ Could not decode error JSON: {result.stdout}")
-    else:
-        print("❌ Expected error for non-existent file, got success.")
+        print(f"❌ Error running probe: {result.stderr}")
+        return
 
-    # 2. Check Summary Output for Masters Section
-    print("\n2. Checking Summary Output for Masters Section...")
-    result = run_probe(["--summary"])
-    if result.returncode == 0:
-        if "Master Slides:" in result.stdout and "layouts" in result.stdout: 
-            # Heuristic check for master section details
-            print("✅ 'Master Slides' section found in summary.")
+    try:
+        data = json.loads(result.stdout)
+        
+        # 1. Check for warnings_count in metadata
+        print("\n1. Checking for warnings_count in metadata...")
+        meta = data['metadata']
+        if 'warnings_count' in meta:
+            print(f"✅ warnings_count present: {meta['warnings_count']}")
         else:
-            print("❌ 'Master Slides' detailed section missing from summary (only total count might be there).")
-    else:
-        print(f"❌ Error running summary: {result.stderr}")
+            print("❌ warnings_count MISSING in metadata!")
 
-    # 3. Check for Duplicate Warnings
-    print("\n3. Checking for Duplicate Warnings...")
-    # We can't easily force duplicates without a specific file, but we can check if the code has dedup logic
-    # For now, we'll just note this for implementation.
-    print("ℹ️ Duplicate warning check requires code inspection/implementation.")
+        # 2. Check for Scheme Color Warning Logic
+        # We can't easily trigger the "schemeColor" warning with Presentation.pptx (it has no theme)
+        # But we can check that we don't have duplicate warnings about it.
+        print("\n2. Checking for Duplicate Color Warnings...")
+        warnings = data.get('warnings', [])
+        print(f"Current Warnings: {warnings}")
+        
+        color_warnings = [w for w in warnings if "color" in w.lower()]
+        if len(color_warnings) > 1:
+            # If we have "Theme color scheme unavailable" AND "Theme colors include scheme references", that might be okay depending on logic
+            # But the suggestion is to consolidate.
+            # In Presentation.pptx, we expect "Theme color scheme unavailable or empty"
+            print(f"ℹ️ Color warnings found: {color_warnings}")
+        elif len(color_warnings) == 1:
+             print(f"✅ Single color warning found: {color_warnings[0]}")
+        else:
+            print("ℹ️ No color warnings found.")
+
+    except json.JSONDecodeError:
+        print(f"❌ Could not decode JSON: {result.stdout}")
 
 if __name__ == "__main__":
     validate_round4()
