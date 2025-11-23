@@ -340,7 +340,13 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
     try:
         for m_idx, master in enumerate(prs.slide_masters):
             for l in master.slide_layouts:
-                master_map[id(l)] = m_idx
+                # Use partname as a stable key instead of id()
+                # This handles cases where python-pptx might wrap objects differently
+                try:
+                    key = l.part.partname
+                except:
+                    key = id(l)
+                master_map[key] = m_idx
     except:
         pass
 
@@ -372,12 +378,18 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
         except ValueError:
             original_idx = idx # Fallback if something weird happens
 
+        # Determine master index using stable key
+        try:
+            key = layout.part.partname
+        except:
+            key = id(layout)
+            
         layout_info = {
             "index": idx,
             "original_index": original_idx, 
             "name": layout.name,
             "placeholder_count": len(layout.placeholders),
-            "master_index": master_map.get(id(layout), None)
+            "master_index": master_map.get(key, None)
         }
         
         if deep:
@@ -435,6 +447,13 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
                 layout_info["placeholder_expected"] = len(layout.placeholders)
                 layout_info["placeholder_instantiated"] = len(placeholders)
                 layout_info["_warning"] = "Using template positions (instantiation failed)"
+        
+        if deep and layout_info.get("placeholder_instantiated", 0) != layout_info.get("placeholder_expected", 0):
+             if "_warning" not in layout_info:
+                 layout_info["_warning"] = "Using template positions (instantiation incomplete)"
+             # Also append to top-level warnings if not already there (optional, but good for visibility)
+             # We'll rely on the layout-level warning for now to avoid spamming top-level warnings
+             pass
         
         placeholder_map = {}
         placeholder_types = []
@@ -917,6 +936,15 @@ def probe_presentation(
             "layout_count_total": len(all_layouts),
             "layout_count_analyzed": len(layouts),
             "warnings_count": len(warnings),
+            "masters": [
+                {
+                    "master_index": m_idx,
+                    "layout_count": len(m.slide_layouts),
+                    "name": getattr(m, 'name', f"Master {m_idx}"),
+                    "rId": getattr(m, 'rId', None) if hasattr(m, 'rId') else None
+                }
+                for m_idx, m in enumerate(prs.slide_masters)
+            ],
             "library_versions": get_library_versions(),
             "checksum": checksum_before if verify_atomic else "verification_skipped"
         },

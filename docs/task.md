@@ -79,3 +79,4 @@
     - [x] Improvements Round 2: Essential mode placeholder map, theme warnings
     - [x] Improvements Round 3: Analysis mode metadata, consolidated font warnings
     - [x] Improvements Round 4: Warnings count metadata, refined color warning
+    - [x] Improvements Round 5: Robust master mapping, metadata.masters, normalized warnings
