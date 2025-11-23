@@ -1,4 +1,4 @@
-$ find core/*py tools/*py schemas/*json -type f
+$ find core/*py tools/*py schemas/*json requirements.txt CLAUDE.md master_plan.md -type f
 core/__init__.py
 core/powerpoint_agent_core.py
 core/strict_validator.py
@@ -38,3 +38,6 @@ tools/ppt_set_title.py
 tools/ppt_update_chart_data.py
 tools/ppt_validate_presentation.py
 schemas/capability_probe.v1.1.1.schema.json
+requirements.txt
+CLAUDE.md
+master_plan.md
