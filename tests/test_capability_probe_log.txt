@@ -1,16 +1,28 @@
-$ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
+$ uv run tools/ppt_capability_probe.py --file templates/Presentation.pptx --json 
 {
   "status": "success",
   "metadata": {
-    "file": "Presentation.pptx",
-    "probed_at": "2025-11-23T06:23:49.761316",
-    "tool_version": "1.1.0",
-    "schema_version": "capability_probe.v1.1.0",
-    "operation_id": "8afdf4e5-c467-4f39-91b9-a0f01ca94fdc",
+    "file": "templates/Presentation.pptx",
+    "probed_at": "2025-11-23T18:27:03.028210",
+    "tool_version": "1.1.1",
+    "schema_version": "capability_probe.v1.1.1",
+    "operation_id": "103269a9-b3c6-4bff-a6ab-1ffb4a890310",
     "deep_analysis": false,
+    "analysis_mode": "essential",
     "atomic_verified": true,
-    "duration_ms": 123,
+    "duration_ms": 118,
     "timeout_seconds": 30,
+    "layout_count_total": 50,
+    "layout_count_analyzed": 50,
+    "warnings_count": 2,
+    "masters": [
+      {
+        "master_index": 0,
+        "layout_count": 50,
+        "name": "",
+        "rId": null
+      }
+    ],
     "library_versions": {
       "python-pptx": "0.6.23",
       "Pillow": "12.0.0"
@@ -42,7 +54,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1,
+        "SUBTITLE": 1,
+        "PICTURE": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 1,
@@ -55,7 +75,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "SLIDE_NUMBER",
         "FOOTER",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 2,
@@ -70,7 +96,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1,
+        "SUBTITLE": 1,
+        "PICTURE": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 3,
@@ -82,7 +116,12 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "CENTER_TITLE",
         "SUBTITLE",
         "PICTURE"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1,
+        "SUBTITLE": 1,
+        "PICTURE": 1
+      }
     },
     {
       "index": 4,
@@ -95,7 +134,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "SUBTITLE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1,
+        "SUBTITLE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 5,
@@ -108,7 +153,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "SUBTITLE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1,
+        "SUBTITLE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 6,
@@ -122,7 +173,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1,
+        "SUBTITLE": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 7,
@@ -132,7 +190,10 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "master_index": 0,
       "placeholder_types": [
         "CENTER_TITLE"
-      ]
+      ],
+      "placeholder_map": {
+        "CENTER_TITLE": 1
+      }
     },
     {
       "index": 8,
@@ -146,7 +207,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "PICTURE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "PICTURE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 9,
@@ -159,7 +227,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "SLIDE_NUMBER",
         "FOOTER",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 10,
@@ -174,7 +248,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 11,
@@ -187,7 +269,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "OBJECT",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 12,
@@ -201,7 +289,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 13,
@@ -215,7 +310,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 14,
@@ -229,7 +331,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 15,
@@ -243,7 +352,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 16,
@@ -257,7 +373,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "PICTURE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "PICTURE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 17,
@@ -271,7 +394,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "OBJECT",
         "PICTURE"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "OBJECT": 1,
+        "PICTURE": 1
+      }
     },
     {
       "index": 18,
@@ -286,7 +416,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 19,
@@ -301,7 +439,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "SLIDE_NUMBER",
         "PICTURE"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1,
+        "PICTURE": 1
+      }
     },
     {
       "index": 20,
@@ -316,7 +462,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 21,
@@ -331,7 +485,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "SLIDE_NUMBER",
         "PICTURE"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1,
+        "PICTURE": 1
+      }
     },
     {
       "index": 22,
@@ -346,7 +508,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 23,
@@ -361,7 +531,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "SLIDE_NUMBER",
         "PICTURE"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1,
+        "PICTURE": 1
+      }
     },
     {
       "index": 24,
@@ -376,7 +554,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 25,
@@ -390,7 +576,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "PICTURE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "PICTURE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 26,
@@ -405,7 +598,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 27,
@@ -420,7 +621,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 28,
@@ -435,7 +644,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 29,
@@ -450,7 +667,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "SLIDE_NUMBER",
         "OBJECT",
         "PICTURE"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1,
+        "OBJECT": 1,
+        "PICTURE": 1
+      }
     },
     {
       "index": 30,
@@ -464,7 +689,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "FOOTER",
         "PICTURE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "SLIDE_NUMBER": 1,
+        "FOOTER": 1,
+        "PICTURE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 31,
@@ -479,7 +711,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 32,
@@ -494,7 +734,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 33,
@@ -505,7 +753,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 34,
@@ -516,7 +768,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 35,
@@ -527,7 +783,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 36,
@@ -538,7 +798,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 37,
@@ -549,7 +813,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 38,
@@ -560,7 +828,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 39,
@@ -571,7 +843,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 40,
@@ -582,7 +858,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 41,
@@ -593,7 +873,11 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
       "placeholder_types": [
         "TITLE",
         "OBJECT"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1
+      }
     },
     {
       "index": 42,
@@ -606,7 +890,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "BODY",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "BODY": 2,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 43,
@@ -620,7 +910,14 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "BODY": 4,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 44,
@@ -633,7 +930,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 45,
@@ -645,7 +948,12 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 46,
@@ -660,7 +968,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "DATE",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "BODY": 1,
+        "OBJECT": 1,
+        "DATE": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 47,
@@ -673,7 +989,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "BODY",
         "PICTURE",
         "DATE"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "BODY": 1,
+        "PICTURE": 1,
+        "DATE": 1
+      }
     },
     {
       "index": 48,
@@ -686,7 +1008,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "OBJECT",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     },
     {
       "index": 49,
@@ -699,7 +1027,13 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
         "OBJECT",
         "FOOTER",
         "SLIDE_NUMBER"
-      ]
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "OBJECT": 1,
+        "FOOTER": 1,
+        "SLIDE_NUMBER": 1
+      }
     }
   ],
   "theme": {
@@ -726,415 +1060,619 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
     "layouts_with_footer": [
       {
         "index": 0,
-        "name": "Title with Picture"
+        "original_index": 0,
+        "name": "Title with Picture",
+        "master_index": 0
       },
       {
         "index": 1,
-        "name": "Content"
+        "original_index": 1,
+        "name": "Content",
+        "master_index": 0
       },
       {
         "index": 2,
-        "name": "Title with Picture 2"
+        "original_index": 2,
+        "name": "Title with Picture 2",
+        "master_index": 0
       },
       {
         "index": 4,
-        "name": "Title"
+        "original_index": 4,
+        "name": "Title",
+        "master_index": 0
       },
       {
         "index": 5,
-        "name": "Title 2"
+        "original_index": 5,
+        "name": "Title 2",
+        "master_index": 0
       },
       {
         "index": 6,
-        "name": "Title 3"
+        "original_index": 6,
+        "name": "Title 3",
+        "master_index": 0
       },
       {
         "index": 8,
-        "name": "Agenda"
+        "original_index": 8,
+        "name": "Agenda",
+        "master_index": 0
       },
       {
         "index": 9,
-        "name": "Agenda 2"
+        "original_index": 9,
+        "name": "Agenda 2",
+        "master_index": 0
       },
       {
         "index": 10,
-        "name": "Agenda with Picture"
+        "original_index": 10,
+        "name": "Agenda with Picture",
+        "master_index": 0
       },
       {
         "index": 11,
-        "name": "Content 2"
+        "original_index": 11,
+        "name": "Content 2",
+        "master_index": 0
       },
       {
         "index": 12,
-        "name": "Content 3"
+        "original_index": 12,
+        "name": "Content 3",
+        "master_index": 0
       },
       {
         "index": 13,
-        "name": "Content 4"
+        "original_index": 13,
+        "name": "Content 4",
+        "master_index": 0
       },
       {
         "index": 14,
-        "name": "Content 5"
+        "original_index": 14,
+        "name": "Content 5",
+        "master_index": 0
       },
       {
         "index": 15,
-        "name": "Content 6"
+        "original_index": 15,
+        "name": "Content 6",
+        "master_index": 0
       },
       {
         "index": 16,
-        "name": "Content with Picture"
+        "original_index": 16,
+        "name": "Content with Picture",
+        "master_index": 0
       },
       {
         "index": 17,
-        "name": "Content with Picture 2"
+        "original_index": 17,
+        "name": "Content with Picture 2",
+        "master_index": 0
       },
       {
         "index": 18,
-        "name": "Content with Picture 3"
+        "original_index": 18,
+        "name": "Content with Picture 3",
+        "master_index": 0
       },
       {
         "index": 19,
-        "name": "Content with Picture 4"
+        "original_index": 19,
+        "name": "Content with Picture 4",
+        "master_index": 0
       },
       {
         "index": 20,
-        "name": "Content with Picture 5"
+        "original_index": 20,
+        "name": "Content with Picture 5",
+        "master_index": 0
       },
       {
         "index": 21,
-        "name": "Content with Picture 6"
+        "original_index": 21,
+        "name": "Content with Picture 6",
+        "master_index": 0
       },
       {
         "index": 22,
-        "name": "Content with Picture 7"
+        "original_index": 22,
+        "name": "Content with Picture 7",
+        "master_index": 0
       },
       {
         "index": 23,
-        "name": "Content with Picture 8"
+        "original_index": 23,
+        "name": "Content with Picture 8",
+        "master_index": 0
       },
       {
         "index": 24,
-        "name": "Content with Picture 9"
+        "original_index": 24,
+        "name": "Content with Picture 9",
+        "master_index": 0
       },
       {
         "index": 25,
-        "name": "Content with Picture 10"
+        "original_index": 25,
+        "name": "Content with Picture 10",
+        "master_index": 0
       },
       {
         "index": 26,
-        "name": "Content with Picture 11"
+        "original_index": 26,
+        "name": "Content with Picture 11",
+        "master_index": 0
       },
       {
         "index": 27,
-        "name": "Content with Picture 12"
+        "original_index": 27,
+        "name": "Content with Picture 12",
+        "master_index": 0
       },
       {
         "index": 28,
-        "name": "Content with Picture 13"
+        "original_index": 28,
+        "name": "Content with Picture 13",
+        "master_index": 0
       },
       {
         "index": 29,
-        "name": "Content with Picture 14"
+        "original_index": 29,
+        "name": "Content with Picture 14",
+        "master_index": 0
       },
       {
         "index": 30,
-        "name": "Content with Picture 15"
+        "original_index": 30,
+        "name": "Content with Picture 15",
+        "master_index": 0
       },
       {
         "index": 31,
-        "name": "Content with Picture 16"
+        "original_index": 31,
+        "name": "Content with Picture 16",
+        "master_index": 0
       },
       {
         "index": 32,
-        "name": "Content with Picture 17"
+        "original_index": 32,
+        "name": "Content with Picture 17",
+        "master_index": 0
       },
       {
         "index": 42,
-        "name": "Two Content"
+        "original_index": 42,
+        "name": "Two Content",
+        "master_index": 0
       },
       {
         "index": 43,
-        "name": "Comparison"
+        "original_index": 43,
+        "name": "Comparison",
+        "master_index": 0
       },
       {
         "index": 44,
-        "name": "Title Only"
+        "original_index": 44,
+        "name": "Title Only",
+        "master_index": 0
       },
       {
         "index": 45,
-        "name": "Blank"
+        "original_index": 45,
+        "name": "Blank",
+        "master_index": 0
       },
       {
         "index": 46,
-        "name": "Content with Caption"
+        "original_index": 46,
+        "name": "Content with Caption",
+        "master_index": 0
       },
       {
         "index": 48,
-        "name": "Conclusion"
+        "original_index": 48,
+        "name": "Conclusion",
+        "master_index": 0
       },
       {
         "index": 49,
-        "name": "Conclusion 2"
+        "original_index": 49,
+        "name": "Conclusion 2",
+        "master_index": 0
       }
     ],
     "layouts_with_slide_number": [
       {
         "index": 0,
-        "name": "Title with Picture"
+        "original_index": 0,
+        "name": "Title with Picture",
+        "master_index": 0
       },
       {
         "index": 1,
-        "name": "Content"
+        "original_index": 1,
+        "name": "Content",
+        "master_index": 0
       },
       {
         "index": 2,
-        "name": "Title with Picture 2"
+        "original_index": 2,
+        "name": "Title with Picture 2",
+        "master_index": 0
       },
       {
         "index": 4,
-        "name": "Title"
+        "original_index": 4,
+        "name": "Title",
+        "master_index": 0
       },
       {
         "index": 5,
-        "name": "Title 2"
+        "original_index": 5,
+        "name": "Title 2",
+        "master_index": 0
       },
       {
         "index": 6,
-        "name": "Title 3"
+        "original_index": 6,
+        "name": "Title 3",
+        "master_index": 0
       },
       {
         "index": 8,
-        "name": "Agenda"
+        "original_index": 8,
+        "name": "Agenda",
+        "master_index": 0
       },
       {
         "index": 9,
-        "name": "Agenda 2"
+        "original_index": 9,
+        "name": "Agenda 2",
+        "master_index": 0
       },
       {
         "index": 10,
-        "name": "Agenda with Picture"
+        "original_index": 10,
+        "name": "Agenda with Picture",
+        "master_index": 0
       },
       {
         "index": 11,
-        "name": "Content 2"
+        "original_index": 11,
+        "name": "Content 2",
+        "master_index": 0
       },
       {
         "index": 12,
-        "name": "Content 3"
+        "original_index": 12,
+        "name": "Content 3",
+        "master_index": 0
       },
       {
         "index": 13,
-        "name": "Content 4"
+        "original_index": 13,
+        "name": "Content 4",
+        "master_index": 0
       },
       {
         "index": 14,
-        "name": "Content 5"
+        "original_index": 14,
+        "name": "Content 5",
+        "master_index": 0
       },
       {
         "index": 15,
-        "name": "Content 6"
+        "original_index": 15,
+        "name": "Content 6",
+        "master_index": 0
       },
       {
         "index": 16,
-        "name": "Content with Picture"
+        "original_index": 16,
+        "name": "Content with Picture",
+        "master_index": 0
       },
       {
         "index": 17,
-        "name": "Content with Picture 2"
+        "original_index": 17,
+        "name": "Content with Picture 2",
+        "master_index": 0
       },
       {
         "index": 18,
-        "name": "Content with Picture 3"
+        "original_index": 18,
+        "name": "Content with Picture 3",
+        "master_index": 0
       },
       {
         "index": 19,
-        "name": "Content with Picture 4"
+        "original_index": 19,
+        "name": "Content with Picture 4",
+        "master_index": 0
       },
       {
         "index": 20,
-        "name": "Content with Picture 5"
+        "original_index": 20,
+        "name": "Content with Picture 5",
+        "master_index": 0
       },
       {
         "index": 21,
-        "name": "Content with Picture 6"
+        "original_index": 21,
+        "name": "Content with Picture 6",
+        "master_index": 0
       },
       {
         "index": 22,
-        "name": "Content with Picture 7"
+        "original_index": 22,
+        "name": "Content with Picture 7",
+        "master_index": 0
       },
       {
         "index": 23,
-        "name": "Content with Picture 8"
+        "original_index": 23,
+        "name": "Content with Picture 8",
+        "master_index": 0
       },
       {
         "index": 24,
-        "name": "Content with Picture 9"
+        "original_index": 24,
+        "name": "Content with Picture 9",
+        "master_index": 0
       },
       {
         "index": 25,
-        "name": "Content with Picture 10"
+        "original_index": 25,
+        "name": "Content with Picture 10",
+        "master_index": 0
       },
       {
         "index": 26,
-        "name": "Content with Picture 11"
+        "original_index": 26,
+        "name": "Content with Picture 11",
+        "master_index": 0
       },
       {
         "index": 27,
-        "name": "Content with Picture 12"
+        "original_index": 27,
+        "name": "Content with Picture 12",
+        "master_index": 0
       },
       {
         "index": 28,
-        "name": "Content with Picture 13"
+        "original_index": 28,
+        "name": "Content with Picture 13",
+        "master_index": 0
       },
       {
         "index": 29,
-        "name": "Content with Picture 14"
+        "original_index": 29,
+        "name": "Content with Picture 14",
+        "master_index": 0
       },
       {
         "index": 30,
-        "name": "Content with Picture 15"
+        "original_index": 30,
+        "name": "Content with Picture 15",
+        "master_index": 0
       },
       {
         "index": 31,
-        "name": "Content with Picture 16"
+        "original_index": 31,
+        "name": "Content with Picture 16",
+        "master_index": 0
       },
       {
         "index": 32,
-        "name": "Content with Picture 17"
+        "original_index": 32,
+        "name": "Content with Picture 17",
+        "master_index": 0
       },
       {
         "index": 42,
-        "name": "Two Content"
+        "original_index": 42,
+        "name": "Two Content",
+        "master_index": 0
       },
       {
         "index": 43,
-        "name": "Comparison"
+        "original_index": 43,
+        "name": "Comparison",
+        "master_index": 0
       },
       {
         "index": 44,
-        "name": "Title Only"
+        "original_index": 44,
+        "name": "Title Only",
+        "master_index": 0
       },
       {
         "index": 45,
-        "name": "Blank"
+        "original_index": 45,
+        "name": "Blank",
+        "master_index": 0
       },
       {
         "index": 46,
-        "name": "Content with Caption"
+        "original_index": 46,
+        "name": "Content with Caption",
+        "master_index": 0
       },
       {
         "index": 48,
-        "name": "Conclusion"
+        "original_index": 48,
+        "name": "Conclusion",
+        "master_index": 0
       },
       {
         "index": 49,
-        "name": "Conclusion 2"
+        "original_index": 49,
+        "name": "Conclusion 2",
+        "master_index": 0
       }
     ],
     "layouts_with_date": [
       {
         "index": 0,
-        "name": "Title with Picture"
+        "original_index": 0,
+        "name": "Title with Picture",
+        "master_index": 0
       },
       {
         "index": 2,
-        "name": "Title with Picture 2"
+        "original_index": 2,
+        "name": "Title with Picture 2",
+        "master_index": 0
       },
       {
         "index": 6,
-        "name": "Title 3"
+        "original_index": 6,
+        "name": "Title 3",
+        "master_index": 0
       },
       {
         "index": 10,
-        "name": "Agenda with Picture"
+        "original_index": 10,
+        "name": "Agenda with Picture",
+        "master_index": 0
       },
       {
         "index": 12,
-        "name": "Content 3"
+        "original_index": 12,
+        "name": "Content 3",
+        "master_index": 0
       },
       {
         "index": 13,
-        "name": "Content 4"
+        "original_index": 13,
+        "name": "Content 4",
+        "master_index": 0
       },
       {
         "index": 14,
-        "name": "Content 5"
+        "original_index": 14,
+        "name": "Content 5",
+        "master_index": 0
       },
       {
         "index": 15,
-        "name": "Content 6"
+        "original_index": 15,
+        "name": "Content 6",
+        "master_index": 0
       },
       {
         "index": 18,
-        "name": "Content with Picture 3"
+        "original_index": 18,
+        "name": "Content with Picture 3",
+        "master_index": 0
       },
       {
         "index": 19,
-        "name": "Content with Picture 4"
+        "original_index": 19,
+        "name": "Content with Picture 4",
+        "master_index": 0
       },
       {
         "index": 20,
-        "name": "Content with Picture 5"
+        "original_index": 20,
+        "name": "Content with Picture 5",
+        "master_index": 0
       },
       {
         "index": 21,
-        "name": "Content with Picture 6"
+        "original_index": 21,
+        "name": "Content with Picture 6",
+        "master_index": 0
       },
       {
         "index": 22,
-        "name": "Content with Picture 7"
+        "original_index": 22,
+        "name": "Content with Picture 7",
+        "master_index": 0
       },
       {
         "index": 23,
-        "name": "Content with Picture 8"
+        "original_index": 23,
+        "name": "Content with Picture 8",
+        "master_index": 0
       },
       {
         "index": 24,
-        "name": "Content with Picture 9"
+        "original_index": 24,
+        "name": "Content with Picture 9",
+        "master_index": 0
       },
       {
         "index": 26,
-        "name": "Content with Picture 11"
+        "original_index": 26,
+        "name": "Content with Picture 11",
+        "master_index": 0
       },
       {
         "index": 27,
-        "name": "Content with Picture 12"
+        "original_index": 27,
+        "name": "Content with Picture 12",
+        "master_index": 0
       },
       {
         "index": 28,
-        "name": "Content with Picture 13"
+        "original_index": 28,
+        "name": "Content with Picture 13",
+        "master_index": 0
       },
       {
         "index": 29,
-        "name": "Content with Picture 14"
+        "original_index": 29,
+        "name": "Content with Picture 14",
+        "master_index": 0
       },
       {
         "index": 31,
-        "name": "Content with Picture 16"
+        "original_index": 31,
+        "name": "Content with Picture 16",
+        "master_index": 0
       },
       {
         "index": 32,
-        "name": "Content with Picture 17"
+        "original_index": 32,
+        "name": "Content with Picture 17",
+        "master_index": 0
       },
       {
         "index": 43,
-        "name": "Comparison"
+        "original_index": 43,
+        "name": "Comparison",
+        "master_index": 0
       },
       {
         "index": 44,
-        "name": "Title Only"
+        "original_index": 44,
+        "name": "Title Only",
+        "master_index": 0
       },
       {
         "index": 45,
-        "name": "Blank"
+        "original_index": 45,
+        "name": "Blank",
+        "master_index": 0
       },
       {
         "index": 46,
-        "name": "Content with Caption"
+        "original_index": 46,
+        "name": "Content with Caption",
+        "master_index": 0
       },
       {
         "index": 47,
-        "name": "Picture with Caption"
+        "original_index": 47,
+        "name": "Picture with Caption",
+        "master_index": 0
       }
     ],
     "total_layouts": 50,
@@ -1151,13 +1689,15 @@ $ uv run tools/ppt_capability_probe.py --file Presentation.pptx --json
     "footer_support_mode": "placeholder",
     "slide_number_strategy": "placeholder",
     "recommendations": [
-      "Footer placeholders available on 38 layout(s): Title with Picture, Content, Title with Picture 2, Title, Title 2, Title 3, Agenda, Agenda 2, Agenda with Picture, Content 2, Content 3, Content 4, Content 5, Content 6, Content with Picture, Content with Picture 2, Content with Picture 3, Content with Picture 4, Content with Picture 5, Content with Picture 6, Content with Picture 7, Content with Picture 8, Content with Picture 9, Content with Picture 10, Content with Picture 11, Content with Picture 12, Content with Picture 13, Content with Picture 14, Content with Picture 15, Content with Picture 16, Content with Picture 17, Two Content, Comparison, Title Only, Blank, Content with Caption, Conclusion, Conclusion 2"
+      "Footer placeholders available on 38 layout(s): Title with Picture, Content, Title with Picture 2, Title, Title 2, Title 3, Agenda, Agenda 2, Agenda with Picture, Content 2, Content 3, Content 4, Content 5, Content 6, Content with Picture, Content with Picture 2, Content with Picture 3, Content with Picture 4, Content with Picture 5, Content with Picture 6, Content with Picture 7, Content with Picture 8, Content with Picture 9, Content with Picture 10, Content with Picture 11, Content with Picture 12, Content with Picture 13, Content with Picture 14, Content with Picture 15, Content with Picture 16, Content with Picture 17, Two Content, Comparison, Title Only, Blank, Content with Caption, Conclusion, Conclusion 2",
+      "Date placeholders available on 26 layout(s): Title with Picture, Title with Picture 2, Title 3, Agenda with Picture, Content 3, Content 4, Content 5, Content 6, Content with Picture 3, Content with Picture 4, Content with Picture 5, Content with Picture 6, Content with Picture 7, Content with Picture 8, Content with Picture 9, Content with Picture 11, Content with Picture 12, Content with Picture 13, Content with Picture 14, Content with Picture 16, Content with Picture 17, Comparison, Title Only, Blank, Content with Caption, Picture with Caption",
+      "Slide number placeholders available on 38 layout(s): Title with Picture, Content, Title with Picture 2, Title, Title 2, Title 3, Agenda, Agenda 2, Agenda with Picture, Content 2, Content 3, Content 4, Content 5, Content 6, Content with Picture, Content with Picture 2, Content with Picture 3, Content with Picture 4, Content with Picture 5, Content with Picture 6, Content with Picture 7, Content with Picture 8, Content with Picture 9, Content with Picture 10, Content with Picture 11, Content with Picture 12, Content with Picture 13, Content with Picture 14, Content with Picture 15, Content with Picture 16, Content with Picture 17, Two Content, Comparison, Title Only, Blank, Content with Caption, Conclusion, Conclusion 2"
     ],
     "analysis_complete": true
   },
   "warnings": [
-    "Theme font scheme API unavailable, using fallback detection",
-    "Using default fonts (Calibri) - theme unavailable"
+    "Theme object unavailable",
+    "Theme fonts unavailable - using Calibri defaults"
   ],
   "info": []
 }
