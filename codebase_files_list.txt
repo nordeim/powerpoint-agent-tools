@@ -1,5 +1,7 @@
+$ find core/*py tools/*py schemas/*json -type f
 core/__init__.py
 core/powerpoint_agent_core.py
+core/strict_validator.py
 tools/ppt_add_bullet_list.py
 tools/ppt_add_chart.py
 tools/ppt_add_connector.py
@@ -7,6 +9,7 @@ tools/ppt_add_shape.py
 tools/ppt_add_slide.py
 tools/ppt_add_table.py
 tools/ppt_add_text_box.py
+tools/ppt_capability_probe.py
 tools/ppt_check_accessibility.py
 tools/ppt_clone_presentation.py
 tools/ppt_create_from_structure.py
@@ -34,3 +37,4 @@ tools/ppt_set_slide_layout.py
 tools/ppt_set_title.py
 tools/ppt_update_chart_data.py
 tools/ppt_validate_presentation.py
+schemas/capability_probe.v1.1.1.schema.json

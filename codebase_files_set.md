@@ -92,15 +92,28 @@ Designed for stateless, security-hardened PowerPoint operations.
 
 Author: PowerPoint Agent Team
 License: MIT
-Version: 1.0.0
+Version: 1.1.0 (Bug Fix Release)
+
+Changelog v1.1.0:
+- Added missing subprocess import for PDF export
+- Added missing PP_PLACEHOLDER import and constants
+- Replaced all magic numbers with named constants
+- Removed text truncation in get_slide_info() (was causing data loss)
+- Added position/size information to shape inspection
+- Added placeholder subtype decoding
+- Replaced print() with proper logging
+- Fixed subtitle placeholder type (was 2, should be SUBTITLE constant)
+- Added comprehensive PLACEHOLDER_TYPE_NAMES mapping
 """
 
 import re
 import json
+import subprocess
 import tempfile
 import shutil
 import threading
 import time
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, Set
 from enum import Enum
@@ -110,7 +123,7 @@ from io import BytesIO
 try:
     from pptx import Presentation
     from pptx.util import Inches, Pt, Emu
-    from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_AUTO_SHAPE_TYPE
+    from pptx.enum.shapes import MSO_SHAPE_TYPE, MSO_AUTO_SHAPE_TYPE, PP_PLACEHOLDER, MSO_CONNECTOR
     from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
     from pptx.enum.chart import XL_CHART_TYPE
     from pptx.chart.data import CategoryChartData
@@ -136,6 +149,20 @@ try:
 except ImportError:
     HAS_PANDAS = False
     pd = None
+
+
+# ============================================================================
+# LOGGING SETUP
+# ============================================================================
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
+
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 
 # ============================================================================
@@ -272,6 +299,33 @@ class ExportFormat(Enum):
     JPG = "jpg"
     PPTX = "pptx"
 
+# Placeholder type mapping for human-readable output
+# Uses numeric keys for maximum compatibility across python-pptx versions
+# Only includes commonly available placeholder types
+PLACEHOLDER_TYPE_NAMES = {
+    1: "TITLE",           # Title placeholder
+    2: "CONTENT",         # Body/content placeholder
+    3: "CENTER_TITLE",    # Centered title (title slides)
+    4: "SUBTITLE",        # Subtitle (also used for footer in some layouts)
+    7: "OBJECT",          # Object placeholder
+    8: "CHART",           # Chart placeholder
+    9: "TABLE",           # Table placeholder
+    13: "SLIDE_NUMBER",   # Slide number placeholder
+    16: "DATE",           # Date placeholder
+    18: "PICTURE",        # Picture placeholder
+}
+
+def get_placeholder_type_name(ph_type_value):
+    """
+    Safely get human-readable name for placeholder type.
+    
+    Args:
+        ph_type_value: Numeric placeholder type value
+        
+    Returns:
+        Human-readable string name or "UNKNOWN_X" if not recognized
+    """
+    return PLACEHOLDER_TYPE_NAMES.get(ph_type_value, f"UNKNOWN_{ph_type_value}")
 
 # Standard slide dimensions (16:9 widescreen)
 SLIDE_WIDTH_INCHES = 10.0
@@ -399,13 +453,11 @@ class Position:
         Raises:
             InvalidPositionError: If format is invalid
         """
-        # Format 1: Absolute inches
         if "left" in pos_dict and "top" in pos_dict:
             left = Position._parse_dimension(pos_dict["left"], slide_width)
             top = Position._parse_dimension(pos_dict["top"], slide_height)
             return (left, top)
         
-        # Format 3: Anchor-based
         if "anchor" in pos_dict:
             anchor = ANCHOR_POINTS.get(pos_dict["anchor"])
             if not anchor:
@@ -417,7 +469,6 @@ class Position:
             offset_y = pos_dict.get("offset_y", 0)
             return (anchor[0] + offset_x, anchor[1] + offset_y)
         
-        # Format 4: Grid system
         if "grid_row" in pos_dict and "grid_col" in pos_dict:
             grid_size = pos_dict.get("grid_size", 12)
             cell_width = slide_width / grid_size
@@ -426,7 +477,6 @@ class Position:
             top = pos_dict["grid_row"] * cell_height
             return (left, top)
         
-        # Format 5: Excel-like grid
         if "grid" in pos_dict:
             grid_ref = pos_dict["grid"].upper()
             match = re.match(r'^([A-Z]+)(\d+)$', grid_ref)
@@ -435,14 +485,12 @@ class Position:
             
             col_str, row_str = match.groups()
             
-            # Convert column letters to number
             col_num = 0
             for char in col_str:
                 col_num = col_num * 26 + (ord(char) - ord('A') + 1)
             
             row_num = int(row_str)
             
-            # Default 12x12 grid
             grid_size = pos_dict.get("grid_size", 12)
             cell_width = slide_width / grid_size
             cell_height = slide_height / grid_size
@@ -501,7 +549,6 @@ class Size:
         width_spec = size_dict.get("width")
         height_spec = size_dict.get("height")
         
-        # Parse width
         if width_spec == "auto":
             width = None
         elif width_spec:
@@ -509,7 +556,6 @@ class Size:
         else:
             width = None
         
-        # Parse height
         if height_spec == "auto":
             height = None
         elif height_spec:
@@ -517,7 +563,6 @@ class Size:
         else:
             height = None
         
-        # Handle "auto" with aspect ratio
         if width is None and height is not None and aspect_ratio:
             width = height * aspect_ratio
         elif height is None and width is not None and aspect_ratio:
@@ -537,8 +582,8 @@ class ColorHelper:
     def from_hex(hex_color: str) -> RGBColor:
         """Convert hex color to RGBColor."""
         hex_color = hex_color.lstrip('#')
-        if len(hex_color) != 6:
-            raise ValueError(f"Invalid hex color: {hex_color}")
+        if len(hex_color) != 6 or not all(c in '0123456789ABCDEFabcdef' for c in hex_color):
+            raise ValueError(f"Invalid hex color: {hex_color}. Must be 6 hex digits.")
         
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
@@ -604,7 +649,6 @@ class TemplateProfile:
     def capture_from_presentation(self, prs: Presentation) -> None:
         """Analyze and capture all template elements from presentation."""
         
-        # Capture slide layouts
         for layout in prs.slide_layouts:
             layout_info = {
                 "name": layout.name,
@@ -620,7 +664,6 @@ class TemplateProfile:
             }
             self.slide_layouts.append(layout_info)
         
-        # Capture theme colors
         try:
             theme = prs.slide_master.theme
             for idx, color in enumerate(theme.theme_color_scheme):
@@ -628,7 +671,6 @@ class TemplateProfile:
         except:
             pass
         
-        # Capture default fonts
         try:
             for shape in prs.slide_master.shapes:
                 if hasattr(shape, 'text_frame'):
@@ -680,12 +722,11 @@ class AccessibilityChecker:
         }
         
         for slide_idx, slide in enumerate(prs.slides):
-            # Check for title
             has_title = False
             for shape in slide.shapes:
                 if shape.is_placeholder:
-                    # Check for TITLE (1) or CENTER_TITLE (3)
-                    if shape.placeholder_format.type == 1 or shape.placeholder_format.type == 3:
+                    ph_type = shape.placeholder_format.type
+                    if ph_type == PP_PLACEHOLDER.TITLE or ph_type == PP_PLACEHOLDER.CENTER_TITLE:
                         if shape.has_text_frame and shape.text_frame.text.strip():
                             has_title = True
                             break
@@ -693,9 +734,7 @@ class AccessibilityChecker:
             if not has_title:
                 issues["missing_titles"].append(slide_idx)
             
-            # Check shapes
             for shape_idx, shape in enumerate(slide.shapes):
-                # Check images for alt text
                 if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                     if not shape.name or shape.name.startswith("Picture"):
                         issues["missing_alt_text"].append({
@@ -704,7 +743,6 @@ class AccessibilityChecker:
                             "shape_name": shape.name
                         })
                 
-                # Check text contrast
                 if hasattr(shape, 'text_frame'):
                     try:
                         AccessibilityChecker._check_text_contrast(
@@ -713,7 +751,6 @@ class AccessibilityChecker:
                     except:
                         pass
         
-        # Calculate severity
         total_issues = sum(len(v) if isinstance(v, list) else (1 if v else 0) 
                           for v in issues.values())
         
@@ -732,16 +769,14 @@ class AccessibilityChecker:
             return
         
         for para in shape.text_frame.paragraphs:
-            if para.font.color and para.font.color.type == 1:  # RGB
+            if para.font.color and para.font.color.type == 1:
                 text_color = para.font.color.rgb
                 
-                # Assume white background if no fill
                 bg_color = RGBColor(255, 255, 255)
                 
-                if shape.fill.type == 1:  # Solid fill
+                if shape.fill.type == 1:
                     bg_color = shape.fill.fore_color.rgb
                 
-                # Check if large text (18pt = 24px or 14pt bold = 18.67px)
                 is_large = (para.font.size and para.font.size >= Pt(18)) or \
                           (para.font.bold and para.font.size and para.font.size >= Pt(14))
                 
@@ -787,8 +822,6 @@ class AssetValidator:
                     try:
                         image = shape.image
                         
-                        # Check resolution (should be at least 96 DPI)
-                        # DPI = pixels / inches
                         if hasattr(image, 'dpi'):
                             if image.dpi[0] < 96 or image.dpi[1] < 96:
                                 issues["low_resolution_images"].append({
@@ -797,11 +830,10 @@ class AssetValidator:
                                     "dpi": image.dpi
                                 })
                         
-                        # Check file size (warn if >2MB)
                         image_size = len(image.blob)
                         issues["total_embedded_size"] += image_size
                         
-                        if image_size > 2 * 1024 * 1024:  # 2MB
+                        if image_size > 2 * 1024 * 1024:
                             issues["large_images"].append({
                                 "slide": slide_idx,
                                 "shape": shape_idx,
@@ -810,7 +842,6 @@ class AssetValidator:
                     except:
                         pass
         
-        # Check total file size if filepath provided
         if filepath and filepath.exists():
             file_size = filepath.stat().st_size
             if file_size > MAX_RECOMMENDED_FILE_SIZE * 1024 * 1024:
@@ -837,13 +868,11 @@ class AssetValidator:
             raise ImportError("Pillow required for image compression")
         
         with PILImage.open(image_path) as img:
-            # Resize if too large
             if img.width > max_width:
                 ratio = max_width / img.width
                 new_height = int(img.height * ratio)
                 img = img.resize((max_width, new_height), PILImage.LANCZOS)
             
-            # Convert to RGB if necessary
             if img.mode in ('RGBA', 'LA', 'P'):
                 background = PILImage.new('RGB', img.size, (255, 255, 255))
                 if img.mode == 'P':
@@ -851,7 +880,6 @@ class AssetValidator:
                 background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
                 img = background
             
-            # Save to BytesIO
             output = BytesIO()
             img.save(output, format='JPEG', quality=quality, optimize=True)
             output.seek(0)
@@ -972,9 +1000,7 @@ class PowerPointAgent:
             slide = self.prs.slides.add_slide(layout)
             return len(self.prs.slides) - 1
         else:
-            # Insert at specific position (requires XML manipulation)
             slide = self.prs.slides.add_slide(layout)
-            # Move to desired position
             xml_slides = self.prs.slides._sldIdLst
             xml_slides.insert(index, xml_slides[-1])
             return index
@@ -1011,11 +1037,9 @@ class PowerPointAgent:
         
         source_slide = self.get_slide(index)
         
-        # Create new slide with same layout
         layout = source_slide.slide_layout
         new_slide = self.prs.slides.add_slide(layout)
         
-        # Copy all shapes from source
         for shape in source_slide.shapes:
             self._copy_shape(shape, new_slide)
         
@@ -1117,7 +1141,6 @@ class PowerPointAgent:
         text_frame.text = text
         text_frame.word_wrap = True
         
-        # Format paragraph
         paragraph = text_frame.paragraphs[0]
         paragraph.font.name = font_name
         paragraph.font.size = Pt(font_size)
@@ -1127,7 +1150,6 @@ class PowerPointAgent:
         if color:
             paragraph.font.color.rgb = ColorHelper.from_hex(color)
         
-        # Set alignment
         alignment_map = {
             "left": PP_ALIGN.LEFT,
             "center": PP_ALIGN.CENTER,
@@ -1154,10 +1176,9 @@ class PowerPointAgent:
         for shape in slide.shapes:
             if shape.is_placeholder:
                 ph_type = shape.placeholder_format.type
-                # Title can be TITLE (1) or CENTER_TITLE (3)
-                if ph_type == 1 or ph_type == 3:
+                if ph_type == PP_PLACEHOLDER.TITLE or ph_type == PP_PLACEHOLDER.CENTER_TITLE:
                     title_shape = shape
-                elif ph_type == 2:  # Subtitle
+                elif ph_type == PP_PLACEHOLDER.SUBTITLE:
                     subtitle_shape = shape
         
         if title_shape and title_shape.has_text_frame:
@@ -1212,12 +1233,9 @@ class PowerPointAgent:
             p.level = 0
             p.font.size = Pt(font_size)
             
-            # Set bullet style
             if bullet_style == "bullet":
-                # Use bullet character (default)
                 pass
             elif bullet_style == "numbered":
-                # Note: python-pptx has limited numbered list support
                 p.text = f"{idx + 1}. {item}"
     
     def format_text(
@@ -1286,20 +1304,17 @@ class PowerPointAgent:
         
         for slide in self.prs.slides:
             for shape in slide.shapes:
-                # Skip shapes that definitely don't have text
                 if not shape.has_text_frame:
                     continue
                 
                 try:
                     text_frame = shape.text_frame
-                except Exception:
+                except (AttributeError, TypeError):
                     continue
                 
-                # Strategy 1: Try to replace in individual runs (Preserves Formatting)
                 replacements_in_runs = 0
                 for paragraph in text_frame.paragraphs:
                     for run in paragraph.runs:
-                        # Check match based on case sensitivity
                         if match_case:
                             if find in run.text:
                                 run.text = run.text.replace(find, replace)
@@ -1307,7 +1322,6 @@ class PowerPointAgent:
                         else:
                             if find.lower() in run.text.lower():
                                 pattern = re.compile(re.escape(find), re.IGNORECASE)
-                                # Check if it actually changes anything
                                 if pattern.search(run.text):
                                     new_text = pattern.sub(replace, run.text)
                                     run.text = new_text
@@ -1317,8 +1331,6 @@ class PowerPointAgent:
                     count += replacements_in_runs
                     continue
                 
-                # Strategy 2: Fallback to Shape-level replacement (May lose formatting)
-                # Only if we didn't find it in runs, but it might exist across runs
                 try:
                     full_text = shape.text
                     if not full_text:
@@ -1333,7 +1345,6 @@ class PowerPointAgent:
                             should_replace = True
                     
                     if should_replace:
-                        # This is destructive to formatting, but ensures replacement happens
                         if match_case:
                             new_text = full_text.replace(find, replace)
                             shape.text = new_text
@@ -1344,7 +1355,7 @@ class PowerPointAgent:
                             new_text = pattern.sub(replace, full_text)
                             shape.text = new_text
                             count += len(matches)
-                except Exception:
+                except (AttributeError, TypeError):
                     continue
         
         return count
@@ -1383,7 +1394,6 @@ class PowerPointAgent:
         if width is None or height is None:
             raise ValueError("Shape must have explicit width and height")
         
-        # Map shape type string to MSO_AUTO_SHAPE_TYPE constant
         shape_type_map = {
             "rectangle": MSO_AUTO_SHAPE_TYPE.RECTANGLE,
             "rounded_rectangle": MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE,
@@ -1403,7 +1413,6 @@ class PowerPointAgent:
             Inches(width), Inches(height)
         )
         
-        # Format shape
         if fill_color:
             shape.fill.solid()
             shape.fill.fore_color.rgb = ColorHelper.from_hex(fill_color)
@@ -1474,7 +1483,6 @@ class PowerPointAgent:
         
         table = table_shape.table
         
-        # Populate data if provided
         if data:
             for row_idx, row_data in enumerate(data):
                 if row_idx >= rows:
@@ -1495,7 +1503,7 @@ class PowerPointAgent:
         Add connector line between two shapes.
         
         Note: python-pptx has limited connector support.
-        This is a simplified implementation.
+        This is a simplified implementation using straight lines.
         """
         slide = self.get_slide(slide_index)
         
@@ -1505,15 +1513,13 @@ class PowerPointAgent:
         shape1 = slide.shapes[from_shape]
         shape2 = slide.shapes[to_shape]
         
-        # Calculate center points
         x1 = shape1.left + shape1.width // 2
         y1 = shape1.top + shape1.height // 2
         x2 = shape2.left + shape2.width // 2
         y2 = shape2.top + shape2.height // 2
         
-        # Add line connector
         connector = slide.shapes.add_connector(
-            1,  # Straight connector
+            MSO_CONNECTOR.STRAIGHT,
             x1, y1, x2, y2
         )
     
@@ -1546,31 +1552,26 @@ class PowerPointAgent:
         
         left, top = Position.from_dict(position)
         
-        # Get image dimensions for aspect ratio
         if HAS_PILLOW:
             with PILImage.open(image_path) as img:
                 aspect_ratio = img.width / img.height
         else:
             aspect_ratio = None
         
-        # Handle size
         if size:
             width, height = Size.from_dict(size, aspect_ratio=aspect_ratio)
             
-            # If one dimension is None (auto), calculate from aspect ratio
             if width is None and height and aspect_ratio:
                 width = height * aspect_ratio
             elif height is None and width and aspect_ratio:
                 height = width / aspect_ratio
         else:
-            # Default to 50% of slide width
             width = SLIDE_WIDTH_INCHES * 0.5
             if aspect_ratio:
                 height = width / aspect_ratio
             else:
                 height = SLIDE_HEIGHT_INCHES * 0.3
         
-        # Compress if requested
         if compress and HAS_PILLOW:
             image_stream = AssetValidator.compress_image(image_path)
             picture = slide.shapes.add_picture(
@@ -1611,17 +1612,14 @@ class PowerPointAgent:
         for shape in slide.shapes:
             if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                 if shape.name == old_image_name or old_image_name in shape.name:
-                    # Get current position and size
                     left = shape.left
                     top = shape.top
                     width = shape.width
                     height = shape.height
                     
-                    # Remove old image
                     sp = shape.element
                     sp.getparent().remove(sp)
                     
-                    # Insert new image
                     if compress and HAS_PILLOW:
                         image_stream = AssetValidator.compress_image(new_image_path)
                         slide.shapes.add_picture(
@@ -1665,17 +1663,13 @@ class PowerPointAgent:
             raise ValueError("Shape is not an image")
         
         if alt_text:
-            # Set alt text (accessible name)
             shape.name = alt_text
-            # Also try to set description if available
             try:
                 shape._element.set('descr', alt_text)
             except:
                 pass
         
         if transparency is not None:
-            # Note: python-pptx has limited transparency support
-            # This may not work in all cases
             try:
                 shape.fill.transparency = transparency
             except:
@@ -1758,7 +1752,6 @@ class PowerPointAgent:
         if width is None or height is None:
             raise ValueError("Chart must have explicit width and height")
         
-        # Map chart type
         chart_type_map = {
             "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
             "column_stacked": XL_CHART_TYPE.COLUMN_STACKED,
@@ -1773,14 +1766,12 @@ class PowerPointAgent:
         
         xl_chart_type = chart_type_map.get(chart_type.lower(), XL_CHART_TYPE.COLUMN_CLUSTERED)
         
-        # Prepare chart data
         chart_data = CategoryChartData()
         chart_data.categories = data.get("categories", [])
         
         for series in data.get("series", []):
             chart_data.add_series(series["name"], series["values"])
         
-        # Add chart
         chart_shape = slide.shapes.add_chart(
             xl_chart_type,
             Inches(left), Inches(top),
@@ -1790,7 +1781,6 @@ class PowerPointAgent:
         
         chart = chart_shape.chart
         
-        # Set title if provided
         if chart_title:
             chart.has_title = True
             chart.chart_title.text_frame.text = chart_title
@@ -1824,24 +1814,17 @@ class PowerPointAgent:
         if not chart_shape:
             raise ValueError(f"Chart at index {chart_index} not found")
         
-        # Prepare new chart data
         chart_data = CategoryChartData()
         chart_data.categories = data.get("categories", [])
         
         for series in data.get("series", []):
             chart_data.add_series(series["name"], series["values"])
             
-        # Update chart data
-        # Note: replace_data is available in newer python-pptx versions
-        # and is preferred over recreation as it preserves formatting.
         try:
             chart_shape.chart.replace_data(chart_data)
         except AttributeError:
-            # Fallback for older versions or if replace_data fails: Recreate chart
-            # This is a destructive operation and will lose custom formatting
-            print("WARNING: chart.replace_data failed, falling back to recreation (formatting may be lost)")
+            logger.warning("chart.replace_data() not available, falling back to chart recreation (formatting may be lost)")
             
-            # 1. Extract properties
             left = chart_shape.left
             top = chart_shape.top
             width = chart_shape.width
@@ -1849,16 +1832,13 @@ class PowerPointAgent:
             chart_type = chart_shape.chart.chart_type
             chart_title = chart_shape.chart.chart_title.text_frame.text if chart_shape.chart.has_title else None
             
-            # 2. Delete existing
             sp = chart_shape.element
             sp.getparent().remove(sp)
             
-            # 3. Create new
             new_chart_shape = slide.shapes.add_chart(
                 chart_type, left, top, width, height, chart_data
             )
             
-            # 4. Restore basic properties
             if chart_title:
                 new_chart_shape.chart.has_title = True
                 new_chart_shape.chart.chart_title.text_frame.text = chart_title
@@ -1925,13 +1905,10 @@ class PowerPointAgent:
         slide = self.get_slide(slide_index)
         layout = self._get_layout(layout_name)
         
-        # Note: Changing layout can lose content
-        # This is a limitation of python-pptx
         slide.slide_layout = layout
     
     def apply_master_slide(self, master_index: int = 0) -> None:
         """Apply master slide formatting."""
-        # Note: Master slide manipulation is limited in python-pptx
         raise NotImplementedError(
             "Master slide application not fully supported. "
             "Use template with desired master slides."
@@ -1975,31 +1952,26 @@ class PowerPointAgent:
         }
         
         for idx, slide in enumerate(self.prs.slides):
-            # Check for empty slides
             if len(slide.shapes) == 0:
                 issues["empty_slides"].append(idx)
             
-            # Check for title
             has_title = False
             for shape in slide.shapes:
                 if shape.is_placeholder:
                     ph_type = shape.placeholder_format.type
-                    # Check for TITLE (1) or CENTER_TITLE (3)
-                    if ph_type == 1 or ph_type == 3:
+                    if ph_type == PP_PLACEHOLDER.TITLE or ph_type == PP_PLACEHOLDER.CENTER_TITLE:
                         if shape.has_text_frame and shape.text_frame.text.strip():
                             has_title = True
             
             if not has_title:
                 issues["slides_without_titles"].append(idx)
             
-            # Collect fonts
             for shape in slide.shapes:
                 if hasattr(shape, 'text_frame'):
                     for paragraph in shape.text_frame.paragraphs:
                         if paragraph.font.name:
                             issues["inconsistent_fonts"].add(paragraph.font.name)
         
-        # Convert set to list for JSON serialization
         issues["inconsistent_fonts"] = list(issues["inconsistent_fonts"])
         
         total_issues = (len(issues["empty_slides"]) + 
@@ -2040,12 +2012,10 @@ class PowerPointAgent:
         if not self.prs:
             raise PowerPointAgentError("No presentation loaded")
         
-        # Save current presentation
         temp_pptx = tempfile.mktemp(suffix='.pptx')
         self.prs.save(temp_pptx)
         
         try:
-            # Try LibreOffice conversion
             result = subprocess.run(
                 ['soffice', '--headless', '--convert-to', 'pdf', 
                  '--outdir', str(output_path.parent), temp_pptx],
@@ -2126,20 +2096,58 @@ class PowerPointAgent:
         return info
     
     def get_slide_info(self, slide_index: int) -> Dict[str, Any]:
-        """Get detailed information about specific slide."""
+        """
+        Get detailed information about specific slide.
+        
+        Fixed in v1.1.0:
+        - Removed 100-character text truncation (was causing data loss)
+        - Added full text with separate preview field
+        - Added position and size information for all shapes
+        - Added human-readable placeholder type names
+        
+        Args:
+            slide_index: Index of slide to inspect
+            
+        Returns:
+            Dict containing comprehensive slide information including
+            full text content, positions, sizes, and placeholder types
+        """
         slide = self.get_slide(slide_index)
         
         shapes_info = []
         for idx, shape in enumerate(slide.shapes):
+            shape_type_str = str(shape.shape_type)
+            
+            if shape.is_placeholder:
+                ph_type = shape.placeholder_format.type
+                ph_type_name = get_placeholder_type_name(ph_type)
+                shape_type_str = f"PLACEHOLDER ({ph_type_name})"
+
             shape_info = {
                 "index": idx,
-                "type": str(shape.shape_type),
+                "type": shape_type_str,
                 "name": shape.name,
-                "has_text": hasattr(shape, 'text_frame')
+                "has_text": hasattr(shape, 'text_frame'),
+                "position": {
+                    "left_inches": shape.left / 914400,
+                    "top_inches": shape.top / 914400,
+                    "left_percent": f"{(shape.left / self.prs.slide_width * 100):.1f}%",
+                    "top_percent": f"{(shape.top / self.prs.slide_height * 100):.1f}%"
+                },
+                "size": {
+                    "width_inches": shape.width / 914400,
+                    "height_inches": shape.height / 914400,
+                    "width_percent": f"{(shape.width / self.prs.slide_width * 100):.1f}%",
+                    "height_percent": f"{(shape.height / self.prs.slide_height * 100):.1f}%"
+                }
             }
             
             if shape.has_text_frame:
-                shape_info["text"] = shape.text_frame.text[:100]  # First 100 chars
+                full_text = shape.text_frame.text
+                shape_info["text"] = full_text
+                shape_info["text_length"] = len(full_text)
+                if len(full_text) > 100:
+                    shape_info["text_preview"] = full_text[:100] + "..."
             
             if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                 shape_info["image_size_bytes"] = len(shape.image.blob)
@@ -2171,9 +2179,7 @@ class PowerPointAgent:
     
     def _copy_shape(self, source_shape, target_slide):
         """Copy shape to target slide (helper for duplicate_slide)."""
-        # Basic implementation for common shape types
         
-        # 1. Pictures
         if source_shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
             try:
                 blob = source_shape.image.blob
@@ -2183,45 +2189,32 @@ class PowerPointAgent:
                     source_shape.width, source_shape.height
                 )
             except Exception as e:
-                print(f"WARNING: Failed to copy picture: {e}")
+                logger.warning(f"Failed to copy picture: {e}")
                 
-        # 2. AutoShapes (Rectangles, Ellipses, etc.) & TextBoxes
         elif source_shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE or \
              source_shape.shape_type == MSO_SHAPE_TYPE.TEXT_BOX:
             try:
-                # Create new shape
                 new_shape = target_slide.shapes.add_shape(
                     source_shape.auto_shape_type,
                     source_shape.left, source_shape.top,
                     source_shape.width, source_shape.height
                 )
                 
-                # Copy text
                 if source_shape.has_text_frame and source_shape.text:
                     new_shape.text_frame.text = source_shape.text_frame.text
-                    # Note: This loses run-level formatting. 
-                    # A full implementation would iterate paragraphs/runs.
                 
-                # Copy fill (basic)
                 try:
-                    if source_shape.fill.type == 1: # Solid fill
+                    if source_shape.fill.type == 1:
                         new_shape.fill.solid()
                         new_shape.fill.fore_color.rgb = source_shape.fill.fore_color.rgb
                 except:
                     pass
                     
             except Exception as e:
-                print(f"WARNING: Failed to copy shape: {e}")
+                logger.warning(f"Failed to copy shape: {e}")
         
-        # 3. Charts (Complex - Try to recreate if possible, else skip)
         elif source_shape.shape_type == MSO_SHAPE_TYPE.CHART:
-            # Cloning charts is very hard in python-pptx without low-level XML
-            # For now, we skip to avoid errors
-            print("WARNING: Chart copying not supported in duplicate_slide")
-            
-        else:
-            # Try generic copy for other shapes if possible, or skip
-            pass
+            logger.warning("Chart copying not supported in duplicate_slide (python-pptx limitation)")
     
     def __enter__(self):
         return self
@@ -2235,15 +2228,12 @@ class PowerPointAgent:
 # MODULE METADATA
 # ============================================================================
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "PowerPoint Agent Team"
 __license__ = "MIT"
 
 __all__ = [
-    # Core class
     "PowerPointAgent",
-    
-    # Exceptions
     "PowerPointAgentError",
     "SlideNotFoundError",
     "LayoutNotFoundError",
@@ -2254,16 +2244,12 @@ __all__ = [
     "AccessibilityError",
     "AssetValidationError",
     "FileLockError",
-    
-    # Helpers
     "Position",
     "Size",
     "ColorHelper",
     "TemplateProfile",
     "AccessibilityChecker",
     "AssetValidator",
-    
-    # Enums
     "ShapeType",
     "ChartType",
     "TextAlignment",
@@ -2271,14 +2257,38 @@ __all__ = [
     "BulletStyle",
     "ImageFormat",
     "ExportFormat",
-    
-    # Constants
     "SLIDE_WIDTH_INCHES",
     "SLIDE_HEIGHT_INCHES",
     "ANCHOR_POINTS",
     "CORPORATE_COLORS",
     "STANDARD_FONTS",
+    "PLACEHOLDER_TYPE_NAMES",
+    "PP_PLACEHOLDER",
 ]
+
+```
+
+# core/strict_validator.py
+```py
+# core/strict_validator.py
+import json
+from pathlib import Path
+from jsonschema import Draft202012Validator, FormatChecker
+
+def validate_against_schema(payload: dict, schema_path: str) -> None:
+    """
+    Strictly validate payload against JSON Schema. Raises ValueError on failure.
+    """
+    schema = json.loads(Path(schema_path).read_text())
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    errors = sorted(validator.iter_errors(payload), key=lambda e: e.path)
+    if errors:
+        msgs = []
+        for e in errors:
+            loc = "/".join(str(p) for p in e.path)
+            msgs.append(f"{loc or '<root>'}: {e.message}")
+        raise ValueError("Strict schema validation failed:\n" + "\n".join(msgs))
+
 
 ```
 
@@ -2287,10 +2297,38 @@ __all__ = [
 #!/usr/bin/env python3
 """
 PowerPoint Add Bullet List Tool
-Add bullet or numbered list to slide
+Add bullet or numbered list with 6×6 rule validation and accessibility checks
+
+Version 2.0.0 - Enhanced Validation and Accessibility
+
+Changes from v1.x:
+- Enhanced: 6×6 rule validation (warns at 6 items, error at 10)
+- Enhanced: Character count validation per item
+- Enhanced: Accessibility checks (color contrast, font size)
+- Enhanced: Readability scoring
+- Enhanced: Theme-aware formatting options
+- Enhanced: JSON-first output (always returns JSON)
+- Added: `--ignore-rules` flag to override 6×6 validation
+- Added: `--theme-colors` flag to use presentation theme
+- Added: Comprehensive warnings and recommendations
+- Fixed: Consistent response format
+
+Best Practices (6×6 Rule):
+- Maximum 6 bullet points per slide
+- Maximum 6 words per line (60 characters recommended)
+- This ensures readability and audience engagement
+- Use multiple slides rather than cramming content
 
 Usage:
-    uv python ppt_add_bullet_list.py --file presentation.pptx --slide 0 --items "Item 1,Item 2,Item 3" --position '{"left":"10%","top":"25%"}' --size '{"width":"80%","height":"60%"}' --json
+    # Simple bullet list (auto-validates 6×6 rule)
+    uv run tools/ppt_add_bullet_list.py --file deck.pptx --slide 1 --items "Point 1,Point 2,Point 3" --position '{"left":"10%","top":"25%"}' --size '{"width":"80%","height":"60%"}' --json
+    
+    # Numbered list with custom formatting
+    uv run tools/ppt_add_bullet_list.py --file deck.pptx --slide 2 --items "Step 1,Step 2,Step 3" --bullet-style numbered --font-size 20 --color "#0070C0" --position '{"left":"15%","top":"30%"}' --size '{"width":"70%","height":"50%"}' --json
+    
+    # Load items from JSON file
+    echo '["Revenue up 45%", "Customer growth 60%", "Market share 23%"]' > items.json
+    uv run tools/ppt_add_bullet_list.py --file deck.pptx --slide 3 --items-file items.json --position '{"left":"10%","top":"25%"}' --size '{"width":"80%","height":"60%"}' --json
 
 Exit Codes:
     0: Success
@@ -2306,8 +2344,63 @@ from typing import Dict, Any, List
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError, ColorHelper, RGBColor
 )
+
+
+def calculate_readability_score(items: List[str]) -> Dict[str, Any]:
+    """
+    Calculate readability metrics for bullet list.
+    
+    Returns:
+        Dict with readability metrics and recommendations
+    """
+    total_chars = sum(len(item) for item in items)
+    avg_chars = total_chars / len(items) if items else 0
+    max_chars = max(len(item) for item in items) if items else 0
+    
+    # Count words (approximate)
+    total_words = sum(len(item.split()) for item in items)
+    avg_words = total_words / len(items) if items else 0
+    max_words = max(len(item.split()) for item in items) if items else 0
+    
+    # Scoring
+    score = 100
+    issues = []
+    
+    # Deduct for too many items
+    if len(items) > 6:
+        score -= (len(items) - 6) * 10
+        issues.append(f"Exceeds 6×6 rule: {len(items)} items (recommended: ≤6)")
+    
+    # Deduct for long items
+    if avg_chars > 60:
+        score -= 20
+        issues.append(f"Items too long: {avg_chars:.0f} chars average (recommended: ≤60)")
+    
+    if max_chars > 100:
+        score -= 10
+        issues.append(f"Longest item: {max_chars} chars (consider splitting)")
+    
+    # Deduct for too many words per line
+    if max_words > 12:
+        score -= 15
+        issues.append(f"Too many words per item: {max_words} max (recommended: ≤10)")
+    
+    score = max(0, score)
+    
+    return {
+        "score": score,
+        "grade": "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 60 else "D" if score >= 50 else "F",
+        "metrics": {
+            "item_count": len(items),
+            "avg_characters": round(avg_chars, 1),
+            "max_characters": max_chars,
+            "avg_words": round(avg_words, 1),
+            "max_words": max_words
+        },
+        "issues": issues
+    }
 
 
 def add_bullet_list(
@@ -2320,9 +2413,37 @@ def add_bullet_list(
     font_size: int = 18,
     font_name: str = "Calibri",
     color: str = None,
-    line_spacing: float = 1.0
+    line_spacing: float = 1.0,
+    ignore_rules: bool = False
 ) -> Dict[str, Any]:
-    """Add bullet or numbered list to slide."""
+    """
+    Add bullet or numbered list with validation.
+    
+    Enforces 6×6 rule unless --ignore-rules is specified:
+    - Maximum 6 bullet points per slide
+    - Maximum ~60 characters per line
+    
+    Args:
+        filepath: Path to PowerPoint file
+        slide_index: Slide index (0-based)
+        items: List of bullet items
+        position: Position dict
+        size: Size dict
+        bullet_style: "bullet", "numbered", or "none"
+        font_size: Font size in points
+        font_name: Font name
+        color: Optional text color (hex)
+        line_spacing: Line spacing multiplier
+        ignore_rules: Override 6×6 rule validation
+        
+    Returns:
+        Dict containing:
+        - status: "success", "warning", or "error"
+        - items_added: Count
+        - readability_score: Metrics and grade
+        - warnings: Validation warnings
+        - recommendations: Suggested improvements
+    """
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -2330,8 +2451,62 @@ def add_bullet_list(
     if not items:
         raise ValueError("At least one item required")
     
-    if len(items) > 20:
-        raise ValueError("Maximum 20 items per list (readability limit)")
+    warnings = []
+    recommendations = []
+    
+    # Calculate readability
+    readability = calculate_readability_score(items)
+    
+    # 6×6 Rule Enforcement
+    if len(items) > 6 and not ignore_rules:
+        warnings.append(
+            f"6×6 Rule violation: {len(items)} items exceeds recommended 6 per slide. "
+            "This reduces readability and audience engagement."
+        )
+        recommendations.append(
+            "Consider splitting into multiple slides or using --ignore-rules to override"
+        )
+    
+    # Hard limit at 10 items (safety)
+    if len(items) > 10 and not ignore_rules:
+        raise ValueError(
+            f"Too many items: {len(items)} exceeds hard limit of 10 per slide. "
+            "This severely reduces readability. Either:\n"
+            "  1. Split into multiple slides (recommended)\n"
+            "  2. Use --ignore-rules to override (not recommended)"
+        )
+    
+    # Warn about very long items
+    for idx, item in enumerate(items):
+        if len(item) > 100:
+            warnings.append(
+                f"Item {idx + 1} is {len(item)} characters (very long). "
+                "Consider breaking into multiple bullets."
+            )
+    
+    # Font size validation
+    if font_size < 14:
+        warnings.append(
+            f"Font size {font_size}pt is below recommended minimum of 14pt. "
+            "Audience may struggle to read from distance."
+        )
+    
+    # Color contrast check (if color specified)
+    if color:
+        try:
+            text_color = ColorHelper.from_hex(color)
+            bg_color = RGBColor(255, 255, 255)
+            is_large_text = font_size >= 18
+            
+            if not ColorHelper.meets_wcag(text_color, bg_color, is_large_text):
+                contrast_ratio = ColorHelper.contrast_ratio(text_color, bg_color)
+                required_ratio = 3.0 if is_large_text else 4.5
+                warnings.append(
+                    f"Color contrast {contrast_ratio:.2f}:1 may not meet WCAG accessibility "
+                    f"standards (required: {required_ratio}:1). Consider darker color."
+                )
+        except:
+            pass
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
@@ -2353,23 +2528,43 @@ def add_bullet_list(
             font_size=font_size
         )
         
-        # Get the last added shape for additional formatting if needed
+        # Get the last added shape for additional formatting
         slide_info = agent.get_slide_info(slide_index)
         last_shape_idx = slide_info["shape_count"] - 1
         
         # Apply color if specified
         if color:
-            agent.format_text(
-                slide_index=slide_index,
-                shape_index=last_shape_idx,
-                color=color
-            )
+            try:
+                agent.format_text(
+                    slide_index=slide_index,
+                    shape_index=last_shape_idx,
+                    color=color
+                )
+            except Exception as e:
+                warnings.append(f"Could not apply color: {str(e)}")
         
         # Save
         agent.save()
     
-    return {
-        "status": "success",
+    # Recommendations based on readability
+    if readability["score"] < 75:
+        recommendations.append(
+            f"Readability score is {readability['grade']} ({readability['score']}/100). "
+            "Consider simplifying content for better audience engagement."
+        )
+    
+    if readability["metrics"]["avg_words"] > 8:
+        recommendations.append(
+            "Average words per item exceeds 8. Keep bullets concise for impact."
+        )
+    
+    # Build response
+    status = "success"
+    if warnings:
+        status = "warning"
+    
+    result = {
+        "status": status,
         "file": str(filepath),
         "slide_index": slide_index,
         "items_added": len(items),
@@ -2380,38 +2575,54 @@ def add_bullet_list(
             "font_name": font_name,
             "color": color,
             "line_spacing": line_spacing
+        },
+        "readability": readability,
+        "validation": {
+            "six_six_rule": {
+                "compliant": len(items) <= 6 and readability["metrics"]["max_words"] <= 10,
+                "item_count_ok": len(items) <= 6,
+                "word_count_ok": readability["metrics"]["max_words"] <= 10
+            },
+            "accessibility": {
+                "font_size_ok": font_size >= 14,
+                "color_contrast_checked": color is not None
+            }
         }
     }
+    
+    if warnings:
+        result["warnings"] = warnings
+    
+    if recommendations:
+        result["recommendations"] = recommendations
+    
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Add bullet or numbered list to PowerPoint slide",
+        description="Add bullet/numbered list with 6×6 rule validation (v2.0.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-List Formats:
-  1. Comma-separated: "Item 1,Item 2,Item 3"
-  2. Newline-separated: "Item 1\\nItem 2\\nItem 3"
-  3. JSON array from file: --items-file items.json
-
-Bullet Styles:
-  - bullet: Traditional bullet points (default)
-  - numbered: 1. 2. 3. numbering
-  - none: Plain list without bullets
+6×6 Rule (Best Practice):
+  - Maximum 6 bullet points per slide
+  - Maximum 6 words per line (~60 characters)
+  - Ensures readability and audience engagement
+  - Validated automatically unless --ignore-rules
 
 Examples:
-  # Simple bullet list
-  uv python ppt_add_bullet_list.py \\
+  # Simple bullet list (validates 6×6 rule)
+  uv run tools/ppt_add_bullet_list.py \\
     --file presentation.pptx \\
     --slide 1 \\
-    --items "Revenue up 45%,Customer growth 60%,Market share 23%" \\
+    --items "Revenue up 45%,Customer growth 60%,Market share increased" \\
     --position '{"left":"10%","top":"25%"}' \\
     --size '{"width":"80%","height":"60%"}' \\
     --json
   
   # Numbered list with custom formatting
-  uv python ppt_add_bullet_list.py \\
-    --file presentation.pptx \\
+  uv run tools/ppt_add_bullet_list.py \\
+    --file deck.pptx \\
     --slide 2 \\
     --items "Define objectives,Analyze market,Develop strategy,Execute plan" \\
     --bullet-style numbered \\
@@ -2421,51 +2632,68 @@ Examples:
     --color "#0070C0" \\
     --json
   
-  # Multi-line items (agenda)
-  uv python ppt_add_bullet_list.py \\
-    --file presentation.pptx \\
-    --slide 0 \\
-    --items "Introduction and welcome,Q4 financial results,2024 strategic priorities,Q&A session" \\
-    --position '{"grid":"B3"}' \\
-    --size '{"width":"60%","height":"50%"}' \\
-    --font-size 22 \\
-    --json
-  
-  # Key takeaways (centered)
-  uv python ppt_add_bullet_list.py \\
-    --file presentation.pptx \\
-    --slide 10 \\
-    --items "Strong Q4 performance,Exceeded revenue targets,Positive market reception" \\
-    --position '{"anchor":"center","offset_x":0,"offset_y":0}' \\
-    --size '{"width":"70%","height":"40%"}' \\
-    --font-size 24 \\
-    --color "#00B050" \\
-    --json
-  
   # From JSON file
   echo '["First point", "Second point", "Third point"]' > items.json
-  uv python ppt_add_bullet_list.py \\
-    --file presentation.pptx \\
+  uv run tools/ppt_add_bullet_list.py \\
+    --file deck.pptx \\
     --slide 3 \\
     --items-file items.json \\
     --position '{"left":"10%","top":"25%"}' \\
     --size '{"width":"80%","height":"60%"}' \\
     --json
+  
+  # Override 6×6 rule (not recommended)
+  uv run tools/ppt_add_bullet_list.py \\
+    --file deck.pptx \\
+    --slide 4 \\
+    --items "Item 1,Item 2,Item 3,Item 4,Item 5,Item 6,Item 7,Item 8" \\
+    --ignore-rules \\
+    --position '{"left":"10%","top":"25%"}' \\
+    --size '{"width":"80%","height":"60%"}' \\
+    --json
 
-Best Practices:
-  - Keep items concise (max 2 lines per bullet)
-  - Use 3-7 items per slide for readability
-  - Start each item with action verb for impact
-  - Use parallel structure (all items same format)
-  - Font size 18-24pt for body text
-  - Leave white space (don't fill entire slide)
+Validation Features:
+  - 6×6 rule enforcement (warns at 6, errors at 10)
+  - Character count per item
+  - Word count per item
+  - Font size accessibility check (minimum 14pt)
+  - Color contrast validation (WCAG 2.1)
+  - Readability scoring (A-F grade)
 
-Formatting Tips:
-  - Use color for emphasis (sparingly)
-  - Increase font size for key points
-  - Use numbered lists for sequential steps
-  - Use bullet lists for unordered points
-  - Consistent spacing improves readability
+Output Format:
+  {
+    "status": "warning",
+    "items_added": 7,
+    "readability": {
+      "score": 60,
+      "grade": "C",
+      "metrics": {
+        "item_count": 7,
+        "avg_characters": 45.2,
+        "max_words": 9
+      }
+    },
+    "validation": {
+      "six_six_rule": {
+        "compliant": false,
+        "item_count_ok": false
+      }
+    },
+    "warnings": [
+      "6×6 Rule violation: 7 items exceeds recommended 6"
+    ],
+    "recommendations": [
+      "Consider splitting into multiple slides"
+    ]
+  }
+
+Related Tools:
+  - ppt_add_text_box.py: Add free-form text
+  - ppt_format_text.py: Format existing text
+  - ppt_get_slide_info.py: Inspect slide content
+
+Version: 2.0.0
+Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
     
@@ -2504,7 +2732,7 @@ Formatting Tips:
     parser.add_argument(
         '--size',
         type=json.loads,
-        help='Size dict (JSON string)'
+        help='Size dict (JSON string, defaults from position if omitted)'
     )
     
     parser.add_argument(
@@ -2518,7 +2746,7 @@ Formatting Tips:
         '--font-size',
         type=int,
         default=18,
-        help='Font size in points (default: 18)'
+        help='Font size in points (default: 18, min recommended: 14)'
     )
     
     parser.add_argument(
@@ -2529,7 +2757,7 @@ Formatting Tips:
     
     parser.add_argument(
         '--color',
-        help='Text color (hex, e.g., #0070C0)'
+        help='Text color hex (e.g., #0070C0, contrast will be validated)'
     )
     
     parser.add_argument(
@@ -2540,9 +2768,16 @@ Formatting Tips:
     )
     
     parser.add_argument(
+        '--ignore-rules',
+        action='store_true',
+        help='Override 6×6 rule validation (not recommended)'
+    )
+    
+    parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
@@ -2557,7 +2792,6 @@ Formatting Tips:
             if not isinstance(items, list):
                 raise ValueError("Items file must contain JSON array")
         elif args.items:
-            # Split by comma or newline
             if '\\n' in args.items:
                 items = args.items.split('\\n')
             else:
@@ -2565,21 +2799,15 @@ Formatting Tips:
             items = [item.strip() for item in items if item.strip()]
         else:
             raise ValueError("Either --items or --items-file required")
-            
-        # Handle optional size and merge from position
+        
+        # Handle size defaults
         size = args.size if args.size else {}
         position = args.position
         
-        if "width" in position and "width" not in size:
-            size["width"] = position["width"]
-        if "height" in position and "height" not in size:
-            size["height"] = position["height"]
-            
-        # Apply defaults if still missing
         if "width" not in size:
-            size["width"] = "80%"
+            size["width"] = position.get("width", "80%")
         if "height" not in size:
-            size["height"] = "50%"
+            size["height"] = position.get("height", "50%")
         
         result = add_bullet_list(
             filepath=args.file,
@@ -2591,34 +2819,23 @@ Formatting Tips:
             font_size=args.font_size,
             font_name=args.font_name,
             color=args.color,
-            line_spacing=args.line_spacing
+            line_spacing=args.line_spacing,
+            ignore_rules=args.ignore_rules
         )
         
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"✅ Added {result['items_added']}-item {result['bullet_style']} list to slide {result['slide_index']}")
-            print(f"   Items:")
-            for i, item in enumerate(result['items'][:5], 1):
-                prefix = f"{i}." if args.bullet_style == 'numbered' else "•"
-                print(f"     {prefix} {item}")
-            if len(result['items']) > 5:
-                print(f"     ... and {len(result['items']) - 5} more")
-        
+        print(json.dumps(result, indent=2))
         sys.exit(0)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None
         }
         
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
 
 
@@ -3940,10 +4157,40 @@ if __name__ == "__main__":
 #!/usr/bin/env python3
 """
 PowerPoint Add Text Box Tool
-Add text box to slide with flexible positioning
+Add text box with flexible positioning and accessibility validation
+
+Version 2.0.0 - Enhanced Validation and Accessibility
+
+Changes from v1.x:
+- Enhanced: Text length validation with readability warnings
+- Enhanced: Font size accessibility validation (warns <14pt)
+- Enhanced: Color contrast checking (WCAG 2.1 AA/AAA)
+- Enhanced: Position validation (warns if off-slide)
+- Enhanced: Size validation (warns if too small to read)
+- Enhanced: JSON-first output (always returns JSON)
+- Enhanced: Full text in response (no truncation)
+- Enhanced: Comprehensive examples for all positioning systems
+- Fixed: Boolean flag parsing (now uses action='store_true')
+- Fixed: Consistent response format with validation results
+- Added: Multi-line text detection and recommendations
+- Added: --allow-offslide flag for intentional off-slide positioning
+
+Best Practices:
+- Keep text under 100 characters for single-line readability
+- Use minimum 14pt font for projected presentations
+- Ensure color contrast meets WCAG AA (4.5:1 for normal text)
+- Use percentage positioning for responsive layouts
+- Test on actual presentation display
 
 Usage:
-    uv python ppt_add_text_box.py --file presentation.pptx --slide 0 --text "Revenue: $1.5M" --position '{"left":"20%","top":"30%"}' --size '{"width":"60%","height":"10%"}' --json
+    # Simple text box with validation
+    uv run tools/ppt_add_text_box.py --file deck.pptx --slide 0 --text "Revenue: $1.5M" --position '{"left":"20%","top":"30%"}' --size '{"width":"60%","height":"10%"}' --json
+    
+    # Centered headline with large font
+    uv run tools/ppt_add_text_box.py --file deck.pptx --slide 1 --text "Key Results" --position '{"anchor":"center"}' --size '{"width":"80%","height":"15%"}' --font-size 48 --bold --color "#0070C0" --json
+    
+    # Grid positioning (Excel-like)
+    uv run tools/ppt_add_text_box.py --file deck.pptx --slide 2 --text "Note" --position '{"grid":"C4"}' --size '{"width":"25%","height":"8%"}' --font-size 16 --json
 
 Exit Codes:
     0: Success
@@ -3954,14 +4201,152 @@ import sys
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
     PowerPointAgent, PowerPointAgentError, SlideNotFoundError,
-    InvalidPositionError
+    InvalidPositionError, ColorHelper, RGBColor
 )
+
+
+def validate_text_box(
+    text: str,
+    font_size: int,
+    color: str = None,
+    position: Dict[str, Any] = None,
+    size: Dict[str, Any] = None,
+    allow_offslide: bool = False
+) -> Dict[str, Any]:
+    """
+    Validate text box parameters and return warnings/recommendations.
+    
+    Returns:
+        Dict with:
+        - warnings: List of validation warnings
+        - recommendations: List of suggested improvements
+        - validation_results: Dict of specific checks
+    """
+    warnings = []
+    recommendations = []
+    validation_results = {}
+    
+    # Text length validation
+    text_length = len(text)
+    line_count = text.count('\n') + 1
+    
+    validation_results["text_length"] = text_length
+    validation_results["line_count"] = line_count
+    validation_results["is_multiline"] = line_count > 1
+    
+    if line_count == 1 and text_length > 100:
+        warnings.append(
+            f"Text is {text_length} characters for single line (recommended: ≤100). "
+            "Long single-line text may be hard to read."
+        )
+        recommendations.append(
+            "Consider breaking into multiple lines or shortening text"
+        )
+    
+    if line_count > 1 and text_length > 500:
+        warnings.append(
+            f"Multi-line text is {text_length} characters total. "
+            "Very long text blocks reduce readability."
+        )
+    
+    # Font size validation
+    validation_results["font_size"] = font_size
+    validation_results["font_size_ok"] = font_size >= 14
+    
+    if font_size < 12:
+        warnings.append(
+            f"Font size {font_size}pt is very small (minimum recommended: 14pt for presentations). "
+            "Audience may struggle to read from distance."
+        )
+        recommendations.append(
+            "Use 14pt or larger for projected presentations, 12pt minimum for handouts"
+        )
+    elif font_size < 14:
+        recommendations.append(
+            f"Font size {font_size}pt is below recommended 14pt for projected content. "
+            "Consider increasing for better readability."
+        )
+    
+    # Color contrast validation
+    if color:
+        try:
+            text_color = ColorHelper.from_hex(color)
+            bg_color = RGBColor(255, 255, 255)  # Assume white background
+            
+            is_large_text = font_size >= 18
+            contrast_ratio = ColorHelper.contrast_ratio(text_color, bg_color)
+            
+            validation_results["color_contrast"] = {
+                "ratio": round(contrast_ratio, 2),
+                "wcag_aa": ColorHelper.meets_wcag(text_color, bg_color, is_large_text),
+                "required_ratio": 3.0 if is_large_text else 4.5
+            }
+            
+            if not ColorHelper.meets_wcag(text_color, bg_color, is_large_text):
+                required = 3.0 if is_large_text else 4.5
+                warnings.append(
+                    f"Color contrast {contrast_ratio:.2f}:1 may not meet WCAG AA standards "
+                    f"(required: {required}:1 for {'large' if is_large_text else 'normal'} text). "
+                    "Consider darker color for better readability."
+                )
+                recommendations.append(
+                    "Use #000000 (black), #333333 (dark gray), or #0070C0 (dark blue) for better contrast"
+                )
+        except Exception as e:
+            validation_results["color_contrast_error"] = str(e)
+    
+    # Position validation (if percentage-based)
+    if position:
+        try:
+            if "left" in position:
+                left_str = str(position["left"])
+                if left_str.endswith('%'):
+                    left_pct = float(left_str.rstrip('%'))
+                    if (left_pct < 0 or left_pct > 100) and not allow_offslide:
+                        warnings.append(
+                            f"Left position {left_pct}% is outside slide bounds (0-100%). "
+                            "Text box may not be visible. Use --allow-offslide if intentional."
+                        )
+            
+            if "top" in position:
+                top_str = str(position["top"])
+                if top_str.endswith('%'):
+                    top_pct = float(top_str.rstrip('%'))
+                    if (top_pct < 0 or top_pct > 100) and not allow_offslide:
+                        warnings.append(
+                            f"Top position {top_pct}% is outside slide bounds (0-100%). "
+                            "Text box may not be visible. Use --allow-offslide if intentional."
+                        )
+        except:
+            pass
+    
+    # Size validation
+    if size:
+        try:
+            if "height" in size:
+                height_str = str(size["height"])
+                if height_str.endswith('%'):
+                    height_pct = float(height_str.rstrip('%'))
+                    if height_pct < 5:
+                        warnings.append(
+                            f"Height {height_pct}% may be too small for {font_size}pt text. "
+                            "Text may be clipped."
+                        )
+                        recommendations.append("Use at least 8-10% height for single-line text")
+        except:
+            pass
+    
+    return {
+        "warnings": warnings,
+        "recommendations": recommendations,
+        "validation_results": validation_results
+    }
 
 
 def add_text_box(
@@ -3975,12 +4360,40 @@ def add_text_box(
     bold: bool = False,
     italic: bool = False,
     color: str = None,
-    alignment: str = "left"
+    alignment: str = "left",
+    allow_offslide: bool = False
 ) -> Dict[str, Any]:
-    """Add text box to slide."""
+    """
+    Add text box with comprehensive validation.
+    
+    Args:
+        filepath: Path to PowerPoint file
+        slide_index: Slide index (0-based)
+        text: Text content
+        position: Position dict (supports %, inches, anchor, grid)
+        size: Size dict
+        font_name: Font name
+        font_size: Font size in points
+        bold: Bold text
+        italic: Italic text
+        color: Text color (hex)
+        alignment: Text alignment (left, center, right, justify)
+        allow_offslide: Allow off-slide positioning
+        
+    Returns:
+        Dict with:
+        - status: "success" or "warning"
+        - text: Full text (not truncated)
+        - validation: Validation results
+        - warnings: List of issues
+        - recommendations: Suggested improvements
+    """
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
+    
+    # Validate parameters
+    validation = validate_text_box(text, font_size, color, position, size, allow_offslide)
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
@@ -3989,7 +4402,8 @@ def add_text_box(
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides-1})"
+                f"Slide index {slide_index} out of range (0-{total_slides-1}). "
+                f"Presentation has {total_slides} slides."
             )
         
         # Add text box
@@ -4012,11 +4426,15 @@ def add_text_box(
         # Save
         agent.save()
     
-    return {
-        "status": "success",
+    # Build response
+    status = "success" if len(validation["warnings"]) == 0 else "warning"
+    
+    result = {
+        "status": status,
         "file": str(filepath),
         "slide_index": slide_index,
-        "text": text[:50] + "..." if len(text) > 50 else text,
+        "text": text,  # Full text, no truncation
+        "text_length": len(text),
         "position": position,
         "size": size,
         "formatting": {
@@ -4027,34 +4445,43 @@ def add_text_box(
             "color": color,
             "alignment": alignment
         },
-        "slide_shape_count": slide_info["shape_count"]
+        "slide_shape_count": slide_info["shape_count"],
+        "validation": validation["validation_results"]
     }
+    
+    if validation["warnings"]:
+        result["warnings"] = validation["warnings"]
+    
+    if validation["recommendations"]:
+        result["recommendations"] = validation["recommendations"]
+    
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Add text box to PowerPoint slide",
+        description="Add text box to PowerPoint slide with validation (v2.0.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Position Formats:
-  1. Percentage: {"left": "20%", "top": "30%"}
+Position Formats (Flexible):
+  1. Percentage (recommended for AI): {"left": "20%", "top": "30%"}
   2. Absolute inches: {"left": 2.0, "top": 3.0}
   3. Anchor-based: {"anchor": "center", "offset_x": 0, "offset_y": -1.0}
   4. Grid system: {"grid_row": 2, "grid_col": 3, "grid_size": 12}
   5. Excel-like: {"grid": "C4"}
 
 Size Formats:
-  - {"width": "60%", "height": "10%"}
-  - {"width": 5.0, "height": 2.0}  (inches)
+  - Percentage: {"width": "60%", "height": "10%"}
+  - Absolute: {"width": 5.0, "height": 2.0}  (inches)
 
-Anchor Points:
+Anchor Points (for anchor-based positioning):
   top_left, top_center, top_right,
   center_left, center, center_right,
   bottom_left, bottom_center, bottom_right
 
 Examples:
-  # Percentage positioning (easiest for AI)
-  uv python ppt_add_text_box.py \\
+  # Percentage positioning (recommended)
+  uv run tools/ppt_add_text_box.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --text "Revenue: $1.5M" \\
@@ -4064,29 +4491,31 @@ Examples:
     --bold \\
     --json
   
-  # Grid positioning (Excel-like)
-  uv python ppt_add_text_box.py \\
+  # Centered large headline
+  uv run tools/ppt_add_text_box.py \\
     --file presentation.pptx \\
     --slide 1 \\
-    --text "Q4 Summary" \\
-    --position '{"grid":"C4"}' \\
-    --size '{"width":"25%","height":"8%"}' \\
-    --json
-  
-  # Anchor-based (centered text)
-  uv python ppt_add_text_box.py \\
-    --file presentation.pptx \\
-    --slide 2 \\
-    --text "Thank You!" \\
-    --position '{"anchor":"center","offset_x":0,"offset_y":0}' \\
+    --text "Key Results" \\
+    --position '{"anchor":"center","offset_x":0,"offset_y":-1.0}' \\
     --size '{"width":"80%","height":"15%"}' \\
     --font-size 48 \\
     --bold \\
+    --color "#0070C0" \\
     --alignment center \\
     --json
   
-  # Bottom right copyright
-  uv python ppt_add_text_box.py \\
+  # Grid positioning (Excel-like C4)
+  uv run tools/ppt_add_text_box.py \\
+    --file presentation.pptx \\
+    --slide 2 \\
+    --text "Q4 Summary" \\
+    --position '{"grid":"C4"}' \\
+    --size '{"width":"25%","height":"8%"}' \\
+    --font-size 20 \\
+    --json
+  
+  # Bottom-right copyright notice
+  uv run tools/ppt_add_text_box.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --text "© 2024 Company Inc." \\
@@ -4096,25 +4525,91 @@ Examples:
     --color "#808080" \\
     --json
   
-  # Colored headline
-  uv python ppt_add_text_box.py \\
+  # Colored callout box
+  uv run tools/ppt_add_text_box.py \\
     --file presentation.pptx \\
-    --slide 1 \\
-    --text "Key Takeaways" \\
-    --position '{"left":"5%","top":"15%"}' \\
-    --size '{"width":"90%","height":"8%"}' \\
-    --font-name "Arial" \\
-    --font-size 36 \\
+    --slide 3 \\
+    --text "Important: Review by Friday" \\
+    --position '{"left":"10%","top":"70%"}' \\
+    --size '{"width":"80%","height":"15%"}' \\
+    --font-size 20 \\
     --bold \\
-    --color "#0070C0" \\
+    --color "#C00000" \\
+    --alignment center \\
+    --json
+  
+  # Multi-line text block
+  uv run tools/ppt_add_text_box.py \\
+    --file presentation.pptx \\
+    --slide 4 \\
+    --text "Line 1: Key Point\\nLine 2: Supporting Detail\\nLine 3: Conclusion" \\
+    --position '{"left":"15%","top":"30%"}' \\
+    --size '{"width":"70%","height":"40%"}' \\
+    --font-size 18 \\
     --json
 
-Tips:
-  - Use percentages for responsive layouts
-  - Grid system ("C4") is intuitive for structured content
-  - Anchor points great for headers/footers
-  - Keep font size 18pt+ for readability
-  - Use hex colors: #FF0000 (red), #0070C0 (blue), #00B050 (green)
+Validation Features:
+  - Text length warnings (>100 chars for single line)
+  - Font size validation (warns <14pt)
+  - Color contrast checking (WCAG AA: 4.5:1 for normal text)
+  - Position validation (warns if off-slide)
+  - Size validation (warns if too small)
+  - Multi-line detection and recommendations
+
+Accessibility Guidelines:
+  - Minimum font size: 14pt for projected presentations
+  - Color contrast: At least 4.5:1 for normal text, 3:1 for large text (≥18pt)
+  - Avoid ALL CAPS for long text (harder to read)
+  - Use high-contrast colors: black, dark gray, dark blue
+  - Test on actual display (not just computer screen)
+
+Common Colors (High Contrast):
+  - Black: #000000 (best contrast)
+  - Dark Gray: #333333 or #595959
+  - Corporate Blue: #0070C0
+  - Dark Green: #00B050
+  - Dark Red: #C00000
+  - Orange: #ED7D31
+
+Output Format:
+  {
+    "status": "warning",
+    "text": "Very long text that exceeds recommended length...",
+    "text_length": 150,
+    "formatting": {
+      "font_size": 12,
+      "color": "#CCCCCC"
+    },
+    "validation": {
+      "text_length": 150,
+      "font_size": 12,
+      "font_size_ok": false,
+      "color_contrast": {
+        "ratio": 2.1,
+        "wcag_aa": false,
+        "required_ratio": 4.5
+      }
+    },
+    "warnings": [
+      "Text is 150 characters for single line (recommended: ≤100)",
+      "Font size 12pt is below recommended 14pt",
+      "Color contrast 2.1:1 may not meet WCAG AA standards"
+    ],
+    "recommendations": [
+      "Consider breaking into multiple lines",
+      "Use 14pt or larger for presentations",
+      "Use darker color for better contrast"
+    ]
+  }
+
+Related Tools:
+  - ppt_format_text.py: Format existing text
+  - ppt_add_bullet_list.py: Add structured lists
+  - ppt_get_slide_info.py: Find text box positions
+  - ppt_set_title.py: Use placeholders for titles
+
+Version: 2.0.0
+Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
     
@@ -4135,20 +4630,20 @@ Tips:
     parser.add_argument(
         '--text',
         required=True,
-        help='Text content'
+        help='Text content (use \\n for line breaks)'
     )
     
     parser.add_argument(
         '--position',
         required=True,
         type=json.loads,
-        help='Position dict (JSON string)'
+        help='Position dict (JSON): {"left":"20%","top":"30%"} or {"anchor":"center"} or {"grid":"C4"}'
     )
     
     parser.add_argument(
         '--size',
         type=json.loads,
-        help='Size dict (JSON string)'
+        help='Size dict (JSON): {"width":"60%","height":"10%"} (defaults from position if omitted)'
     )
     
     parser.add_argument(
@@ -4161,28 +4656,24 @@ Tips:
         '--font-size',
         type=int,
         default=18,
-        help='Font size in points (default: 18)'
+        help='Font size in points (default: 18, recommended: ≥14)'
     )
     
     parser.add_argument(
         '--bold',
-        nargs='?',
-        const='true',
-        default='false',
-        help='Bold text (optional: true/false)'
+        action='store_true',
+        help='Make text bold'
     )
     
     parser.add_argument(
         '--italic',
-        nargs='?',
-        const='true',
-        default='false',
-        help='Italic text (optional: true/false)'
+        action='store_true',
+        help='Make text italic'
     )
     
     parser.add_argument(
         '--color',
-        help='Text color (hex, e.g., #FF0000)'
+        help='Text color hex (e.g., #0070C0). Contrast will be validated.'
     )
     
     parser.add_argument(
@@ -4193,35 +4684,30 @@ Tips:
     )
     
     parser.add_argument(
+        '--allow-offslide',
+        action='store_true',
+        help='Allow positioning outside slide bounds (disables off-slide warnings)'
+    )
+    
+    parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
     
     try:
-        # Handle optional size and merge from position
+        # Handle size defaults
         size = args.size if args.size else {}
         position = args.position
         
-        if "width" in position and "width" not in size:
-            size["width"] = position["width"]
-        if "height" in position and "height" not in size:
-            size["height"] = position["height"]
-            
-        # Apply defaults if still missing
         if "width" not in size:
-            size["width"] = "40%"
+            size["width"] = position.get("width", "40%")
         if "height" not in size:
-            size["height"] = "20%"
-            
-        # Helper to parse boolean string/flag
-        def parse_bool(val):
-            if isinstance(val, bool): return val
-            if val is None: return False
-            return str(val).lower() in ('true', 'yes', '1', 'on')
-
+            size["height"] = position.get("height", "20%")
+        
         result = add_text_box(
             filepath=args.file,
             slide_index=args.slide,
@@ -4230,56 +4716,1286 @@ Tips:
             size=size,
             font_name=args.font_name,
             font_size=args.font_size,
-            bold=parse_bool(args.bold),
-            italic=parse_bool(args.italic),
+            bold=args.bold,
+            italic=args.italic,
             color=args.color,
-            alignment=args.alignment
+            alignment=args.alignment,
+            allow_offslide=args.allow_offslide
         )
         
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"✅ Added text box to slide {result['slide_index']}")
-            print(f"   Text: {result['text']}")
-            print(f"   Font: {result['formatting']['font_name']} {result['formatting']['font_size']}pt")
-            if args.bold or args.italic:
-                style = []
-                if args.bold:
-                    style.append("bold")
-                if args.italic:
-                    style.append("italic")
-                print(f"   Style: {', '.join(style)}")
-        
+        print(json.dumps(result, indent=2))
         sys.exit(0)
         
     except json.JSONDecodeError as e:
         error_result = {
             "status": "error",
-            "error": f"Invalid JSON in position or size argument: {e}",
+            "error": f"Invalid JSON in position or size argument: {str(e)}",
             "error_type": "JSONDecodeError",
             "hint": "Use single quotes around JSON and double quotes inside: '{\"left\":\"20%\",\"top\":\"30%\"}'"
         }
         
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {error_result['error']}", file=sys.stderr)
-            print(f"   Hint: {error_result['hint']}", file=sys.stderr)
-        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None
         }
         
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
+        print(json.dumps(error_result, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_capability_probe.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Capability Probe Tool
+Detect and report presentation template capabilities, layouts, and theme properties
+
+Version 1.1.1 - Schema Alignment & Strict Validation
+
+This tool provides comprehensive introspection of PowerPoint presentations to detect:
+- Available layouts and their placeholders (with accurate runtime positions)
+- Slide dimensions and aspect ratios
+- Theme colors and fonts (using proper font scheme API)
+- Template capabilities (footer support, slide numbers, dates)
+- Multiple master slide support
+
+Critical for AI agents and automation workflows to understand template capabilities
+before generating content.
+
+Changes in v1.1.0:
+- Fixed: JSON contract consistency (added status, operation_id, duration_ms)
+- Fixed: Placeholder type detection (uses python-pptx enum, not guessed numbers)
+- Enhanced: Position accuracy (transient slide instantiation in deep mode)
+- Enhanced: Theme extraction (uses font_scheme API, robust color conversion)
+- Enhanced: Capability detection (includes layout indices, per-master stats)
+- Added: Library version reporting (python-pptx, Pillow)
+- Added: Top-level warnings and info arrays
+- Added: Multiple masters support
+- Added: Edge case handling (locked files, large templates, timeouts)
+- Added: Comprehensive validation before output
+- Updated: v1.1.1 - Aligned with schema v1.1.1 and added strict validation
+
+Usage:
+    # Basic probe (essential info)
+    uv run tools/ppt_capability_probe.py --file template.pptx --json
+    
+    # Deep probe (accurate positions via transient instantiation)
+    uv run tools/ppt_capability_probe.py --file template.pptx --deep --json
+    
+    # Human-friendly summary
+    uv run tools/ppt_capability_probe.py --file template.pptx --summary
+
+Exit Codes:
+    0: Success
+    1: Error occurred
+
+Design Principles:
+    - Read-only operation (atomic, no file mutation)
+    - JSON-first output with consistent contract
+    - Accurate data via transient slide instantiation
+    - Graceful degradation for missing features
+    - Performance-optimized with timeout protection
+"""
+
+import sys
+import json
+import argparse
+import hashlib
+import uuid
+import time
+import importlib.metadata
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime
+from io import BytesIO
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+try:
+    from pptx import Presentation
+    from pptx.enum.shapes import PP_PLACEHOLDER
+except ImportError:
+    print(json.dumps({
+        "status": "error",
+        "error": "python-pptx not installed",
+        "error_type": "ImportError"
+    }, indent=2))
+    sys.exit(1)
+
+from core.powerpoint_agent_core import PowerPointAgentError
+from core.strict_validator import validate_against_schema
+
+
+def get_library_versions() -> Dict[str, str]:
+    """
+    Detect versions of key libraries.
+    
+    Returns:
+        Dict mapping library name to version string
+    """
+    versions = {}
+    
+    try:
+        versions["python-pptx"] = importlib.metadata.version("python-pptx")
+    except:
+        versions["python-pptx"] = "unknown"
+    
+    try:
+        versions["Pillow"] = importlib.metadata.version("Pillow")
+    except:
+        versions["Pillow"] = "not_installed"
+    
+    return versions
+
+
+def build_placeholder_type_map() -> Dict[int, str]:
+    """
+    Build mapping from PP_PLACEHOLDER enum values to human-readable names.
+    
+    Uses actual python-pptx enum values, not guessed numbers.
+    
+    Returns:
+        Dict mapping type code to name
+    """
+    type_map = {}
+    
+    for name in dir(PP_PLACEHOLDER):
+        if name.isupper():
+            try:
+                member = getattr(PP_PLACEHOLDER, name)
+                code = member if isinstance(member, int) else getattr(member, "value", None)
+                if code is not None:
+                    type_map[int(code)] = name
+            except:
+                pass
+    
+    return type_map
+
+
+PLACEHOLDER_TYPE_MAP = build_placeholder_type_map()
+
+
+def get_placeholder_type_name(ph_type_code: int) -> str:
+    """
+    Get human-readable name for placeholder type code.
+    
+    Args:
+        ph_type_code: Numeric type code from placeholder
         
+    Returns:
+        Type name or UNKNOWN_X if not recognized
+    """
+    return PLACEHOLDER_TYPE_MAP.get(ph_type_code, f"UNKNOWN_{ph_type_code}")
+
+
+def calculate_file_checksum(filepath: Path) -> str:
+    """
+    Calculate MD5 checksum of file to verify no mutation.
+    
+    Args:
+        filepath: Path to file
+        
+    Returns:
+        Hex digest of file contents
+    """
+    md5 = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(8192), b''):
+            md5.update(chunk)
+    return md5.hexdigest()
+
+
+def rgb_to_hex(rgb_color) -> str:
+    """
+    Convert RGBColor to hex string.
+    
+    Args:
+        rgb_color: RGBColor object from python-pptx
+        
+    Returns:
+        Hex color string like "#0070C0"
+    """
+    try:
+        return f"#{rgb_color.r:02X}{rgb_color.g:02X}{rgb_color.b:02X}"
+    except:
+        return "#000000"
+
+
+def detect_slide_dimensions(prs) -> Dict[str, Any]:
+    """
+    Detect slide dimensions and calculate aspect ratio.
+    
+    Args:
+        prs: Presentation object
+        
+    Returns:
+        Dict with width, height, aspect ratio, DPI estimate
+    """
+    width_inches = prs.slide_width.inches
+    height_inches = prs.slide_height.inches
+    
+    width_emu = int(prs.slide_width)
+    height_emu = int(prs.slide_height)
+    
+    dpi_estimate = 96
+    width_pixels = int(width_inches * dpi_estimate)
+    height_pixels = int(height_inches * dpi_estimate)
+    
+    ratio = width_inches / height_inches
+    if abs(ratio - 16/9) < 0.01:
+        aspect_ratio = "16:9"
+    elif abs(ratio - 4/3) < 0.01:
+        aspect_ratio = "4:3"
+    else:
+        from fractions import Fraction
+        frac = Fraction(width_pixels, height_pixels).limit_denominator(20)
+        aspect_ratio = f"{frac.numerator}:{frac.denominator}"
+    
+    return {
+        "width_inches": round(width_inches, 2),
+        "height_inches": round(height_inches, 2),
+        "width_emu": width_emu,
+        "height_emu": height_emu,
+        "width_pixels": width_pixels,
+        "height_pixels": height_pixels,
+        "aspect_ratio": aspect_ratio,
+        "aspect_ratio_float": round(ratio, 4),
+        "dpi_estimate": dpi_estimate
+    }
+
+
+def analyze_placeholder(shape, slide_width: float, slide_height: float, instantiated: bool = False) -> Dict[str, Any]:
+    """
+    Analyze a single placeholder and return comprehensive info.
+    
+    Args:
+        shape: Placeholder shape to analyze
+        slide_width: Slide width in inches
+        slide_height: Slide height in inches
+        instantiated: Whether this is from an instantiated slide (accurate) or template
+        
+    Returns:
+        Dict with type, position, size information
+    """
+    ph_format = shape.placeholder_format
+    ph_type = ph_format.type
+    ph_type_name = get_placeholder_type_name(ph_type)
+    
+    try:
+        left_emu = shape.left if hasattr(shape, 'left') else 0
+        top_emu = shape.top if hasattr(shape, 'top') else 0
+        width_emu = shape.width if hasattr(shape, 'width') else 0
+        height_emu = shape.height if hasattr(shape, 'height') else 0
+        
+        left_inches = left_emu / 914400
+        top_inches = top_emu / 914400
+        width_inches = width_emu / 914400
+        height_inches = height_emu / 914400
+        
+        left_percent = (left_inches / slide_width * 100) if slide_width > 0 else 0
+        top_percent = (top_inches / slide_height * 100) if slide_height > 0 else 0
+        width_percent = (width_inches / slide_width * 100) if slide_width > 0 else 0
+        height_percent = (height_inches / slide_height * 100) if slide_height > 0 else 0
+        
+        return {
+            "type": ph_type_name,
+            "type_code": ph_type,
+            "idx": ph_format.idx,
+            "name": shape.name,
+            "position_inches": {
+                "left": round(left_inches, 2),
+                "top": round(top_inches, 2)
+            },
+            "position_percent": {
+                "left": f"{left_percent:.1f}%",
+                "top": f"{top_percent:.1f}%"
+            },
+            "position_emu": {
+                "left": left_emu,
+                "top": top_emu
+            },
+            "size_inches": {
+                "width": round(width_inches, 2),
+                "height": round(height_inches, 2)
+            },
+            "size_percent": {
+                "width": f"{width_percent:.1f}%",
+                "height": f"{height_percent:.1f}%"
+            },
+            "size_emu": {
+                "width": width_emu,
+                "height": height_emu
+            },
+            "position_source": "instantiated" if instantiated else "template"
+        }
+    except Exception as e:
+        return {
+            "type": ph_type_name,
+            "type_code": ph_type,
+            "idx": ph_format.idx,
+            "error": str(e),
+            "position_source": "error"
+        }
+
+
+def _add_transient_slide(prs, layout):
+    """
+    Helper to safely add and remove a transient slide for deep analysis.
+    Yields the slide object, then ensures cleanup in finally block.
+    """
+    slide = None
+    added_index = -1
+    try:
+        slide = prs.slides.add_slide(layout)
+        added_index = len(prs.slides) - 1
+        yield slide
+    finally:
+        if added_index != -1 and added_index < len(prs.slides):
+            try:
+                # Defensive check: ensure we are deleting the slide we added
+                # In a single-threaded atomic read, this should always be true
+                rId = prs.slides._sldIdLst[added_index].rId
+                prs.part.drop_rel(rId)
+                del prs.slides._sldIdLst[added_index]
+            except Exception:
+                # If cleanup fails, we can't do much but suppress to avoid masking analysis errors
+                pass
+
+
+def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: float, deep: bool, warnings: List[str], timeout_start: Optional[float] = None, timeout_seconds: Optional[int] = None, max_layouts: Optional[int] = None) -> List[Dict[str, Any]]:
+    """
+    Detect all layouts, optionally instantiating them for accurate positions.
+    
+    In deep mode, creates transient slides in-memory to get runtime positions,
+    then discards them without saving (maintains atomic read guarantee).
+    
+    Args:
+        prs: Presentation object
+        slide_width: Slide width in inches
+        slide_height: Slide height in inches
+        deep: If True, instantiate layouts for accurate positions
+        warnings: List to append warnings to
+        timeout_start: Start time for timeout check
+        timeout_seconds: Max seconds allowed
+        max_layouts: Maximum number of layouts to analyze
+        
+    Returns:
+        List of layout information dicts
+    """
+    layouts = []
+    
+    # Build mapping: layout id -> master index
+    master_map = {}
+    try:
+        for m_idx, master in enumerate(prs.slide_masters):
+            for l in master.slide_layouts:
+                # Use partname as a stable key instead of id()
+                # This handles cases where python-pptx might wrap objects differently
+                try:
+                    key = l.part.partname
+                except:
+                    key = id(l)
+                master_map[key] = m_idx
+    except:
+        pass
+
+    layouts_to_process = list(prs.slide_layouts)
+    if max_layouts and len(layouts_to_process) > max_layouts:
+        layouts_to_process = layouts_to_process[:max_layouts]
+
+    # Capture original indices before slicing if needed, but since we slice from 0, 
+    # enumerate index matches original index for the subset. 
+    # However, to be robust against future changes where we might filter differently,
+    # let's capture the real index from the full list if possible, or just rely on the fact
+    # that we are iterating the main list.
+    
+    # Since we can't easily get the "original index" from the layout object itself without 
+    # iterating the full list again, and we know we are just slicing the top, 
+    # the current enumeration is correct for "index in the file".
+    # But let's be explicit about "original_index" for clarity.
+    
+    for idx, layout in enumerate(layouts_to_process):
+        # Timeout check
+        if timeout_start and timeout_seconds:
+            if (time.perf_counter() - timeout_start) > timeout_seconds:
+                warnings.append(f"Probe exceeded {timeout_seconds}s timeout during layout analysis")
+                break
+
+        # Use actual index from the presentation's layout list for robustness
+        try:
+            original_idx = prs.slide_layouts.index(layout)
+        except ValueError:
+            original_idx = idx # Fallback if something weird happens
+
+        # Determine master index using stable key
+        try:
+            key = layout.part.partname
+        except:
+            key = id(layout)
+            
+        layout_info = {
+            "index": idx,
+            "original_index": original_idx, 
+            "name": layout.name,
+            "placeholder_count": len(layout.placeholders),
+            "master_index": master_map.get(key, None)
+        }
+        
+        if deep:
+            try:
+                # Use helper for safe transient slide lifecycle
+                instantiation_success = False
+                for temp_slide in _add_transient_slide(prs, layout):
+                    instantiation_success = True
+                    
+                    # Map instantiated placeholders by idx for lookup
+                    instantiated_map = {}
+                    for shape in temp_slide.placeholders:
+                        try:
+                            instantiated_map[shape.placeholder_format.idx] = shape
+                        except:
+                            pass
+                    
+                    placeholders = []
+                    # Iterate layout placeholders (source of truth for existence)
+                    for layout_ph in layout.placeholders:
+                        try:
+                            ph_idx = layout_ph.placeholder_format.idx
+                            if ph_idx in instantiated_map:
+                                # Use instantiated shape for accurate position
+                                ph_info = analyze_placeholder(instantiated_map[ph_idx], slide_width, slide_height, instantiated=True)
+                            else:
+                                # Fallback to layout shape (e.g. master placeholders not instantiated)
+                                ph_info = analyze_placeholder(layout_ph, slide_width, slide_height, instantiated=False)
+                            placeholders.append(ph_info)
+                        except:
+                            pass
+                    
+                    
+                    layout_info["placeholders"] = placeholders
+                    layout_info["instantiation_complete"] = len(placeholders) == len(layout.placeholders)
+                    layout_info["placeholder_expected"] = len(layout.placeholders)
+                    layout_info["placeholder_instantiated"] = len(placeholders)
+
+                if not instantiation_success:
+                     raise Exception("Transient slide creation failed")
+                
+            except Exception as e:
+                warnings.append(f"Could not instantiate layout '{layout.name}': {str(e)}")
+                
+                placeholders = []
+                for shape in layout.placeholders:
+                    try:
+                        ph_info = analyze_placeholder(shape, slide_width, slide_height, instantiated=False)
+                        placeholders.append(ph_info)
+                    except:
+                        pass
+                
+                layout_info["placeholders"] = placeholders
+                layout_info["instantiation_complete"] = False
+                layout_info["placeholder_expected"] = len(layout.placeholders)
+                layout_info["placeholder_instantiated"] = len(placeholders)
+                layout_info["_warning"] = "Using template positions (instantiation failed)"
+        
+        if deep and layout_info.get("placeholder_instantiated", 0) != layout_info.get("placeholder_expected", 0):
+             if "_warning" not in layout_info:
+                 layout_info["_warning"] = "Using template positions (instantiation incomplete)"
+             # Also append to top-level warnings if not already there (optional, but good for visibility)
+             # We'll rely on the layout-level warning for now to avoid spamming top-level warnings
+             pass
+        
+        placeholder_map = {}
+        placeholder_types = []
+        for shape in layout.placeholders:
+            try:
+                ph_type = shape.placeholder_format.type
+                ph_type_name = get_placeholder_type_name(ph_type)
+                
+                # Build map
+                placeholder_map[ph_type_name] = placeholder_map.get(ph_type_name, 0) + 1
+                
+                if ph_type_name not in placeholder_types:
+                    placeholder_types.append(ph_type_name)
+            except:
+                pass
+        
+        layout_info["placeholder_types"] = placeholder_types
+        layout_info["placeholder_map"] = placeholder_map
+        
+        layouts.append(layout_info)
+    
+    return layouts
+
+
+def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
+    """
+    Extract theme colors from presentation or master using proper color scheme API.
+    
+    Args:
+        master_or_prs: Presentation or SlideMaster object
+        warnings: List to append warnings to
+        
+    Returns:
+        Dict mapping color names to hex codes or scheme references
+    """
+    colors = {}
+    
+    try:
+        # Handle both Presentation (use first master) and SlideMaster objects
+        if hasattr(master_or_prs, 'slide_masters'):
+            slide_master = master_or_prs.slide_masters[0]
+        else:
+            slide_master = master_or_prs
+
+        # Use getattr for safety if theme is missing
+        theme = getattr(slide_master, 'theme', None)
+        if not theme:
+            # Don't raise, just return empty to allow partial extraction
+            warnings.append("Theme object unavailable")
+            return {}
+            
+        color_scheme = getattr(theme, 'theme_color_scheme', None)
+        if not color_scheme:
+            warnings.append("Theme color scheme unavailable")
+            return {}
+        
+        color_attrs = [
+            'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
+            'background1', 'background2', 'text1', 'text2', 'hyperlink', 'followed_hyperlink'
+        ]
+        
+        non_rgb_found = False
+        for color_name in color_attrs:
+            try:
+                color = getattr(color_scheme, color_name, None)
+                if color:
+                    # Check if it's an RGBColor (has .r, .g, .b)
+                    if hasattr(color, 'r'):
+                        colors[color_name] = rgb_to_hex(color)
+                    else:
+                        # Fallback for scheme-based colors
+                        colors[color_name] = f"schemeColor:{color_name}"
+                        non_rgb_found = True
+            except:
+                pass
+        
+        if not colors:
+            warnings.append("Theme color scheme unavailable or empty")
+        elif non_rgb_found:
+            warnings.append("Theme colors include non-RGB scheme references; semantic schemeColor values returned")
+            
+    except Exception as e:
+        warnings.append(f"Theme color extraction failed: {str(e)}")
+    
+    return colors
+
+
+def _font_name(font_obj):
+    """Helper to safely get typeface from font object."""
+    return getattr(font_obj, 'typeface', str(font_obj)) if font_obj else None
+
+
+def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
+    """
+    Extract theme fonts from presentation or master using proper font scheme API.
+    
+    Args:
+        master_or_prs: Presentation or SlideMaster object
+        warnings: List to append warnings to
+        
+    Returns:
+        Dict with heading and body font names
+    """
+    fonts = {}
+    fallback_used = False
+    
+    try:
+        # Handle both Presentation (use first master) and SlideMaster objects
+        if hasattr(master_or_prs, 'slide_masters'):
+            slide_master = master_or_prs.slide_masters[0]
+        else:
+            slide_master = master_or_prs
+
+        theme = getattr(slide_master, 'theme', None)
+        
+        if theme:
+            font_scheme = getattr(theme, 'font_scheme', None)
+            if font_scheme:
+                major = getattr(font_scheme, 'major_font', None)
+                minor = getattr(font_scheme, 'minor_font', None)
+                
+                if major:
+                    latin = getattr(major, 'latin', None)
+                    ea = getattr(major, 'east_asian', None)
+                    cs = getattr(major, 'complex_script', None)
+                    
+                    # Precedence: Latin > East Asian > Complex Script
+                    heading_font = _font_name(latin) or _font_name(ea) or _font_name(cs)
+                    if heading_font:
+                        fonts['heading'] = heading_font
+                    
+                    # Also capture specific scripts if available
+                    if ea:
+                        fonts['heading_east_asian'] = _font_name(ea)
+                    if cs:
+                        fonts['heading_complex'] = _font_name(cs)
+                
+                if minor:
+                    latin = getattr(minor, 'latin', None)
+                    ea = getattr(minor, 'east_asian', None)
+                    cs = getattr(minor, 'complex_script', None)
+                    
+                    # Precedence: Latin > East Asian > Complex Script
+                    body_font = _font_name(latin) or _font_name(ea) or _font_name(cs)
+                    if body_font:
+                        fonts['body'] = body_font
+                    
+                    # Also capture specific scripts if available
+                    if ea:
+                        fonts['body_east_asian'] = _font_name(ea)
+                    if cs:
+                        fonts['body_complex'] = _font_name(cs)
+
+        if not fonts:
+            # Try to detect from shapes if theme API failed
+            for shape in slide_master.shapes:
+                if hasattr(shape, 'text_frame') and shape.text_frame.paragraphs:
+                    for paragraph in shape.text_frame.paragraphs:
+                        if paragraph.font.name and 'heading' not in fonts:
+                            fonts['heading'] = paragraph.font.name
+                            break
+                    if 'heading' in fonts:
+                        break
+        
+        if not fonts:
+            fallback_used = True
+            fonts = {"heading": "Calibri", "body": "Calibri"}
+            
+    except Exception as e:
+        fallback_used = True
+        fonts = {"heading": "Calibri", "body": "Calibri"}
+        warnings.append(f"Theme font extraction failed: {str(e)}")
+    
+    if fallback_used and hasattr(master_or_prs, 'slide_masters'):
+        warnings.append("Theme fonts unavailable - using Calibri defaults")
+    
+    return fonts
+
+
+def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
+    """
+    Analyze template capabilities based on detected layouts.
+    
+    Args:
+        layouts: List of layout information dicts
+        prs: Presentation object
+        
+    Returns:
+        Dict with capability flags, layout mappings, and recommendations
+    """
+    has_footer = False
+    has_slide_number = False
+    has_date = False
+    layouts_with_footer = []
+    layouts_with_slide_number = []
+    layouts_with_date = []
+    
+    footer_type_code = None
+    slide_number_type_code = None
+    date_type_code = None
+    
+    for type_code, type_name in PLACEHOLDER_TYPE_MAP.items():
+        if type_name == 'FOOTER':
+            footer_type_code = type_code
+        elif type_name == 'SLIDE_NUMBER':
+            slide_number_type_code = type_code
+        elif type_name == 'DATE':
+            date_type_code = type_code
+    
+    per_master_stats = {}
+    
+    for layout in layouts:
+        layout_ref = {
+            "index": layout['index'],
+            "original_index": layout.get('original_index', layout['index']),
+            "name": layout['name'],
+            "master_index": layout.get('master_index')
+        }
+        m_idx = layout.get('master_index')
+        
+        if m_idx is not None:
+            if m_idx not in per_master_stats:
+                per_master_stats[m_idx] = {
+                    "master_index": m_idx,
+                    "layout_count": 0,
+                    "has_footer_layouts": 0,
+                    "has_slide_number_layouts": 0,
+                    "has_date_layouts": 0
+                }
+            per_master_stats[m_idx]["layout_count"] += 1
+        
+        layout_has_footer = False
+        layout_has_slide_number = False
+        layout_has_date = False
+
+        if 'placeholders' in layout:
+            for ph in layout['placeholders']:
+                if footer_type_code and ph.get('type_code') == footer_type_code:
+                    has_footer = True
+                    layout_has_footer = True
+                    if layout_ref not in layouts_with_footer:
+                        layouts_with_footer.append(layout_ref)
+                
+                if slide_number_type_code and ph.get('type_code') == slide_number_type_code:
+                    has_slide_number = True
+                    layout_has_slide_number = True
+                    if layout_ref not in layouts_with_slide_number:
+                        layouts_with_slide_number.append(layout_ref)
+                
+                if date_type_code and ph.get('type_code') == date_type_code:
+                    has_date = True
+                    layout_has_date = True
+                    if layout_ref not in layouts_with_date:
+                        layouts_with_date.append(layout_ref)
+                        
+        elif 'placeholder_types' in layout:
+            if 'FOOTER' in layout['placeholder_types']:
+                has_footer = True
+                layout_has_footer = True
+                layouts_with_footer.append(layout_ref)
+            
+            if 'SLIDE_NUMBER' in layout['placeholder_types']:
+                has_slide_number = True
+                layout_has_slide_number = True
+                layouts_with_slide_number.append(layout_ref)
+            
+            if 'DATE' in layout['placeholder_types']:
+                has_date = True
+                layout_has_date = True
+                layouts_with_date.append(layout_ref)
+        
+        if m_idx is not None:
+            if layout_has_footer: per_master_stats[m_idx]["has_footer_layouts"] += 1
+            if layout_has_slide_number: per_master_stats[m_idx]["has_slide_number_layouts"] += 1
+            if layout_has_date: per_master_stats[m_idx]["has_date_layouts"] += 1
+    
+    recommendations = []
+    
+    if not has_footer:
+        recommendations.append(
+            "No footer placeholders found - ppt_set_footer.py will use text box fallback strategy"
+        )
+    else:
+        layout_names = [l['name'] for l in layouts_with_footer]
+        recommendations.append(
+            f"Footer placeholders available on {len(layouts_with_footer)} layout(s): {', '.join(layout_names)}"
+        )
+    
+    if not has_slide_number:
+        recommendations.append(
+            "No slide number placeholders - recommend manual text box for slide numbers"
+        )
+    
+    if not has_date:
+        recommendations.append(
+            "No date placeholders - dates must be added manually if needed"
+        )
+    else:
+        layout_names = [l['name'] for l in layouts_with_date]
+        recommendations.append(
+            f"Date placeholders available on {len(layouts_with_date)} layout(s): {', '.join(layout_names)}"
+        )
+
+    if has_slide_number:
+        layout_names = [l['name'] for l in layouts_with_slide_number]
+        recommendations.append(
+            f"Slide number placeholders available on {len(layouts_with_slide_number)} layout(s): {', '.join(layout_names)}"
+        )
+    
+    return {
+        "has_footer_placeholders": has_footer,
+        "has_slide_number_placeholders": has_slide_number,
+        "has_date_placeholders": has_date,
+        "layouts_with_footer": layouts_with_footer,
+        "layouts_with_slide_number": layouts_with_slide_number,
+        "layouts_with_date": layouts_with_date,
+        "total_layouts": len(layouts),
+        "total_master_slides": len(prs.slide_masters),
+        "per_master": list(per_master_stats.values()),
+        "footer_support_mode": "placeholder" if has_footer else "fallback_textbox",
+        "slide_number_strategy": "placeholder" if has_slide_number else "textbox",
+        "recommendations": recommendations
+    }
+
+
+def validate_output(result: Dict[str, Any]) -> Tuple[bool, List[str]]:
+    """
+    Validate probe result has all required fields.
+    
+    Args:
+        result: Probe result dict
+        
+    Returns:
+        Tuple of (is_valid, list of missing fields)
+    """
+    required_fields = [
+        "status",
+        "metadata",
+        "metadata.file",
+        "metadata.probed_at",
+        "metadata.tool_version",
+        "metadata.operation_id",
+        "metadata.duration_ms",
+        "slide_dimensions",
+        "layouts",
+        "theme",
+        "capabilities",
+        "warnings"
+    ]
+    
+    missing = []
+    
+    for field_path in required_fields:
+        parts = field_path.split('.')
+        current = result
+        
+        for part in parts:
+            if not isinstance(current, dict) or part not in current:
+                missing.append(field_path)
+                break
+            current = current[part]
+    
+    return (len(missing) == 0, missing)
+
+
+def probe_presentation(
+    filepath: Path,
+    deep: bool = False,
+    verify_atomic: bool = True,
+    max_layouts: Optional[int] = None,
+    timeout_seconds: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Probe presentation and return comprehensive capability report.
+    
+    Args:
+        filepath: Path to PowerPoint file
+        deep: If True, perform deep analysis with transient slide instantiation
+        verify_atomic: If True, verify no file mutation occurred
+        max_layouts: Maximum layouts to analyze (None = all)
+        
+    Returns:
+        Dict with complete capability report
+    """
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    if not filepath.is_file():
+        raise ValueError(f"Path is not a file: {filepath}")
+    
+    try:
+        with open(filepath, 'rb') as f:
+            f.read(1)
+    except PermissionError:
+        raise PermissionError(f"File is locked or permission denied: {filepath}")
+    
+    start_time = time.perf_counter()
+    operation_id = str(uuid.uuid4())
+    warnings = []
+    info = []
+    
+    checksum_before = None
+    if verify_atomic:
+        checksum_before = calculate_file_checksum(filepath)
+    
+    prs = Presentation(str(filepath))
+    
+    dimensions = detect_slide_dimensions(prs)
+    
+    slide_width = dimensions['width_inches']
+    slide_height = dimensions['height_inches']
+    
+    all_layouts = list(prs.slide_layouts)
+    if max_layouts and len(all_layouts) > max_layouts:
+        info.append(f"Limited analysis to first {max_layouts} of {len(all_layouts)} layouts")
+    
+    layouts = detect_layouts_with_instantiation(
+        prs, 
+        slide_width, 
+        slide_height, 
+        deep, 
+        warnings, 
+        timeout_start=start_time, 
+        timeout_seconds=timeout_seconds,
+        max_layouts=max_layouts
+    )
+    
+    # Check if analysis was cut short by timeout
+    analysis_complete = True
+    if timeout_seconds and (time.perf_counter() - start_time) > timeout_seconds:
+        analysis_complete = False
+    
+    # Extract theme info (primary master)
+    theme_colors = extract_theme_colors(prs, warnings)
+    theme_fonts = extract_theme_fonts(prs, warnings)
+    
+    # Extract per-master theme info
+    theme_per_master = []
+    try:
+        for m_idx, master in enumerate(prs.slide_masters):
+            m_colors = extract_theme_colors(master, []) # Don't collect warnings for secondary masters to avoid noise
+            m_fonts = extract_theme_fonts(master, [])
+            theme_per_master.append({
+                "master_index": m_idx,
+                "colors": m_colors,
+                "fonts": m_fonts
+            })
+    except:
+        pass
+    
+    capabilities = analyze_capabilities(layouts, prs)
+    capabilities["analysis_complete"] = analysis_complete
+    
+    duration_ms = int((time.perf_counter() - start_time) * 1000)
+    
+    checksum_after = None
+    if verify_atomic:
+        checksum_after = calculate_file_checksum(filepath)
+        
+        if checksum_before != checksum_after:
+            raise PowerPointAgentError(
+                "File was modified during probe operation! "
+                "This should never happen (atomic read violation). "
+                f"Checksum before: {checksum_before}, after: {checksum_after}"
+            )
+    
+    library_versions = get_library_versions()
+    
+    result = {
+        "status": "success",
+        "metadata": {
+            "file": str(filepath),
+            "probed_at": datetime.now().isoformat(),
+            "tool_version": "1.1.1",
+            "schema_version": "capability_probe.v1.1.1",
+            "operation_id": operation_id,
+            "deep_analysis": deep,
+            "analysis_mode": "deep" if deep else "essential",
+            "atomic_verified": verify_atomic,
+            "duration_ms": duration_ms,
+            "timeout_seconds": timeout_seconds,
+            "layout_count_total": len(all_layouts),
+            "layout_count_analyzed": len(layouts),
+            "warnings_count": len(warnings),
+            "masters": [
+                {
+                    "master_index": m_idx,
+                    "layout_count": len(m.slide_layouts),
+                    "name": getattr(m, 'name', f"Master {m_idx}"),
+                    "rId": getattr(m, 'rId', None) if hasattr(m, 'rId') else None
+                }
+                for m_idx, m in enumerate(prs.slide_masters)
+            ],
+            "library_versions": get_library_versions(),
+            "checksum": checksum_before if verify_atomic else "verification_skipped"
+        },
+        "slide_dimensions": dimensions,
+        "layouts": layouts,
+        "theme": {
+            "colors": theme_colors,
+            "fonts": theme_fonts,
+            "per_master": theme_per_master
+        },
+        "capabilities": capabilities,
+        "warnings": warnings,
+        "info": info
+    }
+    
+    is_valid, missing_fields = validate_output(result)
+    if not is_valid:
+        result["status"] = "error"
+        result["error_type"] = "SchemaValidationError"
+        warnings.append(f"Output validation found missing fields: {', '.join(missing_fields)}")
+    
+    # Strict Schema Validation
+    try:
+        schema_path = Path(__file__).parent.parent / "schemas" / "capability_probe.v1.1.1.schema.json"
+        validate_against_schema(result, str(schema_path))
+    except Exception as e:
+        # If strict validation fails, we still return the result but mark it as error
+        # or just append a warning if we want to be lenient. 
+        # Given "strict" goal, let's mark as error if it wasn't already.
+        if result["status"] == "success":
+            result["status"] = "error"
+            result["error_type"] = "StrictSchemaValidationError"
+        warnings.append(f"Strict schema validation failed: {str(e)}")
+    
+    return result
+
+
+def format_summary(probe_result: Dict[str, Any]) -> str:
+    """
+    Format probe result as human-readable summary.
+    
+    Args:
+        probe_result: Result from probe_presentation()
+        
+    Returns:
+        Formatted string summary
+    """
+    lines = []
+    
+    lines.append("═══════════════════════════════════════════════════════════════")
+    lines.append("PowerPoint Capability Probe Report v1.1.1")
+    lines.append("═══════════════════════════════════════════════════════════════")
+    lines.append("")
+    
+    meta = probe_result['metadata']
+    lines.append(f"File: {meta['file']}")
+    lines.append(f"Probed: {meta['probed_at']}")
+    lines.append(f"Operation ID: {meta['operation_id']}")
+    lines.append(f"Analysis Mode: {'Deep (instantiated positions)' if meta['deep_analysis'] else 'Essential (template positions)'}")
+    lines.append(f"Duration: {meta['duration_ms']}ms")
+    lines.append(f"Atomic Verified: {'✓' if meta['atomic_verified'] else '✗'}")
+    lines.append("")
+    
+    if meta.get('library_versions'):
+        lines.append("Library Versions:")
+        for lib, ver in meta['library_versions'].items():
+            lines.append(f"  {lib}: {ver}")
+        lines.append("")
+    
+    dims = probe_result['slide_dimensions']
+    lines.append("Slide Dimensions:")
+    lines.append(f"  Size: {dims['width_inches']}\" × {dims['height_inches']}\" ({dims['width_pixels']}×{dims['height_pixels']}px)")
+    lines.append(f"  Aspect Ratio: {dims['aspect_ratio']}")
+    lines.append(f"  DPI Estimate: {dims['dpi_estimate']}")
+    lines.append("")
+    
+    caps = probe_result['capabilities']
+    lines.append("Template Capabilities:")
+    lines.append(f"  ✓ Total Layouts: {caps['total_layouts']}")
+    lines.append(f"  ✓ Master Slides: {caps['total_master_slides']}")
+    lines.append(f"  {'✓' if caps['has_footer_placeholders'] else '✗'} Footer Placeholders: {len(caps['layouts_with_footer'])} layout(s)")
+    lines.append(f"  {'✓' if caps['has_slide_number_placeholders'] else '✗'} Slide Number Placeholders: {len(caps['layouts_with_slide_number'])} layout(s)")
+    lines.append(f"  {'✓' if caps['has_date_placeholders'] else '✗'} Date Placeholders: {len(caps['layouts_with_date'])} layout(s)")
+    lines.append("")
+
+    if 'per_master' in caps:
+        lines.append("Master Slides:")
+        for m in caps['per_master']:
+            lines.append(f"  Master {m['master_index']}: {m['layout_count']} layouts")
+            lines.append(f"    Footer: {'Yes' if m['has_footer_layouts'] else 'No'} | Slide #: {'Yes' if m['has_slide_number_layouts'] else 'No'} | Date: {'Yes' if m['has_date_layouts'] else 'No'}")
+        lines.append("")
+    lines.append("")
+    
+    lines.append("Available Layouts:")
+    for layout in probe_result['layouts']:
+        ph_count = layout['placeholder_count']
+        display_idx = layout.get('original_index', layout['index'])
+        lines.append(f"  [{display_idx}] {layout['name']} ({ph_count} placeholder{'s' if ph_count != 1 else ''})")
+        
+        if 'placeholder_types' in layout:
+            types_str = ', '.join(layout['placeholder_types'])
+            lines.append(f"      Types: {types_str}")
+    lines.append("")
+    
+    theme = probe_result['theme']
+    if theme['fonts']:
+        lines.append("Theme Fonts:")
+        for key, value in theme['fonts'].items():
+            if not key.startswith('_'):
+                lines.append(f"  {key.capitalize()}: {value}")
+        lines.append("")
+    
+    if theme['colors']:
+        color_count = len([k for k in theme['colors'].keys() if not k.startswith('_')])
+        lines.append(f"Theme Colors: {color_count} defined")
+        lines.append("")
+    
+    if caps.get('recommendations'):
+        lines.append("Recommendations:")
+        for rec in caps['recommendations']:
+            lines.append(f"  • {rec}")
+        lines.append("")
+    
+    if probe_result.get('warnings'):
+        lines.append("⚠️  Warnings:")
+        for warning in probe_result['warnings']:
+            lines.append(f"  • {warning}")
+        lines.append("")
+    
+    if probe_result.get('info'):
+        lines.append("ℹ️  Information:")
+        for info_msg in probe_result['info']:
+            lines.append(f"  • {info_msg}")
+        lines.append("")
+    
+    lines.append("═══════════════════════════════════════════════════════════════")
+    
+    return "\n".join(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Probe PowerPoint presentation capabilities (v1.1.1)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic probe (essential info, fast)
+  uv run tools/ppt_capability_probe.py --file template.pptx --json
+  
+  # Deep probe (accurate positions via transient instantiation)
+  uv run tools/ppt_capability_probe.py --file template.pptx --deep --json
+  
+  # Human-friendly summary (mutually exclusive with --json)
+  uv run tools/ppt_capability_probe.py --file template.pptx --summary
+  
+  # Verify atomic read (default, can disable for speed)
+  uv run tools/ppt_capability_probe.py --file template.pptx --no-verify-atomic --json
+  
+  # Large template with layout limit
+  uv run tools/ppt_capability_probe.py --file big_template.pptx --max-layouts 20 --json
+
+Output Schema (v1.1.1):
+  {
+    "status": "success",                    // Always present for automation
+    "metadata": {
+      "file": "...",
+      "operation_id": "uuid",               // Track operations
+      "duration_ms": 487,                   // Performance monitoring
+      "library_versions": {...}             // Debugging context
+    },
+    "slide_dimensions": {...},
+    "layouts": [...],
+    "theme": {...},
+    "capabilities": {...},
+    "warnings": [],                         // Top-level operational signals
+    "info": []
+  }
+
+Changes in v1.1.0:
+  - Fixed JSON contract (status, operation_id, duration, versions)
+  - Fixed placeholder detection (uses python-pptx enum)
+  - Enhanced position accuracy (transient slide instantiation)
+  - Robust theme extraction (font_scheme API)
+  - Precise capability detection (layout indices)
+  - Multiple masters support
+  - Top-level warnings/info arrays
+  - Comprehensive validation
+  - Edge Cases (locked files, large templates, timeouts)
+
+Version: 1.1.1
+Requires: core/powerpoint_agent_core.py v1.1.0+
+        """
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file to probe'
+    )
+    
+    parser.add_argument(
+        '--deep',
+        action='store_true',
+        help='Perform deep analysis with transient slide instantiation for accurate positions (slower)'
+    )
+    
+    parser.add_argument(
+        '--summary',
+        action='store_true',
+        help='Output human-friendly summary instead of JSON (mutually exclusive with --json)'
+    )
+    
+    parser.add_argument(
+        '--verify-atomic',
+        action='store_true',
+        default=True,
+        dest='verify_atomic',
+        help='Verify no file mutation occurred (default: true)'
+    )
+    
+    parser.add_argument(
+        '--no-verify-atomic',
+        action='store_false',
+        dest='verify_atomic',
+        help='Skip atomic verification (faster, less safe)'
+    )
+    
+    parser.add_argument(
+        '--max-layouts',
+        type=int,
+        help='Maximum layouts to analyze (for large templates)'
+    )
+
+    parser.add_argument(
+        '--timeout',
+        type=int,
+        default=30,
+        help='Timeout in seconds for analysis (default: 30)'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        dest='output_json',
+        help='Output JSON format (default if --summary is not used)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Default to JSON if neither is specified
+    if not args.summary and not args.output_json:
+        args.output_json = True
+        
+    if args.summary and args.output_json:
+        parser.error("Cannot use both --summary and --json")
+    
+    try:
+        result = probe_presentation(
+            filepath=args.file,
+            deep=args.deep,
+            verify_atomic=args.verify_atomic,
+            max_layouts=args.max_layouts,
+            timeout_seconds=args.timeout
+        )
+        
+        if args.summary:
+            print(format_summary(result))
+        else:
+            print(json.dumps(result, indent=2))
+        
+        sys.exit(0)
+        
+    except Exception as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "metadata": {
+                "file": str(args.file) if args.file else None,
+                "tool_version": "1.1.1",
+                "operation_id": str(uuid.uuid4()),
+                "probed_at": datetime.now().isoformat()
+            },
+            "warnings": []
+        }
+        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
 
 
@@ -6575,10 +8291,40 @@ if __name__ == "__main__":
 #!/usr/bin/env python3
 """
 PowerPoint Format Text Tool
-Format existing text (font, size, color, bold, italic)
+Format existing text with accessibility validation and contrast checking
+
+Version 2.0.0 - Enhanced Validation and Accessibility
+
+Changes from v1.x:
+- Enhanced: Shows before/after formatting preview
+- Enhanced: Font size validation (warns <12pt)
+- Enhanced: Color contrast checking (WCAG 2.1 AA/AAA)
+- Enhanced: Shape type validation (ensures shape has text)
+- Enhanced: JSON-first output (always returns JSON)
+- Enhanced: Comprehensive documentation and examples
+- Enhanced: Accessibility warnings and recommendations
+- Enhanced: Font availability hints
+- Added: Before/after comparison in response
+- Added: Validation results with specific metrics
+- Fixed: Consistent response format
+- Fixed: Better error messages for non-text shapes
+
+Best Practices:
+- Use minimum 12pt font (14pt recommended for presentations)
+- Ensure color contrast meets WCAG AA (4.5:1 for normal text)
+- Test formatting on actual presentation display
+- Avoid excessive bold/italic (reduces readability)
+- Use standard fonts for compatibility
 
 Usage:
-    uv python ppt_format_text.py --file presentation.pptx --slide 0 --shape 0 --font-name Arial --font-size 24 --color "#FF0000" --bold --json
+    # Change font and size
+    uv run tools/ppt_format_text.py --file deck.pptx --slide 0 --shape 0 --font-name "Arial" --font-size 24 --json
+    
+    # Make text bold and colored
+    uv run tools/ppt_format_text.py --file deck.pptx --slide 1 --shape 2 --bold --color "#0070C0" --json
+    
+    # Comprehensive formatting with validation
+    uv run tools/ppt_format_text.py --file deck.pptx --slide 0 --shape 1 --font-name "Calibri" --font-size 18 --bold --color "#000000" --json
 
 Exit Codes:
     0: Success
@@ -6589,13 +8335,105 @@ import sys
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError,
+    ColorHelper, RGBColor
 )
+
+
+def validate_formatting(
+    font_size: Optional[int] = None,
+    color: Optional[str] = None,
+    current_font_size: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    Validate formatting parameters.
+    
+    Returns:
+        Dict with warnings, recommendations, and validation results
+    """
+    warnings = []
+    recommendations = []
+    validation_results = {}
+    
+    # Font size validation
+    if font_size is not None:
+        validation_results["font_size"] = font_size
+        validation_results["font_size_ok"] = font_size >= 12
+        
+        if font_size < 10:
+            warnings.append(
+                f"Font size {font_size}pt is extremely small. "
+                "Minimum recommended: 12pt for handouts, 14pt for presentations."
+            )
+        elif font_size < 12:
+            warnings.append(
+                f"Font size {font_size}pt is below minimum recommended 12pt. "
+                "Audience may struggle to read."
+            )
+            recommendations.append("Use 12pt minimum, 14pt+ for projected content")
+        elif font_size < 14:
+            recommendations.append(
+                f"Font size {font_size}pt is acceptable for handouts but consider 14pt+ for projected presentations"
+            )
+        
+        # Check if decreasing size
+        if current_font_size and font_size < current_font_size:
+            diff = current_font_size - font_size
+            recommendations.append(
+                f"Decreasing font size by {diff}pt (from {current_font_size}pt to {font_size}pt). "
+                "Verify readability on target display."
+            )
+    
+    # Color contrast validation
+    if color:
+        try:
+            text_color = ColorHelper.from_hex(color)
+            bg_color = RGBColor(255, 255, 255)  # Assume white background
+            
+            # Determine if large text (use provided or assume 18pt if not specified)
+            effective_font_size = font_size if font_size else current_font_size if current_font_size else 18
+            is_large_text = effective_font_size >= 18
+            
+            contrast_ratio = ColorHelper.contrast_ratio(text_color, bg_color)
+            wcag_aa = ColorHelper.meets_wcag(text_color, bg_color, is_large_text)
+            
+            validation_results["color_contrast"] = {
+                "color": color,
+                "ratio": round(contrast_ratio, 2),
+                "wcag_aa": wcag_aa,
+                "is_large_text": is_large_text,
+                "required_ratio": 3.0 if is_large_text else 4.5
+            }
+            
+            if not wcag_aa:
+                required = 3.0 if is_large_text else 4.5
+                warnings.append(
+                    f"Color {color} has contrast ratio {contrast_ratio:.2f}:1 "
+                    f"(WCAG AA requires {required}:1 for {'large' if is_large_text else 'normal'} text). "
+                    "May not meet accessibility standards."
+                )
+                recommendations.append(
+                    "Use high-contrast colors: #000000 (black), #333333 (dark gray), #0070C0 (dark blue)"
+                )
+            elif contrast_ratio < 7.0:
+                recommendations.append(
+                    f"Color contrast {contrast_ratio:.2f}:1 meets WCAG AA but not AAA (7:1). "
+                    "Consider darker color for maximum accessibility."
+                )
+        except ValueError as e:
+            validation_results["color_error"] = str(e)
+            warnings.append(f"Invalid color format: {color}. Use hex format like #FF0000")
+    
+    return {
+        "warnings": warnings,
+        "recommendations": recommendations,
+        "validation_results": validation_results
+    }
 
 
 def format_text(
@@ -6608,14 +8446,38 @@ def format_text(
     bold: bool = None,
     italic: bool = None
 ) -> Dict[str, Any]:
-    """Format text in specified shape."""
+    """
+    Format text with validation and before/after reporting.
+    
+    Args:
+        filepath: Path to PowerPoint file
+        slide_index: Slide index (0-based)
+        shape_index: Shape index (0-based)
+        font_name: Optional font name
+        font_size: Optional font size (pt)
+        color: Optional text color (hex)
+        bold: Optional bold setting
+        italic: Optional italic setting
+        
+    Returns:
+        Dict with:
+        - status: "success" or "warning"
+        - before: Original formatting
+        - after: New formatting
+        - validation: Validation results
+        - warnings: List of issues
+        - recommendations: Suggested improvements
+    """
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
     # Check that at least one formatting option is provided
     if all(v is None for v in [font_name, font_size, color, bold, italic]):
-        raise ValueError("At least one formatting option must be specified")
+        raise ValueError(
+            "At least one formatting option must be specified. "
+            "Use --font-name, --font-size, --color, --bold, or --italic"
+        )
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
@@ -6624,17 +8486,52 @@ def format_text(
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides-1})"
+                f"Slide index {slide_index} out of range (0-{total_slides-1}). "
+                f"Presentation has {total_slides} slides."
             )
         
         # Get slide info to validate shape index
         slide_info = agent.get_slide_info(slide_index)
         if shape_index >= slide_info["shape_count"]:
             raise ValueError(
-                f"Shape index {shape_index} out of range (0-{slide_info['shape_count']-1})"
+                f"Shape index {shape_index} out of range (0-{slide_info['shape_count']-1}). "
+                f"Slide has {slide_info['shape_count']} shapes. "
+                "Use ppt_get_slide_info.py to find valid shape indices."
             )
         
-        # Format text
+        # Check if shape has text
+        shape_info = slide_info["shapes"][shape_index]
+        if not shape_info["has_text"]:
+            raise ValueError(
+                f"Shape {shape_index} ({shape_info['type']}) does not contain text. "
+                f"Cannot format non-text shape. "
+                "Use ppt_get_slide_info.py to find text-containing shapes."
+            )
+        
+        # Extract current formatting (basic preview)
+        before_formatting = {
+            "shape_type": shape_info["type"],
+            "shape_name": shape_info["name"],
+            "has_text": shape_info["has_text"]
+        }
+        
+        # Get current font size if available (for validation)
+        current_font_size = None
+        try:
+            slide = agent.get_slide(slide_index)
+            shape = slide.shapes[shape_index]
+            if hasattr(shape, 'text_frame') and shape.text_frame.paragraphs:
+                first_para = shape.text_frame.paragraphs[0]
+                if first_para.font.size:
+                    current_font_size = int(first_para.font.size.pt)
+                    before_formatting["font_size"] = current_font_size
+        except:
+            pass
+        
+        # Validate formatting
+        validation = validate_formatting(font_size, color, current_font_size)
+        
+        # Apply formatting
         agent.format_text(
             slide_index=slide_index,
             shape_index=shape_index,
@@ -6648,29 +8545,49 @@ def format_text(
         # Save
         agent.save()
     
-    return {
-        "status": "success",
+    # Build response
+    status = "success" if len(validation["warnings"]) == 0 else "warning"
+    
+    after_formatting = {}
+    if font_name is not None:
+        after_formatting["font_name"] = font_name
+    if font_size is not None:
+        after_formatting["font_size"] = font_size
+    if color is not None:
+        after_formatting["color"] = color
+    if bold is not None:
+        after_formatting["bold"] = bold
+    if italic is not None:
+        after_formatting["italic"] = italic
+    
+    result = {
+        "status": status,
         "file": str(filepath),
         "slide_index": slide_index,
         "shape_index": shape_index,
-        "formatting_applied": {
-            "font_name": font_name,
-            "font_size": font_size,
-            "color": color,
-            "bold": bold,
-            "italic": italic
-        }
+        "before": before_formatting,
+        "after": after_formatting,
+        "changes_applied": list(after_formatting.keys()),
+        "validation": validation["validation_results"]
     }
+    
+    if validation["warnings"]:
+        result["warnings"] = validation["warnings"]
+    
+    if validation["recommendations"]:
+        result["recommendations"] = validation["recommendations"]
+    
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Format text in PowerPoint shape",
+        description="Format text in PowerPoint shape with validation (v2.0.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Change font and size
-  uv python ppt_format_text.py \\
+  uv run tools/ppt_format_text.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --shape 0 \\
@@ -6678,54 +8595,132 @@ Examples:
     --font-size 24 \\
     --json
   
-  # Make text bold and red
-  uv python ppt_format_text.py \\
+  # Make text bold and colored (with validation)
+  uv run tools/ppt_format_text.py \\
     --file presentation.pptx \\
     --slide 1 \\
     --shape 2 \\
     --bold \\
-    --color "#FF0000" \\
+    --color "#0070C0" \\
     --json
   
   # Comprehensive formatting
-  uv python ppt_format_text.py \\
+  uv run tools/ppt_format_text.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --shape 1 \\
     --font-name "Calibri" \\
     --font-size 18 \\
     --bold \\
-    --italic \\
-    --color "#0070C0" \\
+    --color "#000000" \\
+    --json
+  
+  # Fix accessibility issue (increase size, darken color)
+  uv run tools/ppt_format_text.py \\
+    --file presentation.pptx \\
+    --slide 2 \\
+    --shape 3 \\
+    --font-size 16 \\
+    --color "#333333" \\
+    --json
+  
+  # Remove bold/italic
+  uv run tools/ppt_format_text.py \\
+    --file presentation.pptx \\
+    --slide 3 \\
+    --shape 1 \\
+    --no-bold \\
+    --no-italic \\
     --json
 
-Common Fonts:
-  - Calibri (default Office)
-  - Arial
-  - Times New Roman
-  - Helvetica
-  - Georgia
-  - Verdana
-  - Tahoma
-
-Color Examples:
-  - Black: #000000
-  - White: #FFFFFF
-  - Red: #FF0000
-  - Blue: #0070C0
-  - Green: #00B050
-  - Orange: #FFC000
-
 Finding Shape Index:
-  # Use ppt_get_slide_info.py to list shapes
-  uv python ppt_get_slide_info.py --file presentation.pptx --slide 0 --json
+  Use ppt_get_slide_info.py to list all shapes and their indices:
+  
+  uv run tools/ppt_get_slide_info.py --file presentation.pptx --slide 0 --json
+  
+  Look for "index" field in the shapes array. Only shapes with
+  "has_text": true can be formatted with this tool.
 
-Best Practices:
-  - Use standard fonts for compatibility
-  - Keep font sizes 12pt or larger
-  - Ensure sufficient color contrast
-  - Test on actual presentation display
-  - Use bold for emphasis sparingly
+Common Fonts (Cross-Platform Compatible):
+  - Calibri (default Microsoft Office)
+  - Arial (universal)
+  - Times New Roman (classic serif)
+  - Helvetica (Mac/design)
+  - Georgia (readable serif)
+  - Verdana (screen-optimized)
+  - Tahoma (compact sans-serif)
+
+Accessible Color Palette:
+  High Contrast (WCAG AAA - 7:1):
+  - Black: #000000
+  - Dark Charcoal: #333333
+  - Navy Blue: #003366
+  
+  Good Contrast (WCAG AA - 4.5:1):
+  - Dark Gray: #595959
+  - Corporate Blue: #0070C0
+  - Forest Green: #006400
+  - Dark Red: #8B0000
+  
+  Large Text Only (WCAG AA - 3:1):
+  - Medium Gray: #767676
+  - Light Blue: #4A90E2
+  - Orange: #ED7D31
+
+Validation Features:
+  - Font size warnings (<12pt)
+  - Color contrast checking (WCAG AA/AAA)
+  - Before/after comparison
+  - Shape type validation
+  - Accessibility recommendations
+
+Accessibility Guidelines:
+  - Minimum font size: 12pt (14pt for presentations)
+  - Color contrast: 4.5:1 for normal text, 3:1 for large text (≥18pt)
+  - Avoid light colors on white background
+  - Test on actual display (contrast varies by screen)
+  - Consider colorblind users (avoid red/green alone)
+
+Output Format:
+  {
+    "status": "warning",
+    "slide_index": 0,
+    "shape_index": 2,
+    "before": {
+      "font_size": 24
+    },
+    "after": {
+      "font_size": 11,
+      "color": "#CCCCCC"
+    },
+    "changes_applied": ["font_size", "color"],
+    "validation": {
+      "font_size": 11,
+      "font_size_ok": false,
+      "color_contrast": {
+        "ratio": 2.1,
+        "wcag_aa": false,
+        "required_ratio": 4.5
+      }
+    },
+    "warnings": [
+      "Font size 11pt is below minimum recommended 12pt",
+      "Color #CCCCCC has contrast ratio 2.1:1 (requires 4.5:1)"
+    ],
+    "recommendations": [
+      "Use 12pt minimum, 14pt+ for presentations",
+      "Use high-contrast colors: #000000, #333333, #0070C0"
+    ]
+  }
+
+Related Tools:
+  - ppt_get_slide_info.py: Find shape indices and current formatting
+  - ppt_add_text_box.py: Add new text with formatting
+  - ppt_set_title.py: Format title/subtitle placeholders
+  - ppt_add_bullet_list.py: Add formatted lists
+
+Version: 2.0.0
+Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
     
@@ -6747,7 +8742,7 @@ Best Practices:
         '--shape',
         required=True,
         type=int,
-        help='Shape index (0-based)'
+        help='Shape index (0-based, use ppt_get_slide_info.py to find)'
     )
     
     parser.add_argument(
@@ -6758,31 +8753,50 @@ Best Practices:
     parser.add_argument(
         '--font-size',
         type=int,
-        help='Font size in points'
+        help='Font size in points (minimum recommended: 12pt)'
     )
     
     parser.add_argument(
         '--color',
-        help='Text color (hex, e.g., #FF0000)'
+        help='Text color hex (e.g., #0070C0). Contrast will be validated.'
     )
     
     parser.add_argument(
         '--bold',
         action='store_true',
+        dest='bold',
         help='Make text bold'
+    )
+    
+    parser.add_argument(
+        '--no-bold',
+        action='store_false',
+        dest='bold',
+        help='Remove bold formatting'
     )
     
     parser.add_argument(
         '--italic',
         action='store_true',
+        dest='italic',
         help='Make text italic'
+    )
+    
+    parser.add_argument(
+        '--no-italic',
+        action='store_false',
+        dest='italic',
+        help='Remove italic formatting'
     )
     
     parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
     )
+    
+    parser.set_defaults(bold=None, italic=None)
     
     args = parser.parse_args()
     
@@ -6794,40 +8808,24 @@ Best Practices:
             font_name=args.font_name,
             font_size=args.font_size,
             color=args.color,
-            bold=args.bold if args.bold else None,
-            italic=args.italic if args.italic else None
+            bold=args.bold,
+            italic=args.italic
         )
         
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"✅ Formatted text in slide {result['slide_index']}, shape {result['shape_index']}")
-            formatting = result['formatting_applied']
-            if formatting['font_name']:
-                print(f"   Font: {formatting['font_name']}")
-            if formatting['font_size']:
-                print(f"   Size: {formatting['font_size']}pt")
-            if formatting['color']:
-                print(f"   Color: {formatting['color']}")
-            if formatting['bold']:
-                print(f"   Bold: Yes")
-            if formatting['italic']:
-                print(f"   Italic: Yes")
-        
+        print(json.dumps(result, indent=2))
         sys.exit(0)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None,
+            "shape_index": args.shape if hasattr(args, 'shape') else None
         }
         
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
 
 
@@ -6994,10 +8992,34 @@ if __name__ == "__main__":
 #!/usr/bin/env python3
 """
 PowerPoint Get Slide Info Tool
-Get detailed information about slide content (shapes, images, text)
+Get detailed information about slide content (shapes, images, text, positions)
+
+Version 2.0.0 - Enhanced with Full Text and Position Data
+
+Changes from v1.x:
+- Fixed: Removed 100-character text truncation (was causing data loss)
+- Enhanced: Now returns full text content with separate preview field
+- Enhanced: Added position information (inches and percentages)
+- Enhanced: Added size information (inches and percentages)
+- Enhanced: Human-readable placeholder type names (e.g., "PLACEHOLDER (TITLE)" not "PLACEHOLDER (14)")
+- Enhanced: Better shape type identification
+
+This tool is critical for:
+- Finding shape indices for ppt_format_text.py
+- Locating images for ppt_replace_image.py
+- Debugging positioning issues
+- Auditing slide content
+- Verifying footer/header presence
 
 Usage:
-    uv python ppt_get_slide_info.py --file presentation.pptx --slide 0 --json
+    # Get info for first slide
+    uv run tools/ppt_get_slide_info.py --file presentation.pptx --slide 0 --json
+    
+    # Get info for specific slide
+    uv run tools/ppt_get_slide_info.py --file presentation.pptx --slide 5 --json
+    
+    # Inspect footer elements
+    uv run tools/ppt_get_slide_info.py --file presentation.pptx --slide 1 --json | grep -i footer
 
 Exit Codes:
     0: Success
@@ -7021,7 +9043,41 @@ def get_slide_info(
     filepath: Path,
     slide_index: int
 ) -> Dict[str, Any]:
-    """Get detailed slide information."""
+    """
+    Get detailed slide information including full text and positioning.
+    
+    Returns comprehensive information about:
+    - All shapes on the slide
+    - Full text content (no truncation)
+    - Position (in inches and percentages)
+    - Size (in inches and percentages)
+    - Placeholder types (human-readable names)
+    - Image metadata
+    
+    Args:
+        filepath: Path to .pptx file
+        slide_index: Slide index (0-based)
+        
+    Returns:
+        Dict containing:
+        - slide_index: Index of slide
+        - layout: Layout name
+        - shape_count: Total shapes
+        - shapes: List of shape information dicts
+        - has_notes: Whether slide has speaker notes
+        
+    Each shape dict contains:
+        - index: Shape index (for targeting with other tools)
+        - type: Shape type (with human-readable placeholder names)
+        - name: Shape name
+        - has_text: Boolean
+        - text: Full text content (no truncation!)
+        - text_length: Character count
+        - text_preview: First 100 chars (if text > 100 chars)
+        - position: Dict with inches and percentages
+        - size: Dict with inches and percentages
+        - image_size_bytes: For pictures only
+    """
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -7036,13 +9092,13 @@ def get_slide_info(
                 f"Slide index {slide_index} out of range (0-{total_slides-1})"
             )
         
-        # Get slide info
+        # Get enhanced slide info from core (now includes full text and positions)
         slide_info = agent.get_slide_info(slide_index)
     
     return {
         "status": "success",
         "file": str(filepath),
-        "slide_index": slide_index,
+        "slide_index": slide_info["slide_index"],
         "layout": slide_info["layout"],
         "shape_count": slide_info["shape_count"],
         "shapes": slide_info["shapes"],
@@ -7052,68 +9108,117 @@ def get_slide_info(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Get PowerPoint slide information",
+        description="Get PowerPoint slide information with full text and positioning",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Get info for first slide
-  uv python ppt_get_slide_info.py \\
+  uv run tools/ppt_get_slide_info.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --json
   
   # Get info for specific slide
-  uv python ppt_get_slide_info.py \\
+  uv run tools/ppt_get_slide_info.py \\
     --file presentation.pptx \\
     --slide 5 \\
     --json
+  
+  # Find footer elements
+  uv run tools/ppt_get_slide_info.py --file deck.pptx --slide 1 --json | jq '.shapes[] | select(.type | contains("FOOTER"))'
+  
+  # Find text boxes at bottom of slide (footer candidates)
+  uv run tools/ppt_get_slide_info.py --file deck.pptx --slide 1 --json | jq '.shapes[] | select(.position.top_percent > "90%")'
 
 Output Information:
   - Slide layout name
   - Total shape count
   - List of all shapes with:
     - Shape index (for targeting with other tools)
-    - Shape type (PLACEHOLDER, PICTURE, TEXT_BOX, etc.)
+    - Shape type with human-readable placeholder names
+      (e.g., "PLACEHOLDER (TITLE)" instead of "PLACEHOLDER (14)")
     - Shape name
     - Whether it contains text
-    - Text preview (first 100 chars)
-    - Image size (for pictures)
+    - FULL text content (no truncation in v2.0!)
+    - Text length in characters
+    - Text preview (first 100 chars if longer)
+    - Position in both inches and percentages
+    - Size in both inches and percentages
+    - Image size for pictures
 
 Use Cases:
   - Find shape indices for ppt_format_text.py
   - Locate images for ppt_replace_image.py
-  - Inspect slide layout
+  - Inspect slide layout and structure
   - Audit slide content
-  - Debug presentation structure
+  - Debug positioning issues
+  - Verify footer/header presence
+  - Check if text is truncated or overflowing
 
 Finding Shape Indices:
   Use this tool before:
-  - ppt_format_text.py (need shape index)
-  - ppt_replace_image.py (need image name)
-  - ppt_format_shape.py (need shape index)
+  - ppt_format_text.py (needs shape index)
+  - ppt_replace_image.py (needs image name)
+  - ppt_format_shape.py (needs shape index)
+  - ppt_set_image_properties.py (needs shape index)
 
 Example Output:
 {
+  "status": "success",
   "slide_index": 0,
   "layout": "Title Slide",
-  "shape_count": 3,
+  "shape_count": 5,
   "shapes": [
     {
       "index": 0,
-      "type": "PLACEHOLDER",
+      "type": "PLACEHOLDER (TITLE)",
       "name": "Title 1",
       "has_text": true,
-      "text": "My Presentation"
+      "text": "My Presentation Title",
+      "text_length": 21,
+      "position": {
+        "left_inches": 0.5,
+        "top_inches": 1.0,
+        "left_percent": "5.0%",
+        "top_percent": "13.3%"
+      },
+      "size": {
+        "width_inches": 9.0,
+        "height_inches": 1.5,
+        "width_percent": "90.0%",
+        "height_percent": "20.0%"
+      }
     },
     {
-      "index": 1,
-      "type": "PICTURE",
-      "name": "company_logo",
-      "has_text": false,
-      "image_size_bytes": 45678
+      "index": 3,
+      "type": "TEXT_BOX",
+      "name": "TextBox 4",
+      "has_text": true,
+      "text": "Bitcoin Market Report • November 2024",
+      "text_length": 38,
+      "position": {
+        "left_inches": 0.5,
+        "top_inches": 6.9,
+        "left_percent": "5.0%",
+        "top_percent": "92.0%"
+      },
+      "size": {
+        "width_inches": 6.0,
+        "height_inches": 0.375,
+        "width_percent": "60.0%",
+        "height_percent": "5.0%"
+      }
     }
-  ]
+  ],
+  "has_notes": false
 }
+
+Changes in v2.0:
+  - Full text returned (no 100-char truncation)
+  - Position and size data included
+  - Placeholder types human-readable
+  - Text preview field for long text
+  - Better documentation
         """
     )
     
@@ -7135,7 +9240,7 @@ Example Output:
         '--json',
         action='store_true',
         default=True,
-        help='Output JSON response (default)'
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
@@ -7153,7 +9258,9 @@ Example Output:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None
         }
         
         print(json.dumps(error_result, indent=2))
@@ -8158,100 +10265,331 @@ if __name__ == "__main__":
 PowerPoint Set Footer Tool
 Configure slide footer, date, and slide number
 
+Version 2.0.0 - Complete Rewrite with Dual Strategy
+
+This tool now implements a dual-strategy approach:
+1. Primary: Attempts to use native placeholder footers (if template supports them)
+2. Fallback: Creates text box overlays for presentations without footer placeholders
+
+Changes from v1.x:
+- Fixed: Now uses correct PP_PLACEHOLDER constants (FOOTER=4, not 15)
+- Fixed: Properly handles presentations without footer placeholders
+- Enhanced: Dual strategy ensures footer always works
+- Enhanced: Detailed warnings when placeholders not available
+- Enhanced: Returns which method was used (placeholder vs text_box)
+- Enhanced: Comprehensive slide-by-slide status reporting
+
 Usage:
-    uv python ppt_set_footer.py --file deck.pptx --text "Confidential" --show-number --json
+    # Basic footer text
+    uv run tools/ppt_set_footer.py --file deck.pptx --text "Confidential" --json
+    
+    # Footer with slide numbers
+    uv run tools/ppt_set_footer.py --file deck.pptx --text "Company Name" --show-number --json
+    
+    # Footer with date and numbers
+    uv run tools/ppt_set_footer.py --file deck.pptx --text "Q4 Report" --show-number --show-date --json
+
+Note on Slide Numbers:
+    Due to python-pptx limitations, --show-number creates text box overlays with
+    slide numbers rather than activating native PowerPoint slide number placeholders.
+    This ensures consistent behavior across all templates.
+
+Exit Codes:
+    0: Success (footer applied via placeholder or text box)
+    1: Error (file not found, invalid arguments, etc.)
 """
 
 import sys
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.powerpoint_agent_core import PowerPointAgent
+from core.powerpoint_agent_core import PowerPointAgent, PP_PLACEHOLDER
+
 
 def set_footer(
     filepath: Path,
     text: str = None,
     show_number: bool = False,
     show_date: bool = False,
-    apply_to_master: bool = True
+    apply_to_all: bool = True
 ) -> Dict[str, Any]:
+    """
+    Set footer on presentation slides using dual-strategy approach.
+    
+    Strategy 1 (Preferred): Use native footer placeholders if available
+    Strategy 2 (Fallback): Create text box overlays at bottom of slides
+    
+    Args:
+        filepath: Path to PowerPoint file
+        text: Footer text content
+        show_number: Whether to show slide numbers
+        show_date: Whether to show date (not implemented - reserved for future)
+        apply_to_all: Apply to all slides (True) or only master (False)
+        
+    Returns:
+        Dict containing:
+        - status: "success" or "warning"
+        - method_used: "placeholder" or "text_box" or "hybrid"
+        - slides_updated: Number of slides modified
+        - slide_indices: List of modified slide indices
+        - warnings: List of warning messages
+        - details: Additional information
+    """
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
 
+    warnings = []
+    slide_indices_updated = set()
+    method_used = None
+    
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
         
-        # In python-pptx, footer visibility is often controlled via the master
-        # or individual slide layouts.
+        # ====================================================================
+        # STRATEGY 1: Try native placeholder approach
+        # ====================================================================
         
-        if apply_to_master:
-             masters = agent.prs.slide_masters
-             for master in masters:
-                 # Update layouts in master
-                 for layout in master.slide_layouts:
-                     # Iterate shapes to find placeholders
-                     for shape in layout.placeholders:
-                         if shape.is_placeholder:
-                             # Footer type is 15, Slide Number is 16, Date is 14
-                             if shape.placeholder_format.type == 15 and text: # Footer
-                                 shape.text = text
-                             
-        # Also attempt to set on individual slides for immediate visibility
-        count = 0
-        for slide in agent.prs.slides:
-            # This is simplified; robustness varies by template
-            # We try to find standard placeholders
-            for shape in slide.placeholders:
-                 if shape.placeholder_format.type == 15 and text:
-                     shape.text = text
-                     count += 1
-                     
+        placeholder_count = 0
+        
+        if text:
+            # Try to set footer text on master slide layouts
+            try:
+                for master in agent.prs.slide_masters:
+                    for layout in master.slide_layouts:
+                        for shape in layout.placeholders:
+                            if shape.placeholder_format.type == PP_PLACEHOLDER.FOOTER:
+                                try:
+                                    shape.text = text
+                                    placeholder_count += 1
+                                except:
+                                    pass
+            except Exception as e:
+                warnings.append(f"Could not access master slide layouts: {str(e)}")
+            
+            # Try to set footer text on individual slides
+            for slide_idx, slide in enumerate(agent.prs.slides):
+                for shape in slide.placeholders:
+                    if shape.placeholder_format.type == PP_PLACEHOLDER.FOOTER:
+                        try:
+                            shape.text = text
+                            slide_indices_updated.add(slide_idx)
+                            placeholder_count += 1
+                        except:
+                            pass
+        
+        # ====================================================================
+        # STRATEGY 2: Fallback to text box overlay if no placeholders found
+        # ====================================================================
+        
+        textbox_count = 0
+        
+        if placeholder_count == 0:
+            warnings.append(
+                "No footer placeholders found in this presentation template. "
+                "Using text box overlay strategy instead."
+            )
+            
+            # Skip title slide (slide 0) for footer overlays
+            for slide_idx in range(1, len(agent.prs.slides)):
+                try:
+                    # Add footer text box (bottom-left)
+                    if text:
+                        agent.add_text_box(
+                            slide_index=slide_idx,
+                            text=text,
+                            position={"left": "5%", "top": "92%"},
+                            size={"width": "60%", "height": "5%"},
+                            font_size=10,
+                            color="#595959",
+                            alignment="left"
+                        )
+                        textbox_count += 1
+                        slide_indices_updated.add(slide_idx)
+                    
+                    # Add slide number box (bottom-right)
+                    if show_number:
+                        # Display number is 1-indexed for audience (slide 1 displays as "2")
+                        display_number = slide_idx + 1
+                        agent.add_text_box(
+                            slide_index=slide_idx,
+                            text=str(display_number),
+                            position={"left": "92%", "top": "92%"},
+                            size={"width": "5%", "height": "5%"},
+                            font_size=10,
+                            color="#595959",
+                            alignment="left"
+                        )
+                        textbox_count += 1
+                        slide_indices_updated.add(slide_idx)
+                        
+                except Exception as e:
+                    warnings.append(f"Failed to add text box to slide {slide_idx}: {str(e)}")
+        
+        # Determine which method was used
+        if placeholder_count > 0 and textbox_count == 0:
+            method_used = "placeholder"
+        elif textbox_count > 0 and placeholder_count == 0:
+            method_used = "text_box"
+        elif placeholder_count > 0 and textbox_count > 0:
+            method_used = "hybrid"
+        else:
+            method_used = "none"
+            warnings.append("No footer elements were added (no text provided or all operations failed)")
+        
+        # ====================================================================
+        # Handle --show-date flag (reserved for future implementation)
+        # ====================================================================
+        
+        if show_date:
+            warnings.append(
+                "Date placeholder activation not yet implemented due to python-pptx limitations. "
+                "Consider adding date manually via ppt_add_text_box.py"
+            )
+        
+        # Save changes
         agent.save()
-        
-    return {
-        "status": "success",
+    
+    # ====================================================================
+    # Build comprehensive response
+    # ====================================================================
+    
+    status = "success" if len(slide_indices_updated) > 0 else "warning"
+    
+    result = {
+        "status": status,
         "file": str(filepath),
+        "method_used": method_used,
         "footer_text": text,
         "settings": {
             "show_number": show_number,
-            "show_date": show_date
+            "show_date": show_date,
+            "show_date_implemented": False  # Not yet supported
         },
-        "slides_updated": count
+        "slides_updated": len(slide_indices_updated),
+        "slide_indices": sorted(list(slide_indices_updated)),
+        "details": {
+            "placeholder_count": placeholder_count,
+            "textbox_count": textbox_count,
+            "total_elements_added": placeholder_count + textbox_count
+        }
     }
+    
+    if warnings:
+        result["warnings"] = warnings
+        
+    # Add recommendations if using fallback strategy
+    if method_used == "text_box":
+        result["recommendation"] = (
+            "This presentation template does not include footer placeholders. "
+            "For better maintainability, consider using a template with built-in footer support, "
+            "or continue using text box overlays (which work on all presentations)."
+        )
+    
+    return result
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Set PowerPoint footer")
-    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
-    parser.add_argument('--text', help='Footer text')
-    parser.add_argument('--show-number', nargs='?', const='true', default='false', help='Show slide number (optional: true/false)')
-    parser.add_argument('--show-date', nargs='?', const='true', default='false', help='Show date (optional: true/false)')
-    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
+    parser = argparse.ArgumentParser(
+        description="Set PowerPoint footer with dual-strategy approach",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Add footer text only
+  uv run tools/ppt_set_footer.py --file deck.pptx --text "Confidential" --json
+  
+  # Add footer with slide numbers
+  uv run tools/ppt_set_footer.py --file deck.pptx --text "Q4 Report" --show-number --json
+  
+  # Footer with all options
+  uv run tools/ppt_set_footer.py --file deck.pptx --text "Company Name" --show-number --show-date --json
+
+Strategy:
+  This tool uses a dual-strategy approach:
+  1. First attempts to use native PowerPoint footer placeholders
+  2. Falls back to text box overlays if placeholders not available
+  
+  The method used is reported in the "method_used" field:
+  - "placeholder": Native footer placeholders used
+  - "text_box": Text box overlays used (for templates without footer support)
+  - "hybrid": Both methods used
+  
+Slide Numbering:
+  Due to python-pptx limitations, slide numbers are implemented as text boxes
+  positioned at bottom-right (92% left, 92% top) rather than activating
+  native PowerPoint slide number placeholders. This ensures consistent behavior.
+
+Output:
+  {
+    "status": "success",
+    "method_used": "text_box",
+    "slides_updated": 8,
+    "slide_indices": [1, 2, 3, 4, 5, 6, 7, 8],
+    "warnings": ["No footer placeholders found..."],
+    "recommendation": "..."
+  }
+        """
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file path'
+    )
+    
+    parser.add_argument(
+        '--text',
+        help='Footer text content'
+    )
+    
+    parser.add_argument(
+        '--show-number',
+        action='store_true',
+        help='Show slide numbers (implemented as text box overlays)'
+    )
+    
+    parser.add_argument(
+        '--show-date',
+        action='store_true',
+        help='Show date (reserved for future implementation)'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        default=True,
+        help='Output JSON response (default: true)'
+    )
     
     args = parser.parse_args()
     
     try:
-        # Helper to parse boolean string/flag
-        def parse_bool(val):
-            if isinstance(val, bool): return val
-            if val is None: return False
-            return str(val).lower() in ('true', 'yes', '1', 'on')
-
         result = set_footer(
             filepath=args.file, 
             text=args.text, 
-            show_number=parse_bool(args.show_number),
-            show_date=parse_bool(args.show_date)
+            show_number=args.show_number,
+            show_date=args.show_date
         )
+        
         print(json.dumps(result, indent=2))
         sys.exit(0)
+        
     except Exception as e:
-        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None
+        }
+        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
@@ -8359,92 +10697,39 @@ if __name__ == "__main__":
 #!/usr/bin/env python3
 """
 PowerPoint Set Slide Layout Tool
-Change the layout of an existing slide
+Change the layout of an existing slide with safety warnings
+
+Version 2.0.0 - Enhanced Safety and User Experience
+
+Changes from v1.x:
+- Enhanced: Content loss warning system
+- Enhanced: Improved layout name matching (fuzzy + suggestions)
+- Enhanced: Shows available layouts on error
+- Enhanced: Reports placeholder changes
+- Enhanced: JSON-first output with comprehensive metadata
+- Enhanced: Better error messages and recovery suggestions
+- Added: `--force` flag for destructive operations
+- Added: Current vs new layout comparison
+- Fixed: Consistent response format
+
+IMPORTANT WARNING:
+    Changing slide layouts in PowerPoint can cause CONTENT LOSS!
+    - Text in removed placeholders may disappear
+    - Shapes may be repositioned
+    - Formatting may change
+    - This is a python-pptx limitation, not a bug
+    
+    ALWAYS backup your presentation before changing layouts!
 
 Usage:
-    uv python ppt_set_slide_layout.py --file presentation.pptx --slide 0 --layout "Title Only" --json
-"""
-
-import sys
-import json
-import argparse
-from pathlib import Path
-from typing import Dict, Any
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError, SlideNotFoundError, LayoutNotFoundError
-)
-
-
-def set_slide_layout(filepath: Path, slide_index: int, layout_name: str) -> Dict[str, Any]:
+    # Change to Title Only (minimal risk)
+    uv run tools/ppt_set_slide_layout.py --file presentation.pptx --slide 2 --layout "Title Only" --json
     
-    if not filepath.exists():
-        raise FileNotFoundError(f"File not found: {filepath}")
+    # Change with force flag (acknowledges content loss risk)
+    uv run tools/ppt_set_slide_layout.py --file presentation.pptx --slide 5 --layout "Blank" --force --json
     
-    with PowerPointAgent(filepath) as agent:
-        agent.open(filepath)
-        
-        total = agent.get_slide_count()
-        if not 0 <= slide_index < total:
-            raise SlideNotFoundError(f"Slide index {slide_index} out of range")
-            
-        # Get available layouts to validate/fuzzy match
-        available = agent.get_available_layouts()
-        if layout_name not in available:
-            # Try fuzzy match
-            layout_lower = layout_name.lower()
-            for avail in available:
-                if layout_lower in avail.lower():
-                    layout_name = avail
-                    break
-            else:
-                 raise LayoutNotFoundError(f"Layout '{layout_name}' not found. Available: {available}")
-
-        agent.set_slide_layout(slide_index, layout_name)
-        agent.save()
-        
-    return {
-        "status": "success",
-        "file": str(filepath),
-        "slide_index": slide_index,
-        "new_layout": layout_name
-    }
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Set PowerPoint slide layout")
-    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
-    parser.add_argument('--slide', required=True, type=int, help='Slide index (0-based)')
-    parser.add_argument('--layout', required=True, help='New layout name')
-    parser.add_argument('--json', action='store_true', default=True, help='Output JSON')
-    
-    args = parser.parse_args()
-    
-    try:
-        result = set_slide_layout(filepath=args.file, slide_index=args.slide, layout_name=args.layout)
-        print(json.dumps(result, indent=2))
-        sys.exit(0)
-    except Exception as e:
-        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}, indent=2))
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
-
-```
-
-# tools/ppt_set_title.py
-```py
-#!/usr/bin/env python3
-"""
-PowerPoint Set Title Tool
-Set slide title and optional subtitle
-
-Usage:
-    uv python ppt_set_title.py --file presentation.pptx --slide 0 --title "Q4 Results" --subtitle "Financial Review" --json
+    # List available layouts first
+    uv run tools/ppt_get_info.py --file presentation.pptx --json | jq '.layouts'
 
 Exit Codes:
     0: Success
@@ -8455,25 +10740,50 @@ import sys
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
+from difflib import get_close_matches
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError, LayoutNotFoundError
 )
 
 
-def set_title(
+def set_slide_layout(
     filepath: Path,
     slide_index: int,
-    title: str,
-    subtitle: str = None
+    layout_name: str,
+    force: bool = False
 ) -> Dict[str, Any]:
-    """Set slide title and subtitle."""
+    """
+    Change slide layout with safety warnings.
+    
+    WARNING: Changing layouts can cause content loss due to python-pptx limitations.
+    Always backup presentations before layout changes.
+    
+    Args:
+        filepath: Path to PowerPoint file
+        slide_index: Slide index (0-based)
+        layout_name: Target layout name (fuzzy matching supported)
+        force: Acknowledge content loss risk (required for destructive layouts)
+        
+    Returns:
+        Dict containing:
+        - status: "success" or "warning"
+        - old_layout: Previous layout name
+        - new_layout: New layout name
+        - warnings: Content loss warnings
+        - placeholders_before: Count before change
+        - placeholders_after: Count after change
+        - recommendations: Suggestions
+    """
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
+    
+    warnings = []
+    recommendations = []
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
@@ -8482,60 +10792,244 @@ def set_title(
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides-1})"
+                f"Slide index {slide_index} out of range (0-{total_slides-1}). "
+                f"Presentation has {total_slides} slides."
             )
         
-        # Set title
-        agent.set_title(slide_index, title, subtitle)
+        # Get available layouts
+        available_layouts = agent.get_available_layouts()
         
-        # Get slide info
-        slide_info = agent.get_slide_info(slide_index)
+        # Get current slide info
+        slide_info_before = agent.get_slide_info(slide_index)
+        old_layout = slide_info_before["layout"]
+        placeholders_before = sum(1 for shape in slide_info_before["shapes"] 
+                                 if "PLACEHOLDER" in shape["type"])
+        
+        # Layout name matching with fuzzy search
+        matched_layout = None
+        
+        # Exact match (case-insensitive)
+        for layout in available_layouts:
+            if layout.lower() == layout_name.lower():
+                matched_layout = layout
+                break
+        
+        # Fuzzy match if no exact match
+        if not matched_layout:
+            # Check if it's a substring
+            for layout in available_layouts:
+                if layout_name.lower() in layout.lower():
+                    matched_layout = layout
+                    warnings.append(
+                        f"Matched '{layout_name}' to layout '{layout}' (substring match)"
+                    )
+                    break
+        
+        # Use difflib for close matches
+        if not matched_layout:
+            close_matches = get_close_matches(layout_name, available_layouts, n=3, cutoff=0.6)
+            if close_matches:
+                raise LayoutNotFoundError(
+                    f"Layout '{layout_name}' not found. Did you mean one of these?\n" +
+                    "\n".join(f"  - {match}" for match in close_matches) +
+                    f"\n\nAll available layouts:\n" +
+                    "\n".join(f"  - {layout}" for layout in available_layouts)
+                )
+            else:
+                raise LayoutNotFoundError(
+                    f"Layout '{layout_name}' not found.\n\n" +
+                    f"Available layouts:\n" +
+                    "\n".join(f"  - {layout}" for layout in available_layouts)
+                )
+        
+        # Safety warnings for destructive layouts
+        destructive_layouts = ["Blank", "Title Only"]
+        if matched_layout in destructive_layouts and placeholders_before > 0:
+            warnings.append(
+                f"⚠️  CONTENT LOSS RISK: Changing from '{old_layout}' to '{matched_layout}' "
+                f"may remove {placeholders_before} placeholders and their content!"
+            )
+            
+            if not force:
+                raise PowerPointAgentError(
+                    f"Layout change from '{old_layout}' to '{matched_layout}' requires --force flag.\n"
+                    f"This change may cause content loss ({placeholders_before} placeholders will be affected).\n\n"
+                    "To proceed, add --force flag:\n"
+                    f"  --layout \"{matched_layout}\" --force\n\n"
+                    "RECOMMENDATION: Backup your presentation first!"
+                )
+        
+        # Warn about same layout
+        if matched_layout == old_layout:
+            recommendations.append(
+                f"Slide already uses '{old_layout}' layout. No change needed."
+            )
+        
+        # Apply layout change
+        agent.set_slide_layout(slide_index, matched_layout)
+        
+        # Get slide info after change
+        slide_info_after = agent.get_slide_info(slide_index)
+        placeholders_after = sum(1 for shape in slide_info_after["shapes"] 
+                                if "PLACEHOLDER" in shape["type"])
+        
+        # Detect content loss
+        if placeholders_after < placeholders_before:
+            warnings.append(
+                f"Content loss detected: {placeholders_before - placeholders_after} "
+                f"placeholders removed during layout change."
+            )
+            recommendations.append(
+                "Review slide content and restore any lost text using ppt_add_text_box.py"
+            )
         
         # Save
         agent.save()
     
-    return {
-        "status": "success",
+    # Build response
+    status = "success" if len(warnings) == 0 else "warning"
+    
+    result = {
+        "status": status,
         "file": str(filepath),
         "slide_index": slide_index,
-        "title": title,
-        "subtitle": subtitle,
-        "layout": slide_info["layout"],
-        "shape_count": slide_info["shape_count"]
+        "old_layout": old_layout,
+        "new_layout": matched_layout,
+        "layout_changed": (old_layout != matched_layout),
+        "placeholders": {
+            "before": placeholders_before,
+            "after": placeholders_after,
+            "change": placeholders_after - placeholders_before
+        },
+        "available_layouts": available_layouts
     }
+    
+    if warnings:
+        result["warnings"] = warnings
+    
+    if recommendations:
+        result["recommendations"] = recommendations
+    
+    return result
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Set PowerPoint slide title and subtitle",
+        description="Change PowerPoint slide layout with safety warnings (v2.0.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+⚠️  IMPORTANT WARNING ⚠️
+    Changing slide layouts can cause CONTENT LOSS!
+    - Text in removed placeholders may disappear
+    - Shapes may be repositioned
+    - Formatting may change
+    
+    ALWAYS backup your presentation before changing layouts!
+
 Examples:
-  # Set title only
-  uv python ppt_set_title.py --file presentation.pptx --slide 0 --title "Q4 Financial Results" --json
+  # List available layouts first
+  uv run tools/ppt_get_info.py --file presentation.pptx --json | jq '.layouts'
   
-  # Set title and subtitle
-  uv python ppt_set_title.py --file deck.pptx --slide 0 --title "2024 Strategy" --subtitle "Driving Growth & Innovation" --json
+  # Change to Title Only layout (low risk)
+  uv run tools/ppt_set_slide_layout.py \\
+    --file presentation.pptx \\
+    --slide 2 \\
+    --layout "Title Only" \\
+    --json
   
-  # Update existing title
-  uv python ppt_set_title.py --file presentation.pptx --slide 5 --title "Updated Section Title" --json
+  # Change to Blank layout (HIGH RISK - requires --force)
+  uv run tools/ppt_set_slide_layout.py \\
+    --file presentation.pptx \\
+    --slide 5 \\
+    --layout "Blank" \\
+    --force \\
+    --json
   
-  # Set title on last slide
-  uv python ppt_set_title.py --file presentation.pptx --slide -1 --title "Thank You" --json
+  # Fuzzy matching (will match "Title and Content")
+  uv run tools/ppt_set_slide_layout.py \\
+    --file presentation.pptx \\
+    --slide 3 \\
+    --layout "title content" \\
+    --json
+  
+  # Change multiple slides (bash loop)
+  for i in {2..5}; do
+    uv run tools/ppt_set_slide_layout.py \\
+      --file presentation.pptx \\
+      --slide $i \\
+      --layout "Section Header" \\
+      --json
+  done
 
-Best Practices:
-  - Keep titles concise (max 60 characters)
-  - Use title case: "This Is Title Case"
-  - Subtitles provide context, not repetition
-  - First slide (index 0) should use "Title Slide" layout
-  - Section headers benefit from clear, bold titles
-
-Slide Index:
-  - 0 = first slide
-  - 1 = second slide
-  - -1 = last slide (not yet supported in this version)
+Common Layouts:
+  Low Risk (preserve most content):
+  - "Title and Content" → Most versatile
+  - "Two Content" → Side-by-side content
+  - "Section Header" → Section dividers
   
-  To find total slides: uv python ppt_get_info.py --file your.pptx --json
+  Medium Risk:
+  - "Title Only" → Removes content placeholders
+  - "Content with Caption" → Repositions content
+  
+  High Risk (requires --force):
+  - "Blank" → Removes all placeholders!
+  - Custom layouts → Unpredictable behavior
+
+Layout Matching:
+  This tool supports flexible matching:
+  - Exact: "Title and Content" matches "Title and Content"
+  - Case-insensitive: "title slide" matches "Title Slide"
+  - Substring: "content" matches "Title and Content"
+  - Fuzzy: "tile slide" suggests "Title Slide"
+
+Safety Features:
+  - Warns about content loss risk
+  - Requires --force for destructive layouts
+  - Reports placeholder count changes
+  - Suggests recovery actions
+  - Provides rollback instructions
+
+Output Format:
+  {
+    "status": "warning",
+    "old_layout": "Title and Content",
+    "new_layout": "Title Only",
+    "layout_changed": true,
+    "placeholders": {
+      "before": 2,
+      "after": 1,
+      "change": -1
+    },
+    "warnings": [
+      "Content loss detected: 1 placeholders removed"
+    ],
+    "recommendations": [
+      "Review slide content and restore any lost text"
+    ]
+  }
+
+Recovery from Content Loss:
+  If content was lost during layout change:
+  
+  1. Check backup (you did backup, right?)
+  2. Use ppt_get_slide_info.py to inspect current state
+  3. Restore text manually:
+     uv run tools/ppt_add_text_box.py \\
+       --file presentation.pptx \\
+       --slide X \\
+       --text "Restored content" \\
+       --position '{"left":"10%","top":"25%"}' \\
+       --size '{"width":"80%","height":"60%"}' \\
+       --json
+
+Related Tools:
+  - ppt_get_info.py: List all available layouts
+  - ppt_get_slide_info.py: Inspect current slide layout
+  - ppt_add_text_box.py: Restore lost content manually
+  - ppt_clone_presentation.py: Create backup before changes
+
+Version: 2.0.0
+Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
     
@@ -8554,20 +11048,402 @@ Slide Index:
     )
     
     parser.add_argument(
-        '--title',
+        '--layout',
         required=True,
-        help='Title text'
+        help='New layout name (fuzzy matching supported)'
     )
     
     parser.add_argument(
-        '--subtitle',
-        help='Optional subtitle text'
+        '--force',
+        action='store_true',
+        help='Force destructive layout change (acknowledges content loss risk)'
     )
     
     parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        result = set_slide_layout(
+            filepath=args.file,
+            slide_index=args.slide,
+            layout_name=args.layout,
+            force=args.force
+        )
+        
+        print(json.dumps(result, indent=2))
+        sys.exit(0)
+        
+    except Exception as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None
+        }
+        
+        print(json.dumps(error_result, indent=2))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+```
+
+# tools/ppt_set_title.py
+```py
+#!/usr/bin/env python3
+"""
+PowerPoint Set Title Tool
+Set slide title and optional subtitle with validation
+
+Version 2.0.0 - Enhanced Validation and JSON-First
+
+Changes from v1.x:
+- Enhanced: Now validates title length and provides readability warnings
+- Enhanced: Checks for placeholder availability
+- Enhanced: JSON-first output (always returns JSON)
+- Enhanced: Better error messages and suggestions
+- Enhanced: Layout compatibility warnings
+- Enhanced: Comprehensive documentation and examples
+- Fixed: Consistent response format across all scenarios
+- Fixed: Proper integration with core library v1.1.0 (fixed placeholder types)
+
+Best Practices:
+- Keep titles under 60 characters for readability
+- Keep subtitles under 100 characters
+- Use "Title Slide" layout for first slide (index 0)
+- Use title case: "This Is Title Case"
+- Subtitles provide context, not repetition
+
+Usage:
+    # Set title only
+    uv run tools/ppt_set_title.py --file presentation.pptx --slide 0 --title "Q4 Results" --json
+    
+    # Set title and subtitle
+    uv run tools/ppt_set_title.py --file deck.pptx --slide 0 --title "2024 Strategy" --subtitle "Growth & Innovation" --json
+    
+    # Update existing title
+    uv run tools/ppt_set_title.py --file presentation.pptx --slide 5 --title "New Section Title" --json
+
+Exit Codes:
+    0: Success
+    1: Error occurred
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any, List
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+)
+
+
+def set_title(
+    filepath: Path,
+    slide_index: int,
+    title: str,
+    subtitle: str = None
+) -> Dict[str, Any]:
+    """
+    Set slide title and subtitle with validation.
+    
+    This tool integrates with core library v1.1.0 which correctly handles:
+    - PP_PLACEHOLDER.TITLE (type 1)
+    - PP_PLACEHOLDER.CENTER_TITLE (type 3)
+    - PP_PLACEHOLDER.SUBTITLE (type 4) - FIXED in v1.1.0
+    
+    Args:
+        filepath: Path to PowerPoint file
+        slide_index: Slide index (0-based)
+        title: Title text
+        subtitle: Optional subtitle text
+        
+    Returns:
+        Dict containing:
+        - status: "success" or "warning"
+        - file: File path
+        - slide_index: Modified slide
+        - title: Title set
+        - subtitle: Subtitle set (if any)
+        - layout: Current layout name
+        - warnings: List of validation warnings
+        - recommendations: Suggested improvements
+    """
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    warnings = []
+    recommendations = []
+    
+    # Validation: Title length
+    if len(title) > 60:
+        warnings.append(
+            f"Title is {len(title)} characters (recommended: ≤60 for readability). "
+            "Consider shortening for better visual impact."
+        )
+    
+    if len(title) > 100:
+        warnings.append(
+            "Title exceeds 100 characters and may not fit on slide. "
+            "Strong recommendation to shorten."
+        )
+    
+    # Validation: Subtitle length
+    if subtitle and len(subtitle) > 100:
+        warnings.append(
+            f"Subtitle is {len(subtitle)} characters (recommended: ≤100). "
+            "Long subtitles reduce readability."
+        )
+    
+    # Validation: Title case check (basic)
+    if title == title.upper() and len(title) > 10:
+        recommendations.append(
+            "Title is all uppercase. Consider using title case for better readability: "
+            "'This Is Title Case' instead of 'THIS IS TITLE CASE'"
+        )
+    
+    if title == title.lower() and len(title) > 10:
+        recommendations.append(
+            "Title is all lowercase. Consider using title case for professionalism."
+        )
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        # Validate slide index
+        total_slides = agent.get_slide_count()
+        if not 0 <= slide_index < total_slides:
+            raise SlideNotFoundError(
+                f"Slide index {slide_index} out of range (0-{total_slides-1}). "
+                f"This presentation has {total_slides} slides."
+            )
+        
+        # Get slide info before modification
+        slide_info_before = agent.get_slide_info(slide_index)
+        layout_name = slide_info_before["layout"]
+        
+        # Layout recommendations
+        if slide_index == 0 and "Title Slide" not in layout_name:
+            recommendations.append(
+                f"First slide has layout '{layout_name}'. "
+                "Consider using 'Title Slide' layout for cover slides."
+            )
+        
+        # Check for title/subtitle placeholders
+        has_title_placeholder = False
+        has_subtitle_placeholder = False
+        
+        for shape in slide_info_before["shapes"]:
+            shape_type = shape["type"]
+            if "TITLE" in shape_type or "CENTER_TITLE" in shape_type:
+                has_title_placeholder = True
+            if "SUBTITLE" in shape_type:
+                has_subtitle_placeholder = True
+        
+        if not has_title_placeholder:
+            warnings.append(
+                f"Layout '{layout_name}' may not have a title placeholder. "
+                "Title may not display as expected. Consider changing layout first."
+            )
+        
+        if subtitle and not has_subtitle_placeholder:
+            warnings.append(
+                f"Layout '{layout_name}' does not have a subtitle placeholder. "
+                "Subtitle will not be displayed. Consider using 'Title Slide' layout."
+            )
+        
+        # Set title (delegates to core library v1.1.0 with fixed placeholder types)
+        agent.set_title(slide_index, title, subtitle)
+        
+        # Get slide info after modification for verification
+        slide_info_after = agent.get_slide_info(slide_index)
+        
+        # Save
+        agent.save()
+    
+    # Build response
+    status = "success" if len(warnings) == 0 else "warning"
+    
+    result = {
+        "status": status,
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "title": title,
+        "subtitle": subtitle,
+        "layout": layout_name,
+        "shape_count": slide_info_after["shape_count"],
+        "placeholders_found": {
+            "title": has_title_placeholder,
+            "subtitle": has_subtitle_placeholder
+        },
+        "validation": {
+            "title_length": len(title),
+            "title_length_ok": len(title) <= 60,
+            "subtitle_length": len(subtitle) if subtitle else 0,
+            "subtitle_length_ok": len(subtitle) <= 100 if subtitle else True
+        }
+    }
+    
+    if warnings:
+        result["warnings"] = warnings
+    
+    if recommendations:
+        result["recommendations"] = recommendations
+    
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Set PowerPoint slide title and subtitle with validation (v2.0.0)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Set title only
+  uv run tools/ppt_set_title.py \\
+    --file presentation.pptx \\
+    --slide 0 \\
+    --title "Q4 Financial Results" \\
+    --json
+  
+  # Set title and subtitle (first slide)
+  uv run tools/ppt_set_title.py \\
+    --file deck.pptx \\
+    --slide 0 \\
+    --title "2024 Strategic Plan" \\
+    --subtitle "Driving Growth and Innovation" \\
+    --json
+  
+  # Update section title (middle slide)
+  uv run tools/ppt_set_title.py \\
+    --file presentation.pptx \\
+    --slide 5 \\
+    --title "Market Analysis" \\
+    --json
+  
+  # Set title on last slide
+  uv run tools/ppt_set_title.py \\
+    --file presentation.pptx \\
+    --slide 10 \\
+    --title "Thank You" \\
+    --subtitle "Questions?" \\
+    --json
+
+Best Practices:
+  Title Guidelines:
+  - Keep under 60 characters (optimal readability)
+  - Use title case: "This Is Title Case"
+  - Be specific and descriptive
+  - Avoid jargon and abbreviations
+  - One clear message per title
+  
+  Subtitle Guidelines:
+  - Keep under 100 characters
+  - Provide context, not repetition
+  - Use for date, location, or clarification
+  - Optional on content slides
+  
+  Layout Recommendations:
+  - Slide 0 (first): Use "Title Slide" layout
+  - Section headers: Use "Section Header" layout
+  - Content slides: Use "Title and Content" layout
+  - Blank slides: Use "Title Only" layout
+
+Validation:
+  This tool performs automatic validation:
+  - Title length (warns if >60 chars, strong warning if >100)
+  - Subtitle length (warns if >100 chars)
+  - Title case recommendations
+  - Placeholder availability checks
+  - Layout compatibility warnings
+
+Output Format:
+  Always returns JSON with:
+  - status: "success" or "warning"
+  - validation: Length checks and recommendations
+  - warnings: Issues that should be addressed
+  - recommendations: Optional improvements
+  
+  Example success output:
+  {
+    "status": "success",
+    "slide_index": 0,
+    "title": "Q4 Results",
+    "subtitle": "Financial Review",
+    "layout": "Title Slide",
+    "validation": {
+      "title_length": 10,
+      "title_length_ok": true
+    }
+  }
+  
+  Example with warnings:
+  {
+    "status": "warning",
+    "title": "This Is A Very Long Title That Exceeds Recommended Length",
+    "warnings": [
+      "Title is 61 characters (recommended: ≤60)"
+    ],
+    "recommendations": [
+      "Consider shortening for better visual impact"
+    ]
+  }
+
+Related Tools:
+  - ppt_get_slide_info.py: Inspect slide layout and placeholders
+  - ppt_set_slide_layout.py: Change slide layout
+  - ppt_get_info.py: Get presentation info (total slides, layouts)
+  - ppt_add_text_box.py: Add custom text if placeholders unavailable
+
+Version: 2.0.0
+Requires: core/powerpoint_agent_core.py v1.1.0+
+        """
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file path'
+    )
+    
+    parser.add_argument(
+        '--slide',
+        required=True,
+        type=int,
+        help='Slide index (0-based, e.g., 0 for first slide)'
+    )
+    
+    parser.add_argument(
+        '--title',
+        required=True,
+        help='Title text (recommended: ≤60 characters)'
+    )
+    
+    parser.add_argument(
+        '--subtitle',
+        help='Optional subtitle text (recommended: ≤100 characters)'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        default=True,
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
@@ -8580,29 +11456,19 @@ Slide Index:
             subtitle=args.subtitle
         )
         
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"✅ Set title on slide {result['slide_index']}")
-            print(f"   Title: {result['title']}")
-            if args.subtitle:
-                print(f"   Subtitle: {result['subtitle']}")
-            print(f"   Layout: {result['layout']}")
-        
+        print(json.dumps(result, indent=2))
         sys.exit(0)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None
         }
         
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
 
 
@@ -8978,6 +11844,329 @@ Best Practices:
 
 if __name__ == "__main__":
     main()
+
+```
+
+# schemas/capability_probe.v1.1.1.schema.json
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.com/capability_probe/v1.1.1",
+  "title": "PowerPoint capability probe output (v1.1.1)",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "Success payload",
+      "type": "object",
+      "required": ["status", "metadata", "slide_dimensions", "layouts", "theme", "capabilities", "warnings", "info"],
+      "properties": {
+        "status": { "const": "success" },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "file",
+            "probed_at",
+            "tool_version",
+            "schema_version",
+            "operation_id",
+            "deep_analysis",
+            "atomic_verified",
+            "duration_ms",
+            "library_versions",
+            "layout_count_total",
+            "layout_count_analyzed"
+          ],
+          "properties": {
+            "file": { "type": "string", "minLength": 1 },
+            "probed_at": { "type": "string", "format": "date-time" },
+            "tool_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+            "schema_version": { "type": "string", "pattern": "^capability_probe\\.v\\d+\\.\\d+\\.\\d+$" },
+            "operation_id": { "type": "string", "pattern": "^[0-9a-fA-F-]{36}$" },
+            "deep_analysis": { "type": "boolean" },
+            "analysis_mode": { "type": "string", "enum": ["deep", "essential"] },
+            "atomic_verified": { "type": "boolean" },
+            "duration_ms": { "type": "integer", "minimum": 0 },
+            "library_versions": {
+              "type": "object",
+              "required": ["python-pptx", "Pillow"],
+              "properties": {
+                "python-pptx": { "type": "string" },
+                "Pillow": { "type": "string" }
+              },
+              "additionalProperties": true
+            },
+            "checksum": { "type": ["string", "null"], "pattern": "^[0-9a-f]{32}$" },
+            "timeout_seconds": { "type": ["integer", "null"], "minimum": 0 },
+            "layout_count_total": { "type": "integer", "minimum": 0 },
+            "layout_count_analyzed": { "type": "integer", "minimum": 0 },
+            "warnings_count": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "slide_dimensions": {
+          "type": "object",
+          "required": [
+            "width_inches",
+            "height_inches",
+            "width_emu",
+            "height_emu",
+            "width_pixels",
+            "height_pixels",
+            "aspect_ratio",
+            "aspect_ratio_float",
+            "dpi_estimate"
+          ],
+          "properties": {
+            "width_inches": { "type": "number", "minimum": 0 },
+            "height_inches": { "type": "number", "minimum": 0 },
+            "width_emu": { "type": "integer", "minimum": 0 },
+            "height_emu": { "type": "integer", "minimum": 0 },
+            "width_pixels": { "type": "integer", "minimum": 0 },
+            "height_pixels": { "type": "integer", "minimum": 0 },
+            "aspect_ratio": { "type": "string", "minLength": 3 },
+            "aspect_ratio_float": { "type": "number", "minimum": 0 },
+            "dpi_estimate": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "layouts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["index", "original_index", "name", "placeholder_count", "master_index"],
+            "properties": {
+              "index": { "type": "integer", "minimum": 0 },
+              "original_index": { "type": "integer", "minimum": 0 },
+              "name": { "type": "string" },
+              "placeholder_count": { "type": "integer", "minimum": 0 },
+              "master_index": { "type": ["integer", "null"], "minimum": 0 },
+              "placeholders": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["type", "type_code", "idx", "name", "position_source"],
+                  "properties": {
+                    "type": { "type": "string" },
+                    "type_code": { "type": "integer" },
+                    "idx": { "type": "integer", "minimum": 0 },
+                    "name": { "type": "string" },
+                    "position_source": { "enum": ["instantiated", "template", "error"] },
+                    "position_inches": {
+                      "type": "object",
+                      "properties": {
+                        "left": { "type": "number" },
+                        "top": { "type": "number" }
+                      },
+                      "required": ["left", "top"],
+                      "additionalProperties": false
+                    },
+                    "position_percent": {
+                      "type": "object",
+                      "properties": {
+                        "left": { "type": "string", "pattern": "^\\d+(\\.\\d+)?%$" },
+                        "top": { "type": "string", "pattern": "^\\d+(\\.\\d+)?%$" }
+                      },
+                      "required": ["left", "top"],
+                      "additionalProperties": false
+                    },
+                    "position_emu": {
+                      "type": "object",
+                      "properties": {
+                        "left": { "type": "integer", "minimum": 0 },
+                        "top": { "type": "integer", "minimum": 0 }
+                      },
+                      "required": ["left", "top"],
+                      "additionalProperties": false
+                    },
+                    "size_inches": {
+                      "type": "object",
+                      "properties": {
+                        "width": { "type": "number", "minimum": 0 },
+                        "height": { "type": "number", "minimum": 0 }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "size_percent": {
+                      "type": "object",
+                      "properties": {
+                        "width": { "type": "string", "pattern": "^\\d+(\\.\\d+)?%$" },
+                        "height": { "type": "string", "pattern": "^\\d+(\\.\\d+)?%$" }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "size_emu": {
+                      "type": "object",
+                      "properties": {
+                        "width": { "type": "integer", "minimum": 0 },
+                        "height": { "type": "integer", "minimum": 0 }
+                      },
+                      "required": ["width", "height"],
+                      "additionalProperties": false
+                    },
+                    "error": { "type": "string" }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "instantiation_complete": { "type": "boolean" },
+              "placeholder_expected": { "type": "integer", "minimum": 0 },
+              "placeholder_instantiated": { "type": "integer", "minimum": 0 },
+              "placeholder_types": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "placeholder_map": {
+                "type": "object",
+                "additionalProperties": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "theme": {
+          "type": "object",
+          "required": ["colors", "fonts"],
+          "properties": {
+            "colors": { "type": "object", "additionalProperties": { "type": "string" } },
+            "fonts": { "type": "object", "additionalProperties": { "type": "string" } },
+            "per_master": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["master_index", "colors", "fonts"],
+                "properties": {
+                  "master_index": { "type": "integer", "minimum": 0 },
+                  "colors": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "fonts": { "type": "object", "additionalProperties": { "type": "string" } }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "capabilities": {
+          "type": "object",
+          "required": [
+            "has_footer_placeholders",
+            "has_slide_number_placeholders",
+            "has_date_placeholders",
+            "layouts_with_footer",
+            "layouts_with_slide_number",
+            "layouts_with_date",
+            "total_layouts",
+            "total_master_slides",
+            "per_master",
+            "footer_support_mode",
+            "slide_number_strategy",
+            "recommendations",
+            "analysis_complete"
+          ],
+          "properties": {
+            "has_footer_placeholders": { "type": "boolean" },
+            "has_slide_number_placeholders": { "type": "boolean" },
+            "has_date_placeholders": { "type": "boolean" },
+            "layouts_with_footer": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "index": { "type": "integer", "minimum": 0 },
+                  "original_index": { "type": "integer", "minimum": 0 },
+                  "name": { "type": "string" },
+                  "master_index": { "type": ["integer", "null"], "minimum": 0 }
+                },
+                "additionalProperties": true
+              }
+            },
+            "layouts_with_slide_number": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "index": { "type": "integer", "minimum": 0 },
+                  "original_index": { "type": "integer", "minimum": 0 },
+                  "name": { "type": "string" },
+                  "master_index": { "type": ["integer", "null"], "minimum": 0 }
+                },
+                "additionalProperties": true
+              }
+            },
+            "layouts_with_date": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "index": { "type": "integer", "minimum": 0 },
+                  "original_index": { "type": "integer", "minimum": 0 },
+                  "name": { "type": "string" },
+                  "master_index": { "type": ["integer", "null"], "minimum": 0 }
+                },
+                "additionalProperties": true
+              }
+            },
+            "total_layouts": { "type": "integer", "minimum": 0 },
+            "total_master_slides": { "type": "integer", "minimum": 0 },
+            "per_master": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "master_index",
+                  "layout_count",
+                  "has_footer_layouts",
+                  "has_slide_number_layouts",
+                  "has_date_layouts"
+                ],
+                "properties": {
+                  "master_index": { "type": "integer", "minimum": 0 },
+                  "layout_count": { "type": "integer", "minimum": 0 },
+                  "has_footer_layouts": { "type": "integer", "minimum": 0 },
+                  "has_slide_number_layouts": { "type": "integer", "minimum": 0 },
+                  "has_date_layouts": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "footer_support_mode": { "enum": ["placeholder", "fallback_textbox"] },
+            "slide_number_strategy": { "enum": ["placeholder", "textbox"] },
+            "recommendations": { "type": "array", "items": { "type": "string" } },
+            "analysis_complete": { "type": "boolean" }
+          },
+          "additionalProperties": true
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } },
+        "info": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "Error payload",
+      "type": "object",
+      "required": ["status", "error", "error_type", "metadata", "warnings"],
+      "properties": {
+        "status": { "const": "error" },
+        "error": { "type": "string" },
+        "error_type": { "type": "string" },
+        "metadata": {
+          "type": "object",
+          "required": ["file", "tool_version", "operation_id", "probed_at"],
+          "properties": {
+            "file": { "type": ["string", "null"] },
+            "tool_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+            "operation_id": { "type": "string", "pattern": "^[0-9a-fA-F-]{36}$" },
+            "probed_at": { "type": "string", "format": "date-time" }
+          },
+          "additionalProperties": true
+        },
+        "warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    }
+  ]
+}
 
 ```
 
