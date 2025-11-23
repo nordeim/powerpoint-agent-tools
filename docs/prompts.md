@@ -124,6 +124,10 @@ awesome job on your meticulous analysis, planning and execution! please keep usi
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review and analyze the attached system prompt for an AI agent working with Powerpoint presentation creation and modification, then think deeper and think harder to re-imagine how the the new capability probe tool can enhance the Powerpoint AI Agent's performance and output quality.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
