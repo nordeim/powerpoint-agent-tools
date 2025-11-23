@@ -20,8 +20,92 @@ from typing import Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError,
+    ColorHelper, RGBColor
 )
+
+
+def validate_shape_params(
+    position: Dict[str, Any],
+    size: Dict[str, Any],
+    fill_color: str = None,
+    allow_offslide: bool = False
+) -> Dict[str, Any]:
+    """
+    Validate shape parameters and return warnings/recommendations.
+    """
+    warnings = []
+    recommendations = []
+    validation_results = {}
+    
+    # Position validation (if percentage-based)
+    if position:
+        try:
+            if "left" in position:
+                left_str = str(position["left"])
+                if left_str.endswith('%'):
+                    left_pct = float(left_str.rstrip('%'))
+                    if (left_pct < 0 or left_pct > 100) and not allow_offslide:
+                        warnings.append(
+                            f"Left position {left_pct}% is outside slide bounds (0-100%). "
+                            "Shape may not be visible. Use --allow-offslide if intentional."
+                        )
+            
+            if "top" in position:
+                top_str = str(position["top"])
+                if top_str.endswith('%'):
+                    top_pct = float(top_str.rstrip('%'))
+                    if (top_pct < 0 or top_pct > 100) and not allow_offslide:
+                        warnings.append(
+                            f"Top position {top_pct}% is outside slide bounds (0-100%). "
+                            "Shape may not be visible. Use --allow-offslide if intentional."
+                        )
+        except:
+            pass
+    
+    # Size validation
+    if size:
+        try:
+            if "width" in size:
+                width_str = str(size["width"])
+                if width_str.endswith('%'):
+                    width_pct = float(width_str.rstrip('%'))
+                    if width_pct < 1:
+                        warnings.append(f"Width {width_pct}% is extremely small (<1%). Shape may be invisible.")
+            
+            if "height" in size:
+                height_str = str(size["height"])
+                if height_str.endswith('%'):
+                    height_pct = float(height_str.rstrip('%'))
+                    if height_pct < 1:
+                        warnings.append(f"Height {height_pct}% is extremely small (<1%). Shape may be invisible.")
+        except:
+            pass
+            
+    # Color contrast validation (if fill color provided)
+    if fill_color:
+        try:
+            # Check contrast against white background
+            shape_color = ColorHelper.from_hex(fill_color)
+            bg_color = RGBColor(255, 255, 255)
+            contrast_ratio = ColorHelper.contrast_ratio(shape_color, bg_color)
+            
+            validation_results["contrast_ratio"] = round(contrast_ratio, 2)
+            
+            # Warn if very low contrast (e.g. white shape on white bg)
+            if contrast_ratio < 1.1:
+                warnings.append(
+                    f"Shape fill color has very low contrast ({contrast_ratio:.2f}:1) against white background. "
+                    "It may be invisible."
+                )
+        except Exception as e:
+            validation_results["contrast_error"] = str(e)
+            
+    return {
+        "warnings": warnings,
+        "recommendations": recommendations,
+        "validation_results": validation_results
+    }
 
 
 def add_shape(
@@ -32,12 +116,16 @@ def add_shape(
     size: Dict[str, Any],
     fill_color: str = None,
     line_color: str = None,
-    line_width: float = 1.0
+    line_width: float = 1.0,
+    allow_offslide: bool = False
 ) -> Dict[str, Any]:
-    """Add shape to slide."""
+    """Add shape to slide with validation."""
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
+        
+    # Validate parameters
+    validation = validate_shape_params(position, size, fill_color, allow_offslide)
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
@@ -63,7 +151,7 @@ def add_shape(
         # Save
         agent.save()
     
-    return {
+    result = {
         "status": "success",
         "file": str(filepath),
         "slide_index": slide_index,
@@ -74,8 +162,18 @@ def add_shape(
             "fill_color": fill_color,
             "line_color": line_color,
             "line_width": line_width
-        }
+        },
+        "validation": validation["validation_results"]
     }
+    
+    if validation["warnings"]:
+        result["warnings"] = validation["warnings"]
+        result["status"] = "warning"
+        
+    if validation["recommendations"]:
+        result["recommendations"] = validation["recommendations"]
+        
+    return result
 
 
 def main():
@@ -241,6 +339,12 @@ Shape Layering:
     )
     
     parser.add_argument(
+        '--allow-offslide',
+        action='store_true',
+        help='Allow positioning outside slide bounds (disables off-slide warnings)'
+    )
+    
+    parser.add_argument(
         '--json',
         action='store_true',
         help='Output JSON response'
@@ -272,7 +376,8 @@ Shape Layering:
             size=size,
             fill_color=args.fill_color,
             line_color=args.line_color,
-            line_width=args.line_width
+            line_width=args.line_width,
+            allow_offslide=args.allow_offslide
         )
         
         if args.json:

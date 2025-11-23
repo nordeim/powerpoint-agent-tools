@@ -24,6 +24,81 @@ from core.powerpoint_agent_core import (
 )
 
 
+def validate_table_params(
+    rows: int,
+    cols: int,
+    position: Dict[str, Any],
+    size: Dict[str, Any],
+    allow_offslide: bool = False
+) -> Dict[str, Any]:
+    """
+    Validate table parameters and return warnings/recommendations.
+    """
+    warnings = []
+    recommendations = []
+    validation_results = {}
+    
+    # Position validation (if percentage-based)
+    if position:
+        try:
+            if "left" in position:
+                left_str = str(position["left"])
+                if left_str.endswith('%'):
+                    left_pct = float(left_str.rstrip('%'))
+                    if (left_pct < 0 or left_pct > 100) and not allow_offslide:
+                        warnings.append(
+                            f"Left position {left_pct}% is outside slide bounds (0-100%). "
+                            "Table may not be visible. Use --allow-offslide if intentional."
+                        )
+            
+            if "top" in position:
+                top_str = str(position["top"])
+                if top_str.endswith('%'):
+                    top_pct = float(top_str.rstrip('%'))
+                    if (top_pct < 0 or top_pct > 100) and not allow_offslide:
+                        warnings.append(
+                            f"Top position {top_pct}% is outside slide bounds (0-100%). "
+                            "Table may not be visible. Use --allow-offslide if intentional."
+                        )
+        except:
+            pass
+    
+    # Size validation
+    if size:
+        try:
+            # Check if table is too small for the number of rows/cols
+            # Heuristic: ~3% height per row, ~5% width per col minimum for readability
+            if "height" in size:
+                height_str = str(size["height"])
+                if height_str.endswith('%'):
+                    height_pct = float(height_str.rstrip('%'))
+                    min_height = rows * 2  # 2% per row minimum
+                    if height_pct < min_height:
+                        warnings.append(
+                            f"Table height {height_pct}% is very small for {rows} rows (recommended: >{min_height}%). "
+                            "Text may be unreadable."
+                        )
+            
+            if "width" in size:
+                width_str = str(size["width"])
+                if width_str.endswith('%'):
+                    width_pct = float(width_str.rstrip('%'))
+                    min_width = cols * 5  # 5% per col minimum
+                    if width_pct < min_width:
+                        warnings.append(
+                            f"Table width {width_pct}% is very small for {cols} columns (recommended: >{min_width}%). "
+                            "Text may be unreadable."
+                        )
+        except:
+            pass
+            
+    return {
+        "warnings": warnings,
+        "recommendations": recommendations,
+        "validation_results": validation_results
+    }
+
+
 def add_table(
     filepath: Path,
     slide_index: int,
@@ -32,12 +107,16 @@ def add_table(
     position: Dict[str, Any],
     size: Dict[str, Any],
     data: List[List[Any]] = None,
-    headers: List[str] = None
+    headers: List[str] = None,
+    allow_offslide: bool = False
 ) -> Dict[str, Any]:
-    """Add table to slide."""
+    """Add table to slide with validation."""
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
+        
+    # Validate parameters
+    validation = validate_table_params(rows, cols, position, size, allow_offslide)
     
     if rows < 1 or cols < 1:
         raise ValueError("Table must have at least 1 row and 1 column")
@@ -93,7 +172,7 @@ def add_table(
         # Save
         agent.save()
     
-    return {
+    result = {
         "status": "success",
         "file": str(filepath),
         "slide_index": slide_index,
@@ -101,8 +180,18 @@ def add_table(
         "cols": cols,
         "has_headers": headers is not None,
         "data_rows_filled": len(data) if data else 0,
-        "total_cells": rows * cols
+        "total_cells": rows * cols,
+        "validation": validation["validation_results"]
     }
+    
+    if validation["warnings"]:
+        result["warnings"] = validation["warnings"]
+        result["status"] = "warning"
+        
+    if validation["recommendations"]:
+        result["recommendations"] = validation["recommendations"]
+        
+    return result
 
 
 def main():
@@ -273,6 +362,12 @@ When to Use Tables vs Charts:
     )
     
     parser.add_argument(
+        '--allow-offslide',
+        action='store_true',
+        help='Allow positioning outside slide bounds (disables off-slide warnings)'
+    )
+    
+    parser.add_argument(
         '--json',
         action='store_true',
         help='Output JSON response'
@@ -311,7 +406,8 @@ When to Use Tables vs Charts:
             position=args.position,
             size=args.size,
             data=data,
-            headers=headers
+            headers=headers,
+            allow_offslide=args.allow_offslide
         )
         
         if args.json:

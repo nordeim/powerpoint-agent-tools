@@ -515,13 +515,24 @@ class ColorHelper:
     @staticmethod
     def luminance(rgb_color: RGBColor) -> float:
         """Calculate relative luminance for WCAG contrast."""
+        if hasattr(rgb_color, 'r'):
+            r = rgb_color.r
+            g = rgb_color.g
+            b = rgb_color.b
+        else:
+            # Handle pptx.dml.color.RGBColor which behaves like a hex string
+            hex_color = str(rgb_color)
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+
         def _channel(c):
             c = c / 255.0
             return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
         
-        r = _channel(rgb_color.r)
-        g = _channel(rgb_color.g)
-        b = _channel(rgb_color.b)
+        r = _channel(r)
+        g = _channel(g)
+        b = _channel(b)
         
         return 0.2126 * r + 0.7152 * g + 0.0722 * b
     
