@@ -1,0 +1,12 @@
+{
+  "status": "error",
+  "error": "File not found: samples/missing.pptx",
+  "error_type": "FileNotFoundError",
+  "metadata": {
+    "file": "samples/missing.pptx",
+    "tool_version": "1.1.0",
+    "operation_id": "0ad7ff97-fdd1-42f1-a542-35dba045921b",
+    "probed_at": "2025-11-23T11:56:44.106205"
+  },
+  "warnings": []
+}
