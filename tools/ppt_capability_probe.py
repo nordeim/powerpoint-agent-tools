@@ -435,23 +435,24 @@ def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: flo
                 layout_info["placeholder_expected"] = len(layout.placeholders)
                 layout_info["placeholder_instantiated"] = len(placeholders)
                 layout_info["_warning"] = "Using template positions (instantiation failed)"
-            placeholder_map = {}
-            placeholder_types = []
-            for shape in layout.placeholders:
-                try:
-                    ph_type = shape.placeholder_format.type
-                    ph_type_name = get_placeholder_type_name(ph_type)
-                    
-                    # Build map
-                    placeholder_map[ph_type_name] = placeholder_map.get(ph_type_name, 0) + 1
-                    
-                    if ph_type_name not in placeholder_types:
-                        placeholder_types.append(ph_type_name)
-                except:
-                    pass
-            
-            layout_info["placeholder_types"] = placeholder_types
-            layout_info["placeholder_map"] = placeholder_map
+        
+        placeholder_map = {}
+        placeholder_types = []
+        for shape in layout.placeholders:
+            try:
+                ph_type = shape.placeholder_format.type
+                ph_type_name = get_placeholder_type_name(ph_type)
+                
+                # Build map
+                placeholder_map[ph_type_name] = placeholder_map.get(ph_type_name, 0) + 1
+                
+                if ph_type_name not in placeholder_types:
+                    placeholder_types.append(ph_type_name)
+            except:
+                pass
+        
+        layout_info["placeholder_types"] = placeholder_types
+        layout_info["placeholder_map"] = placeholder_map
         
         layouts.append(layout_info)
     
