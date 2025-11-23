@@ -504,10 +504,12 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
         theme = getattr(slide_master, 'theme', None)
         if not theme:
             # Don't raise, just return empty to allow partial extraction
+            warnings.append("Theme object unavailable")
             return {}
             
         color_scheme = getattr(theme, 'theme_color_scheme', None)
         if not color_scheme:
+            warnings.append("Theme color scheme unavailable")
             return {}
         
         color_attrs = [
