@@ -1,0 +1,30 @@
+name: Capability probe - schema and regression validation
+
+on:
+  push:
+    paths:
+      - "tools/ppt_capability_probe.py"
+      - "core/strict_validator.py"
+      - "schemas/capability_probe.v1.1.1.schema.json"
+      - "tests/ppt_probe_tests.sh"
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-pptx jsonschema Pillow
+
+      - name: Run test matrix
+        run: bash tests/ppt_probe_tests.sh

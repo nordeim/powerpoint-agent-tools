@@ -1,0 +1,129 @@
+{
+  "status": "success",
+  "metadata": {
+    "file": "samples/multi_master.pptx",
+    "probed_at": "2025-11-23T11:25:13.795205",
+    "tool_version": "1.1.0",
+    "schema_version": "capability_probe.v1.1.0",
+    "operation_id": "76ade394-5bdb-4f7b-86ee-cc9d9745007a",
+    "deep_analysis": false,
+    "analysis_mode": "essential",
+    "atomic_verified": true,
+    "duration_ms": 35,
+    "timeout_seconds": 30,
+    "layout_count_total": 3,
+    "layout_count_analyzed": 3,
+    "warnings_count": 1,
+    "library_versions": {
+      "python-pptx": "0.6.23",
+      "Pillow": "12.0.0"
+    },
+    "checksum": "c8136b86f405da1ee8587dd8f4f7c894"
+  },
+  "slide_dimensions": {
+    "width_inches": 10.5,
+    "height_inches": 8.0,
+    "width_emu": 9601200,
+    "height_emu": 7315200,
+    "width_pixels": 1008,
+    "height_pixels": 768,
+    "aspect_ratio": "21:16",
+    "aspect_ratio_float": 1.3125,
+    "dpi_estimate": 96
+  },
+  "layouts": [
+    {
+      "index": 0,
+      "original_index": 0,
+      "name": "Cover ",
+      "placeholder_count": 3,
+      "master_index": 0,
+      "placeholder_types": [
+        "PICTURE",
+        "TITLE"
+      ],
+      "placeholder_map": {
+        "PICTURE": 2,
+        "TITLE": 1
+      }
+    },
+    {
+      "index": 1,
+      "original_index": 1,
+      "name": "Preview Page 1",
+      "placeholder_count": 2,
+      "master_index": 0,
+      "placeholder_types": [
+        "TITLE",
+        "PICTURE"
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 1
+      }
+    },
+    {
+      "index": 2,
+      "original_index": 2,
+      "name": "Painting Page 1",
+      "placeholder_count": 3,
+      "master_index": 0,
+      "placeholder_types": [
+        "TITLE",
+        "PICTURE"
+      ],
+      "placeholder_map": {
+        "TITLE": 1,
+        "PICTURE": 2
+      }
+    }
+  ],
+  "theme": {
+    "colors": {},
+    "fonts": {
+      "heading": "Calibri",
+      "body": "Calibri"
+    },
+    "per_master": [
+      {
+        "master_index": 0,
+        "colors": {},
+        "fonts": {
+          "heading": "Calibri",
+          "body": "Calibri"
+        }
+      }
+    ]
+  },
+  "capabilities": {
+    "has_footer_placeholders": false,
+    "has_slide_number_placeholders": false,
+    "has_date_placeholders": false,
+    "layouts_with_footer": [],
+    "layouts_with_slide_number": [],
+    "layouts_with_date": [],
+    "total_layouts": 3,
+    "total_master_slides": 1,
+    "per_master": [
+      {
+        "master_index": 0,
+        "layout_count": 3,
+        "has_footer_layouts": 0,
+        "has_slide_number_layouts": 0,
+        "has_date_layouts": 0
+      }
+    ],
+    "footer_support_mode": "fallback_textbox",
+    "slide_number_strategy": "textbox",
+    "recommendations": [
+      "No footer placeholders found - ppt_set_footer.py will use text box fallback strategy",
+      "No slide number placeholders - recommend manual text box for slide numbers",
+      "No date placeholders - dates must be added manually if needed"
+    ],
+    "analysis_complete": true
+  },
+  "warnings": [
+    "Theme fonts unavailable - using Calibri defaults"
+  ],
+  "info": []
+}
