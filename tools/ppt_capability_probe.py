@@ -494,6 +494,7 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
             'background1', 'background2', 'text1', 'text2', 'hyperlink', 'followed_hyperlink'
         ]
         
+        non_rgb_found = False
         for color_name in color_attrs:
             try:
                 color = getattr(color_scheme, color_name, None)
@@ -504,13 +505,13 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
                     else:
                         # Fallback for scheme-based colors
                         colors[color_name] = f"schemeColor:{color_name}"
-                        # We don't warn here to avoid spamming warnings for every color
+                        non_rgb_found = True
             except:
                 pass
         
         if not colors:
             warnings.append("Theme color scheme unavailable or empty")
-        elif any(c.startswith("schemeColor:") for c in colors.values()):
+        elif non_rgb_found:
             warnings.append("Theme colors include scheme references without explicit RGB")
             
     except Exception as e:
@@ -536,6 +537,7 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
         Dict with heading and body font names
     """
     fonts = {}
+    fallback_used = False
     
     try:
         # Handle both Presentation (use first master) and SlideMaster objects
@@ -585,11 +587,7 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
                         fonts['body_complex'] = _font_name(cs)
 
         if not fonts:
-            # Only warn if we are processing the primary master (passed as Presentation)
-            # or if it's the first master, to avoid noise
-            if hasattr(master_or_prs, 'slide_masters'):
-                 warnings.append("Theme font scheme API unavailable, using fallback detection")
-            
+            # Try to detect from shapes if theme API failed
             for shape in slide_master.shapes:
                 if hasattr(shape, 'text_frame') and shape.text_frame.paragraphs:
                     for paragraph in shape.text_frame.paragraphs:
@@ -600,13 +598,16 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
                         break
         
         if not fonts:
+            fallback_used = True
             fonts = {"heading": "Calibri", "body": "Calibri"}
-            if hasattr(master_or_prs, 'slide_masters'):
-                warnings.append("Using default fonts (Calibri) - theme unavailable")
             
     except Exception as e:
+        fallback_used = True
         fonts = {"heading": "Calibri", "body": "Calibri"}
         warnings.append(f"Theme font extraction failed: {str(e)}")
+    
+    if fallback_used and hasattr(master_or_prs, 'slide_masters'):
+        warnings.append("Theme fonts unavailable - using Calibri defaults")
     
     return fonts
 
@@ -909,6 +910,7 @@ def probe_presentation(
             "schema_version": "capability_probe.v1.1.0",
             "operation_id": operation_id,
             "deep_analysis": deep,
+            "analysis_mode": "deep" if deep else "essential",
             "atomic_verified": verify_atomic,
             "duration_ms": duration_ms,
             "timeout_seconds": timeout_seconds,
