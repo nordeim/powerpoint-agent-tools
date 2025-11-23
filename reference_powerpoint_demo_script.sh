@@ -612,7 +612,7 @@ echo "   Total Issues: $VALIDATION_ISSUES"
 
 if [ "$VALIDATION_ISSUES" -gt 0 ]; then
     echo "   Issues found:"
-    echo "$VALIDATION_OUTPUT" | jq -r '.issues | to_entries[] | "     - \(.key): \(.value | length) items"'
+    echo "$VALIDATION_OUTPUT" | jq -r '.summary | to_entries[] | "     - \(.key): \(.value) items"'
 fi
 
 VALIDATION_RESULTS+=("$VALIDATION_OUTPUT")
@@ -633,7 +633,7 @@ echo "   Total Issues: $ACCESSIBILITY_ISSUES"
 
 if [ "$ACCESSIBILITY_ISSUES" -gt 0 ]; then
     echo "   Accessibility issues found:"
-    echo "$ACCESSIBILITY_OUTPUT" | jq -r '.issues | to_entries[] | "     - \(.key): \(.value | length) items"'
+    echo "$ACCESSIBILITY_OUTPUT" | jq -r '.issues | to_entries[] | select(.value | type == "array") | "     - \(.key): \(.value | length) items"'
 fi
 
 VALIDATION_RESULTS+=("$ACCESSIBILITY_OUTPUT")

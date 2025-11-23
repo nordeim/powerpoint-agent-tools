@@ -1,0 +1,130 @@
+[
+  {
+    "status": "warnings",
+    "file": "bitcoin_market_report_nov2024_v2.pptx",
+    "total_issues": 4,
+    "summary": {
+      "empty_slides": 0,
+      "slides_without_titles": 0,
+      "missing_alt_text": 0,
+      "low_contrast": 4,
+      "low_resolution_images": 0,
+      "large_images": 0
+    },
+    "details": {
+      "validation": {
+        "status": "valid",
+        "total_issues": 0,
+        "issues": {
+          "empty_slides": [],
+          "text_overflow": [],
+          "inconsistent_fonts": [
+            "Calibri"
+          ],
+          "slides_without_titles": []
+        }
+      },
+      "accessibility": {
+        "status": "issues_found",
+        "total_issues": 4,
+        "issues": {
+          "missing_alt_text": [],
+          "low_contrast": [
+            {
+              "slide": 2,
+              "shape": 4,
+              "text": "Price Drop: $120K → $95K",
+              "contrast_ratio": 1.0,
+              "required": 3.0
+            },
+            {
+              "slide": 3,
+              "shape": 4,
+              "text": "Liquidity: $700M → $535M",
+              "contrast_ratio": 1.0,
+              "required": 3.0
+            },
+            {
+              "slide": 5,
+              "shape": 4,
+              "text": "First time in 7 months",
+              "contrast_ratio": 1.0,
+              "required": 3.0
+            },
+            {
+              "slide": 6,
+              "shape": 4,
+              "text": "Support Break: $100K",
+              "contrast_ratio": 1.0,
+              "required": 3.0
+            }
+          ],
+          "missing_titles": [],
+          "reading_order_issues": [],
+          "large_file_size_warning": false
+        },
+        "wcag_level": "fail"
+      },
+      "assets": {
+        "status": "valid",
+        "total_issues": 0,
+        "issues": {
+          "low_resolution_images": [],
+          "large_images": [],
+          "total_embedded_size": 0,
+          "external_links": []
+        }
+      }
+    },
+    "recommendations": [
+      {
+        "priority": "medium",
+        "issue": "Low color contrast text",
+        "action": "Improve text/background contrast for readability",
+        "count": 4
+      }
+    ]
+  },
+  {
+    "status": "issues_found",
+    "total_issues": 4,
+    "issues": {
+      "missing_alt_text": [],
+      "low_contrast": [
+        {
+          "slide": 2,
+          "shape": 4,
+          "text": "Price Drop: $120K → $95K",
+          "contrast_ratio": 1.0,
+          "required": 3.0
+        },
+        {
+          "slide": 3,
+          "shape": 4,
+          "text": "Liquidity: $700M → $535M",
+          "contrast_ratio": 1.0,
+          "required": 3.0
+        },
+        {
+          "slide": 5,
+          "shape": 4,
+          "text": "First time in 7 months",
+          "contrast_ratio": 1.0,
+          "required": 3.0
+        },
+        {
+          "slide": 6,
+          "shape": 4,
+          "text": "Support Break: $100K",
+          "contrast_ratio": 1.0,
+          "required": 3.0
+        }
+      ],
+      "missing_titles": [],
+      "reading_order_issues": [],
+      "large_file_size_warning": false
+    },
+    "wcag_level": "fail",
+    "file": "bitcoin_market_report_nov2024_v2.pptx"
+  }
+]
