@@ -25,3 +25,20 @@ https://copilot.microsoft.com/shares/Z7fXjyhhdZ1JrR8nV8CNV
 
 new tool:
 https://copilot.microsoft.com/shares/LT6LiA8NizDAcB9kkCxbj
+
+---
+
+ChatGPT analysis:
+https://chatgpt.com/share/69239cb6-d1f8-8008-888d-0ca50dd6d497
+
+Powerpoint AI:
+https://chatgpt.com/share/69239af3-5338-8008-8c8f-9f20b4c91c34
+
+Proposed v2 architecture:
+https://chatgpt.com/share/69239f41-d2ac-8008-a643-5ab4a282f782
+
+---
+
+Google AI analysis:
+https://drive.google.com/file/d/17Qx8ymTZ60dU9_42jmQQgxo9fh_-v7zy/view?usp=sharing  
+https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221ltDtujsoINe6mOsPcM6KarNIEjavlx5T%22%5D,%22action%22:%22open%22,%22userId%22:%22103961307342447084491%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing  
