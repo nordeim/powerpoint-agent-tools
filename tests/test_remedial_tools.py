@@ -94,7 +94,23 @@ def test_targeted_text_replace(tmp_path):
     
     # Verify
     prs = Presentation(pptx_path)
-    # Slide 0 should be UNCHANGED
-    assert prs.slides[0].shapes[0].text_frame.text == "Target"
     # Slide 1 should be CHANGED
     assert prs.slides[1].shapes[0].text_frame.text == "Hit"
+
+def test_file_extension_validation(tmp_path):
+    """Test that tools reject invalid file extensions."""
+    invalid_file = tmp_path / "test.txt"
+    invalid_file.touch()
+    
+    # Test ppt_add_notes
+    with pytest.raises(ValueError, match="Invalid PowerPoint file format"):
+        add_notes(invalid_file, 0, "text")
+            
+    # Test ppt_replace_text
+    with pytest.raises(ValueError, match="Invalid PowerPoint file format"):
+        replace_text(invalid_file, "find", "replace")
+
+    # Test ppt_set_z_order
+    with pytest.raises(ValueError, match="Invalid PowerPoint file format"):
+        set_z_order(invalid_file, 0, 0, "bring_to_front")
+

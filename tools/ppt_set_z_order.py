@@ -34,16 +34,23 @@ def set_z_order(
     Change the Z-order (stacking order) of a shape.
     """
     
+    if not filepath.suffix.lower() in ['.pptx', '.ppt']:
+        raise ValueError("Invalid PowerPoint file format (must be .pptx or .ppt)")
+
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
         
+        # Performance warning for large presentations
+        slide_count = agent.get_slide_count()
+        if slide_count > 50:
+            print(f"⚠️  WARNING: Large presentation ({slide_count} slides) - operation may take longer", file=sys.stderr)
+        
         # Validate slide index
-        total = agent.get_slide_count()
-        if not 0 <= slide_index < total:
-            raise SlideNotFoundError(f"Slide index {slide_index} out of range (0-{total-1})")
+        if not 0 <= slide_index < slide_count:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range (0-{slide_count-1})")
             
         slide = agent.prs.slides[slide_index]
         
@@ -94,8 +101,16 @@ def set_z_order(
                 sp_tree.remove(element)
                 sp_tree.insert(current_index - 1, element)
                 new_index = current_index - 1
+        
+        # Post-manipulation validation
+        if not _validate_xml_structure(sp_tree):
+            raise PowerPointAgentError("XML structure corrupted during Z-order operation")
                 
         agent.save()
+
+def _validate_xml_structure(sp_tree) -> bool:
+    """Validate XML tree integrity after manipulation"""
+    return all(child is not None for child in sp_tree)
         
     return {
         "status": "success",

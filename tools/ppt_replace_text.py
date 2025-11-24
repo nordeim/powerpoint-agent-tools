@@ -100,6 +100,9 @@ def replace_text(
 ) -> Dict[str, Any]:
     """Find and replace text with optional targeting."""
     
+    if not filepath.suffix.lower() in ['.pptx', '.ppt']:
+        raise ValueError("Invalid PowerPoint file format (must be .pptx or .ppt)")
+
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
@@ -117,6 +120,11 @@ def replace_text(
     with PowerPointAgent(filepath) as agent:
         # Open appropriately based on dry_run
         agent.open(filepath, acquire_lock=not dry_run)
+        
+        # Performance warning for large presentations
+        slide_count = agent.get_slide_count()
+        if slide_count > 50:
+            print(f"⚠️  WARNING: Large presentation ({slide_count} slides) - operation may take longer", file=sys.stderr)
         
         # Determine scope
         target_slides = []

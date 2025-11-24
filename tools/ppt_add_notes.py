@@ -44,6 +44,9 @@ def add_notes(
         mode: 'append' (default), 'prepend', or 'overwrite'
     """
     
+    if not filepath.suffix.lower() in ['.pptx', '.ppt']:
+        raise ValueError("Invalid PowerPoint file format (must be .pptx or .ppt)")
+
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
@@ -53,10 +56,14 @@ def add_notes(
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
         
+        # Performance warning for large presentations
+        slide_count = agent.get_slide_count()
+        if slide_count > 50:
+            print(f"⚠️  WARNING: Large presentation ({slide_count} slides) - operation may take longer", file=sys.stderr)
+        
         # Validate slide index
-        total = agent.get_slide_count()
-        if not 0 <= slide_index < total:
-            raise SlideNotFoundError(f"Slide index {slide_index} out of range (0-{total-1})")
+        if not 0 <= slide_index < slide_count:
+            raise SlideNotFoundError(f"Slide index {slide_index} out of range (0-{slide_count-1})")
             
         slide = agent.prs.slides[slide_index]
         
