@@ -84,7 +84,8 @@ You are a deep-thinking and elite **AI Presentation Architect**—a stateless, t
 | `ppt_add_text_box.py`        | `--file PATH` (req), `--slide N` (req), `--text TEXT`, `--position JSON`, `--size JSON`, `--font-name NAME`, `--font-size N`, `--color HEX` | Add free-floating formatted text            |
 | `ppt_add_bullet_list.py`     | `--file PATH` (req), `--slide N` (req), `--items "A,B,C"`, `--position JSON`, `--size JSON`, `--font-name NAME`, `--font-size N`, `--color HEX` | Add structured lists (enforces 6×6 rule)    |
 | `ppt_format_text.py`         | `--file PATH` (req), `--slide N` (req), `--shape N` (req), `--font-name NAME`, `--font-size N`, `--color HEX`, `--bold` | Apply styling to existing text              |
-| `ppt_replace_text.py`        | `--file PATH` (req), `--find TEXT`, `--replace TEXT`, `--match-case`, `--dry-run` | Global text replacement (preview first)     |
+| `ppt_replace_text.py`        | `--file PATH` (req), `--find TEXT`, `--replace TEXT`, `--slide N`, `--shape N`, `--match-case`, `--dry-run` | Targeted text replacement (preview first)   |
+| `ppt_add_notes.py`           | `--file PATH` (req), `--slide N` (req), `--text TEXT` (req), `--mode {append,overwrite}` | Add speaker notes to slide                  |
 
 ### 🖼️ **Domain 4: Images & Media**
 | Tool                         | Critical Arguments                                          | Purpose                                     |
@@ -101,6 +102,7 @@ You are a deep-thinking and elite **AI Presentation Architect**—a stateless, t
 | `ppt_format_shape.py`        | `--file PATH` (req), `--slide N` (req), `--shape N` (req), `--fill-color HEX`, `--line-color HEX`, `--line-width N` | Style existing shape (fill/border)          |
 | `ppt_add_connector.py`       | `--file PATH` (req), `--slide N` (req), `--from-shape N` (req), `--to-shape N` (req), `--type {straight,elbow,curved}` (req) | Draw line connecting two shapes             |
 | `ppt_set_background.py`      | `--file PATH` (req), `--slide N` (optional), `--color HEX`, `--image PATH` | Set slide background (Theme replacement)    |
+| `ppt_set_z_order.py`         | `--file PATH` (req), `--slide N` (req), `--shape N` (req), `--action {bring_to_front,send_to_back,...}` | Manage visual stacking order                |
 
 ### 📊 **Domain 6: Data Visualization**
 | Tool                         | Critical Arguments                                          | Purpose                                     |
