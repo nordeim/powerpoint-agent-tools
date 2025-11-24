@@ -1,38 +1,104 @@
 #!/usr/bin/env python3
 """
 PowerPoint Replace Text Tool
-Find and replace text across entire presentation
+Find and replace text across presentation or in specific targets
+
+Version 2.0.0 - Enhanced with Surgical Targeting
+
+Changes from v1.0:
+- Added: --slide and --shape arguments for targeted replacement
+- Enhanced: Logic to handle specific scope vs global scope
+- Enhanced: Detailed reporting on location of replacements
 
 Usage:
-    uv python ppt_replace_text.py --file presentation.pptx --find "Company Inc." --replace "Company LLC" --json
-
-Exit Codes:
-    0: Success
-    1: Error occurred
+    # Global replacement
+    uv run tools/ppt_replace_text.py --file deck.pptx --find "Old" --replace "New" --json
+    
+    # Targeted replacement (Specific Slide)
+    uv run tools/ppt_replace_text.py --file deck.pptx --slide 2 --find "Old" --replace "New" --json
+    
+    # Surgical replacement (Specific Shape)
+    uv run tools/ppt_replace_text.py --file deck.pptx --slide 2 --shape 0 --find "Old" --replace "New" --json
 """
 
 import sys
+import re
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
 )
 
+def perform_replacement_on_shape(shape, find: str, replace: str, match_case: bool) -> int:
+    """
+    Helper to replace text in a single shape.
+    Returns number of replacements made.
+    """
+    if not hasattr(shape, 'text_frame'):
+        return 0
+        
+    count = 0
+    text_frame = shape.text_frame
+    
+    # Strategy 1: Replace in runs (preserves formatting)
+    for paragraph in text_frame.paragraphs:
+        for run in paragraph.runs:
+            if match_case:
+                if find in run.text:
+                    run.text = run.text.replace(find, replace)
+                    count += 1
+            else:
+                if find.lower() in run.text.lower():
+                    pattern = re.compile(re.escape(find), re.IGNORECASE)
+                    if pattern.search(run.text):
+                        run.text = pattern.sub(replace, run.text)
+                        count += 1
+    
+    if count > 0:
+        return count
+        
+    # Strategy 2: Shape-level replacement (if runs didn't catch it due to splitting)
+    # Only try this if Strategy 1 failed but we know the text exists
+    try:
+        full_text = shape.text
+        should_replace = False
+        if match_case:
+            if find in full_text:
+                should_replace = True
+        else:
+            if find.lower() in full_text.lower():
+                should_replace = True
+        
+        if should_replace:
+            if match_case:
+                new_text = full_text.replace(find, replace)
+                shape.text = new_text
+                count += 1
+            else:
+                pattern = re.compile(re.escape(find), re.IGNORECASE)
+                new_text = pattern.sub(replace, full_text)
+                shape.text = new_text
+                count += 1
+    except:
+        pass
+        
+    return count
 
 def replace_text(
     filepath: Path,
     find: str,
     replace: str,
+    slide_index: Optional[int] = None,
+    shape_index: Optional[int] = None,
     match_case: bool = False,
-    whole_words: bool = False,
     dry_run: bool = False
 ) -> Dict[str, Any]:
-    """Find and replace text across presentation."""
+    """Find and replace text with optional targeting."""
     
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -40,188 +106,110 @@ def replace_text(
     if not find:
         raise ValueError("Find text cannot be empty")
     
-    # For dry run, just scan without modifying
-    if dry_run:
-        with PowerPointAgent(filepath) as agent:
-            agent.open(filepath, acquire_lock=False)  # Read-only
-            
-            # Count occurrences
-            count = 0
-            locations = []
-            
-            for slide_idx, slide in enumerate(agent.prs.slides):
-                for shape_idx, shape in enumerate(slide.shapes):
-                    if hasattr(shape, 'text_frame'):
-                        text = shape.text_frame.text
-                        
-                        if match_case:
-                            occurrences = text.count(find)
-                        else:
-                            occurrences = text.lower().count(find.lower())
-                        
-                        if occurrences > 0:
-                            count += occurrences
-                            locations.append({
-                                "slide": slide_idx,
-                                "shape": shape_idx,
-                                "occurrences": occurrences,
-                                "preview": text[:100]
-                            })
-        
-        return {
-            "status": "dry_run",
-            "file": str(filepath),
-            "find": find,
-            "replace": replace,
-            "matches_found": count,
-            "locations": locations[:10],  # First 10 locations
-            "total_locations": len(locations),
-            "match_case": match_case
-        }
+    # If shape is specified, slide must be specified
+    if shape_index is not None and slide_index is None:
+        raise ValueError("If --shape is specified, --slide must also be specified")
     
-    # Actual replacement
+    action = "dry_run" if dry_run else "replace"
+    total_replacements = 0
+    locations = []
+    
     with PowerPointAgent(filepath) as agent:
-        agent.open(filepath)
+        # Open appropriately based on dry_run
+        agent.open(filepath, acquire_lock=not dry_run)
         
-        # Perform replacement
-        count = agent.replace_text(
-            find=find,
-            replace=replace,
-            match_case=match_case
-        )
+        # Determine scope
+        target_slides = []
+        if slide_index is not None:
+            # Single slide scope
+            if not 0 <= slide_index < agent.get_slide_count():
+                raise SlideNotFoundError(f"Slide index {slide_index} out of range")
+            target_slides = [(slide_index, agent.prs.slides[slide_index])]
+        else:
+            # Global scope
+            target_slides = list(enumerate(agent.prs.slides))
+            
+        # Iterate scope
+        for s_idx, slide in target_slides:
+            
+            # Determine shapes on this slide
+            target_shapes = []
+            if shape_index is not None:
+                # Single shape scope
+                if 0 <= shape_index < len(slide.shapes):
+                    target_shapes = [(shape_index, slide.shapes[shape_index])]
+                else:
+                    # Warning or Error? Error seems appropriate for explicit target
+                    raise ValueError(f"Shape index {shape_index} out of range on slide {s_idx}")
+            else:
+                # All shapes on slide
+                target_shapes = list(enumerate(slide.shapes))
+            
+            # Execute on shapes
+            for sh_idx, shape in target_shapes:
+                if not hasattr(shape, 'text_frame'):
+                    continue
+                    
+                # Logic for Dry Run (Count only)
+                if dry_run:
+                    text = shape.text_frame.text
+                    occurrences = 0
+                    if match_case:
+                        occurrences = text.count(find)
+                    else:
+                        occurrences = text.lower().count(find.lower())
+                    
+                    if occurrences > 0:
+                        total_replacements += occurrences
+                        locations.append({
+                            "slide": s_idx,
+                            "shape": sh_idx,
+                            "occurrences": occurrences,
+                            "preview": text[:50] + "..." if len(text) > 50 else text
+                        })
+                
+                # Logic for Actual Replacement
+                else:
+                    replacements = perform_replacement_on_shape(shape, find, replace, match_case)
+                    if replacements > 0:
+                        total_replacements += replacements
+                        locations.append({
+                            "slide": s_idx,
+                            "shape": sh_idx,
+                            "replacements": replacements
+                        })
         
-        # Save
-        agent.save()
-    
+        if not dry_run:
+            agent.save()
+            
     return {
         "status": "success",
         "file": str(filepath),
+        "action": action,
         "find": find,
         "replace": replace,
-        "replacements_made": count,
-        "match_case": match_case
+        "scope": {
+            "slide": slide_index if slide_index is not None else "all",
+            "shape": shape_index if shape_index is not None else "all"
+        },
+        "total_matches" if dry_run else "replacements_made": total_replacements,
+        "locations": locations
     }
-
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Find and replace text across PowerPoint presentation",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Simple replacement
-  uv python ppt_replace_text.py \\
-    --file presentation.pptx \\
-    --find "2023" \\
-    --replace "2024" \\
-    --json
-  
-  # Case-sensitive replacement
-  uv python ppt_replace_text.py \\
-    --file presentation.pptx \\
-    --find "Company Inc." \\
-    --replace "Company LLC" \\
-    --match-case \\
-    --json
-  
-  # Dry run to preview changes
-  uv python ppt_replace_text.py \\
-    --file presentation.pptx \\
-    --find "old_term" \\
-    --replace "new_term" \\
-    --dry-run \\
-    --json
-  
-  # Update product name
-  uv python ppt_replace_text.py \\
-    --file product_deck.pptx \\
-    --find "Product X" \\
-    --replace "Product Y" \\
-    --json
-  
-  # Fix typo across all slides
-  uv python ppt_replace_text.py \\
-    --file presentation.pptx \\
-    --find "recieve" \\
-    --replace "receive" \\
-    --json
-
-Common Use Cases:
-  - Update dates (2023 → 2024)
-  - Change company names (rebranding)
-  - Fix recurring typos
-  - Update product names
-  - Change terminology
-  - Update prices/numbers
-  - Localization (English → Spanish)
-  - Template customization
-
-Best Practices:
-  1. Always use --dry-run first to preview changes
-  2. Create backup before bulk replacements
-  3. Use --match-case for proper nouns
-  4. Test on a copy first
-  5. Review results after replacement
-  6. Be specific with find text to avoid unwanted matches
-
-Safety Tips:
-  - Backup file before major changes
-  - Use dry-run to verify matches
-  - Check match count makes sense
-  - Review a few slides manually after
-  - Use case-sensitive for precision
-  - Avoid replacing common words
-
-Limitations:
-  - Only replaces visible text (not in images)
-  - Does not replace text in charts/tables (text only)
-  - Preserves original formatting
-  - Cannot use regex patterns (exact match only)
-        """
+        description="Find and replace text in PowerPoint (v2.0.0 - Targeted)",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
-    parser.add_argument(
-        '--file',
-        required=True,
-        type=Path,
-        help='PowerPoint file path'
-    )
-    
-    parser.add_argument(
-        '--find',
-        required=True,
-        help='Text to find'
-    )
-    
-    parser.add_argument(
-        '--replace',
-        required=True,
-        help='Replacement text'
-    )
-    
-    parser.add_argument(
-        '--match-case',
-        action='store_true',
-        help='Case-sensitive matching'
-    )
-    
-    parser.add_argument(
-        '--whole-words',
-        action='store_true',
-        help='Match whole words only (not yet implemented)'
-    )
-    
-    parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Preview changes without modifying file'
-    )
-    
-    parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output JSON response'
-    )
+    parser.add_argument('--file', required=True, type=Path, help='PowerPoint file path')
+    parser.add_argument('--find', required=True, help='Text to find')
+    parser.add_argument('--replace', required=True, help='Replacement text')
+    parser.add_argument('--slide', type=int, help='Target specific slide index')
+    parser.add_argument('--shape', type=int, help='Target specific shape index (requires --slide)')
+    parser.add_argument('--match-case', action='store_true', help='Case-sensitive matching')
+    parser.add_argument('--dry-run', action='store_true', help='Preview changes without modifying')
+    parser.add_argument('--json', action='store_true', default=True, help='Output JSON response')
     
     args = parser.parse_args()
     
@@ -230,28 +218,13 @@ Limitations:
             filepath=args.file,
             find=args.find,
             replace=args.replace,
+            slide_index=args.slide,
+            shape_index=args.shape,
             match_case=args.match_case,
-            whole_words=args.whole_words,
             dry_run=args.dry_run
         )
         
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            if args.dry_run:
-                print(f"🔍 Dry run - no changes made")
-                print(f"   Found: {result['matches_found']} occurrences")
-                print(f"   In: {result['total_locations']} locations")
-                if result['locations']:
-                    print(f"   Sample locations:")
-                    for loc in result['locations'][:3]:
-                        print(f"     - Slide {loc['slide']}: {loc['occurrences']} matches")
-            else:
-                print(f"✅ Replaced '{args.find}' with '{args.replace}'")
-                print(f"   Replacements: {result['replacements_made']}")
-                if args.match_case:
-                    print(f"   Case-sensitive: Yes")
-        
+        print(json.dumps(result, indent=2))
         sys.exit(0)
         
     except Exception as e:
@@ -260,14 +233,8 @@ Limitations:
             "error": str(e),
             "error_type": type(e).__name__
         }
-        
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
