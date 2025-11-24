@@ -1,5 +1,3 @@
-I will now meticulously create the files as planned, starting with the speaker notes tool.
-
 ### 1. Creating `tools/ppt_add_notes.py`
 
 This tool enables the "AI Architect" to script the presentation, adding a critical layer of "voice" to the visual slides.
