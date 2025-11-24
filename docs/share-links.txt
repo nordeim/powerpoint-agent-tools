@@ -42,3 +42,10 @@ https://chatgpt.com/share/69239f41-d2ac-8008-a643-5ab4a282f782
 Google AI analysis:
 https://drive.google.com/file/d/17Qx8ymTZ60dU9_42jmQQgxo9fh_-v7zy/view?usp=sharing  
 https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221ltDtujsoINe6mOsPcM6KarNIEjavlx5T%22%5D,%22action%22:%22open%22,%22userId%22:%22103961307342447084491%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing  
+
+---
+
+https://drive.google.com/file/d/17Qx8ymTZ60dU9_42jmQQgxo9fh_-v7zy/view?usp=sharing  
+https://drive.google.com/file/d/1bOhnrWlwv7noj6P8YVjaK9-LGPd8j0ob/view?usp=sharing  
+https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221ltDtujsoINe6mOsPcM6KarNIEjavlx5T%22%5D,%22action%22:%22open%22,%22userId%22:%22103961307342447084491%22,%22resourceKeys%22:%7B%7D%7D&usp=sharing  
+
