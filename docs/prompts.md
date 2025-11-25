@@ -154,6 +154,10 @@ Remember to plan for the creation of tests for the tools to be added  and/or mod
 
 ---
 
+Awesome job on meticulous analysis, planning and execution! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically to re-image `core/powerpoint_agent_core.py` v3.0 to match your excellent unified system prompt v3.0. Then meticulously create an implementation plan to create a complete working drop-in replacement file for `core/powerpoint_agent_core.py` with no placeholder comments, also include an integrated checklist in your plan. After generating the code file, thoroughly review it against the checklist. Design a test to validate the correctness and accuracy of the updated file to avoid regression. Regression is a real threat whenever updates are made, so you need to be extremely thorough and meticulous. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
