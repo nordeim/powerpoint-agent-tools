@@ -1,0 +1,67 @@
+{
+    "manifest_id": "manifest-20251125-001",
+    "source_file": "/data/presentations/quarterly-deck.pptx",
+    "work_copy": "/tmp/manifest-20251125-001-workcopy.pptx",
+    "created_by": "alice@example.com",
+    "timestamp": "2025-11-25T06:57:00Z",
+    "approval_token": "HMAC-SHA256:eyJtYW5pZmVzdF9pZCI6Im1hbmlmZXN0LTIwMjUxMTI1LTAwMSIsInVzZXIiOiJhbGljZUBleGFtcGxlLmNvbSIsImV4cGlyeSI6IjIwMjUtMTEtMjVUMDg6MDA6MDBaIiwic2NvcGUiOiJkZWxldGU6c2xpZGUifQ==.signature-placeholder",
+    "operations": [
+        {
+            "op_id": "op-01-clone",
+            "cmd": "ppt_clone_presentation.py",
+            "args": {
+                "--source": "/data/presentations/quarterly-deck.pptx",
+                "--output": "/tmp/manifest-20251125-001-workcopy.pptx",
+                "--json": true
+            },
+            "expected_effect": "Create a writable work copy for edits",
+            "rollback_cmd": "rm -f /tmp/manifest-20251125-001-workcopy.pptx",
+            "critical": true
+        },
+        {
+            "op_id": "op-02-add-overlay",
+            "cmd": "ppt_add_shape.py",
+            "args": {
+                "--file": "/tmp/manifest-20251125-001-workcopy.pptx",
+                "--slide-index": 2,
+                "--shape-type": "rectangle",
+                "--anchor": "full-slide",
+                "--opacity": 0.15,
+                "--z-order": "behind_text",
+                "--fill-color": "#000000"
+            },
+            "expected_effect": "Add a readability overlay to slide 2 without obscuring text",
+            "rollback_cmd": "ppt_remove_shape.py --file /tmp/manifest-20251125-001-workcopy.pptx --slide-index 2 --shape-id <shape-id-from-result>",
+            "critical": false
+        },
+        {
+            "op_id": "op-03-run-accessibility",
+            "cmd": "ppt_check_accessibility.py",
+            "args": {
+                "--file": "/tmp/manifest-20251125-001-workcopy.pptx",
+                "--json": true
+            },
+            "expected_effect": "Produce accessibility report; must meet policy thresholds",
+            "rollback_cmd": "",
+            "critical": true
+        },
+        {
+            "op_id": "op-04-export",
+            "cmd": "ppt_export_pdf.py",
+            "args": {
+                "--file": "/tmp/manifest-20251125-001-workcopy.pptx",
+                "--output": "/data/exports/quarterly-deck-20251125.pdf"
+            },
+            "expected_effect": "Export final PDF after validation",
+            "rollback_cmd": "rm -f /data/exports/quarterly-deck-20251125.pdf",
+            "critical": true
+        }
+    ],
+    "diff_summary": {
+        "slides_added": 0,
+        "slides_removed": 0,
+        "shapes_added": 1,
+        "shapes_removed": 0
+    },
+    "notes": "Add overlay to slide 3 for readability; ensure accessibility checks pass before export."
+}
