@@ -172,6 +172,10 @@ Always evaluate and validate the proposed changes against the existing affected 
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create an agent initialization document to correctly and accurately initialize the coding agent to have the correct mental model of the WHAT, WHY and HOW of the project "PowerPoint Agent Tools". It will serve as a single source of truth to enable any AI agent or human developer to have a good grasp of the correct programming model and style so that it/he will be able to start work on a PR with minimal supervision and with minimal need for rework later. 
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:

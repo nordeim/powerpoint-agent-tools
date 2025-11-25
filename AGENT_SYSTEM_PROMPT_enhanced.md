@@ -658,6 +658,9 @@ uv run tools/ppt_check_accessibility.py --file "$WORK_COPY" --json
 | `ppt_set_background.py` | Set background | `--file PATH` (req), `--slide N`, `--color HEX`, `--image PATH` |
 | `ppt_set_z_order.py` | Manage layers (NEW) | `--file PATH` (req), `--slide N` (req), `--shape N` (req), `--action {bring_to_front,send_to_back,bring_forward,send_backward}` |
 
+> [!NOTE]
+> The legacy `transparency` parameter is automatically converted to `fill_opacity` (with warning) for backward compatibility, but new code should use `fill_opacity` directly.
+
 #### Domain 6: Data Visualization
 | Tool | Purpose | Critical Arguments |
 |------|---------|-------------------|
@@ -849,6 +852,21 @@ uv run tools/ppt_replace_text.py --file deck.pptx --slide 0 --shape 2 \
 ### 4.3 Tool Interaction Patterns
 
 #### Pattern: Safe Overlay Addition
+
+**Conceptual Model:**
+```python
+# This now works exactly as the system prompt describes:
+agent.add_shape(
+    slide_index=0,
+    shape_type="rectangle",
+    position={"left": "0%", "top": "0%"},
+    size={"width": "100%", "height": "100%"},
+    fill_color="#FFFFFF",
+    fill_opacity=0.15  # Subtle overlay ✅
+)
+```
+
+**CLI Execution:**
 ```bash
 # 1. Clone for safety
 uv run tools/ppt_clone_presentation.py --source original.pptx --output work.pptx --json
@@ -857,26 +875,23 @@ uv run tools/ppt_clone_presentation.py --source original.pptx --output work.pptx
 uv run tools/ppt_capability_probe.py --file work.pptx --deep --json
 uv run tools/ppt_get_info.py --file work.pptx --json  # Capture presentation_version
 
-# 3. Add overlay shape
+# 3. Add overlay shape (with opacity 0.15)
 uv run tools/ppt_add_shape.py --file work.pptx --slide 2 --shape rectangle \
   --position '{"left":"0%","top":"0%"}' --size '{"width":"100%","height":"100%"}' \
-  --fill-color "#FFFFFF" --json
+  --fill-color "#FFFFFF" --fill-opacity 0.15 --json
 
 # 4. Refresh shape indices (MANDATORY after add)
 uv run tools/ppt_get_slide_info.py --file work.pptx --slide 2 --json
 # → Note new shape index (e.g., index 7)
 
-# 5. Set opacity via format (workaround - fill transparency)
-# Note: May require direct shape formatting depending on tool support
-
-# 6. Send to back
+# 5. Send to back
 uv run tools/ppt_set_z_order.py --file work.pptx --slide 2 --shape 7 \
   --action send_to_back --json
 
-# 7. Refresh indices again (MANDATORY after z-order)
+# 6. Refresh indices again (MANDATORY after z-order)
 uv run tools/ppt_get_slide_info.py --file work.pptx --slide 2 --json
 
-# 8. Validate
+# 7. Validate
 uv run tools/ppt_validate_presentation.py --file work.pptx --json
 uv run tools/ppt_check_accessibility.py --file work.pptx --json
 ```
