@@ -139,3 +139,48 @@ The two minor enhancement opportunities (deprecation warning documentation and u
 3. **🔍 VALIDATION CONFIRMATION** - Run the exact overlay example from the review document to confirm end-to-end functionality
 
 **Final Verdict**: The system prompt is **fully aligned** with the core library changes and maintains the high standards of technical accuracy, backward compatibility, and user-focused documentation demonstrated in the meticulous review process.
+
+---
+
+# Implementation Plan - System Prompt Enhancements
+
+## Goal Description
+Update `AGENT_SYSTEM_PROMPT_enhanced.md` to document the legacy `transparency` parameter behavior and provide a complete, unified overlay example as requested.
+
+## User Review Required
+> [!NOTE]
+> The overlay example will include both the requested Python conceptual model and the corresponding updated CLI commands to ensure consistency.
+
+## Proposed Changes
+
+### Documentation
+#### [MODIFY] [AGENT_SYSTEM_PROMPT_enhanced.md](file:///home/project/powerpoint-agent-tools/AGENT_SYSTEM_PROMPT_enhanced.md)
+
+1.  **Deprecation Warning Documentation**:
+    - **Location**: After the "Domain 5: Visual Design" table (around line 660).
+    - **Change**: Add the requested note about `transparency` conversion.
+
+2.  **Complete Overlay Example**:
+    - **Location**: "Pattern: Safe Overlay Addition" section (around line 851).
+    - **Change**:
+        - Insert the "Conceptual Model" Python block.
+        - Update the Bash script to use `--fill-opacity 0.15` in Step 3.
+        - Remove Step 5 (the workaround).
+
+## Verification Plan
+
+### Manual Verification
+- Read the modified file to ensure:
+    - The deprecation note is correctly placed and formatted.
+    - The overlay pattern includes the Python model.
+    - The Bash script is syntactically correct and uses the new argument.
+
+---
+
+# Task: Enhancing System Prompt
+
+- [x] Analyze `AGENT_SYSTEM_PROMPT_enhanced.md` to locate insertion points <!-- id: 0 -->
+- [x] Create Implementation Plan <!-- id: 1 -->
+- [x] Apply updates to `AGENT_SYSTEM_PROMPT_enhanced.md` <!-- id: 2 -->
+- [x] Verify changes <!-- id: 3 -->
+
