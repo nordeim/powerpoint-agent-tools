@@ -2529,56 +2529,147 @@ class PowerPointAgent:
         slide_index: int,
         shape_index: int,
         fill_color: Optional[str] = None,
-        line_color: Optional[str] = None,
-        line_width: Optional[float] = None,
         fill_opacity: Optional[float] = None,
-        line_opacity: Optional[float] = None
+        line_color: Optional[str] = None,
+        line_opacity: Optional[float] = None,
+        line_width: Optional[float] = None,
+        transparency: Optional[float] = None
     ) -> Dict[str, Any]:
         """
-        Format existing shape.
+        Format existing shape with optional transparency/opacity support.
         
         Args:
             slide_index: Target slide index
             shape_index: Shape index on slide
-            fill_color: Fill color hex
-            line_color: Line color hex
+            fill_color: Fill color hex (e.g., "#0070C0")
+            fill_opacity: Fill opacity from 0.0 (transparent) to 1.0 (opaque)
+            line_color: Line/border color hex
+            line_opacity: Line opacity from 0.0 (transparent) to 1.0 (opaque)
             line_width: Line width in points
-            transparency: Fill transparency (0.0 = opaque, 1.0 = invisible)
+            transparency: DEPRECATED - Use fill_opacity instead.
+                         If provided, converted to fill_opacity (transparency = 1 - opacity).
+                         Will be removed in v4.0.
             
         Returns:
-            Dict with formatting changes applied
+            Dict with formatting changes applied and their status
+            
+        Raises:
+            SlideNotFoundError: If slide index is invalid
+            ShapeNotFoundError: If shape index is invalid
+            ValueError: If opacity values are out of range
+            
+        Example:
+            # Make an existing shape semi-transparent
+            agent.format_shape(
+                slide_index=0,
+                shape_index=3,
+                fill_opacity=0.5  # 50% opaque
+            )
         """
         shape = self._get_shape(slide_index, shape_index)
         
-        changes = []
+        changes: List[str] = []
+        changes_detail: Dict[str, Any] = {}
         
+        # Handle deprecated transparency parameter
+        if transparency is not None:
+            if fill_opacity is None:
+                # Convert transparency to opacity (they're inverses)
+                # transparency: 0.0 = opaque, 1.0 = invisible
+                # opacity: 1.0 = opaque, 0.0 = invisible
+                fill_opacity = 1.0 - transparency
+                changes.append("transparency_converted_to_opacity")
+                changes_detail["transparency_deprecated"] = True
+                changes_detail["transparency_value"] = transparency
+                changes_detail["converted_opacity"] = fill_opacity
+                self._log_warning(
+                    "The 'transparency' parameter is deprecated. "
+                    "Use 'fill_opacity' instead (opacity = 1 - transparency)."
+                )
+            else:
+                # Both provided - fill_opacity takes precedence
+                changes.append("transparency_ignored")
+                changes_detail["transparency_ignored"] = True
+                self._log_warning(
+                    "Both 'transparency' and 'fill_opacity' provided. "
+                    "Using 'fill_opacity', ignoring 'transparency'."
+                )
+        
+        # Validate opacity ranges
+        if fill_opacity is not None and not 0.0 <= fill_opacity <= 1.0:
+            raise ValueError(
+                f"fill_opacity must be between 0.0 and 1.0, got {fill_opacity}"
+            )
+        if line_opacity is not None and not 0.0 <= line_opacity <= 1.0:
+            raise ValueError(
+                f"line_opacity must be between 0.0 and 1.0, got {line_opacity}"
+            )
+        
+        # Apply fill color
         if fill_color is not None:
             shape.fill.solid()
             shape.fill.fore_color.rgb = ColorHelper.from_hex(fill_color)
             changes.append("fill_color")
+            changes_detail["fill_color"] = fill_color
         
+        # Apply fill opacity
+        if fill_opacity is not None:
+            # Ensure shape has solid fill before applying opacity
+            if fill_color is None:
+                try:
+                    shape.fill.solid()
+                except Exception:
+                    pass
+            
+            if fill_opacity < 1.0:
+                success = self._set_fill_opacity(shape, fill_opacity)
+                if success:
+                    changes.append("fill_opacity")
+                    changes_detail["fill_opacity"] = fill_opacity
+                    changes_detail["fill_opacity_applied"] = True
+                else:
+                    changes.append("fill_opacity_failed")
+                    changes_detail["fill_opacity"] = fill_opacity
+                    changes_detail["fill_opacity_applied"] = False
+            else:
+                # Opacity 1.0 = fully opaque (default, no XML change needed)
+                changes.append("fill_opacity_reset")
+                changes_detail["fill_opacity"] = 1.0
+        
+        # Apply line color
         if line_color is not None:
-            shape.line.color.rgb = ColorHelper.from_hex(line_color)
+            self._ensure_line_solid_fill(shape, line_color)
             changes.append("line_color")
+            changes_detail["line_color"] = line_color
         
+        # Apply line opacity
+        if line_opacity is not None:
+            if line_opacity < 1.0:
+                success = self._set_line_opacity(shape, line_opacity)
+                if success:
+                    changes.append("line_opacity")
+                    changes_detail["line_opacity"] = line_opacity
+                    changes_detail["line_opacity_applied"] = True
+                else:
+                    changes.append("line_opacity_failed")
+                    changes_detail["line_opacity"] = line_opacity
+                    changes_detail["line_opacity_applied"] = False
+            else:
+                changes.append("line_opacity_reset")
+                changes_detail["line_opacity"] = 1.0
+        
+        # Apply line width
         if line_width is not None:
             shape.line.width = Pt(line_width)
             changes.append("line_width")
-        
-        if transparency is not None:
-            try:
-                # Transparency is set on fill
-                shape.fill.solid()
-                # Note: python-pptx doesn't directly support transparency
-                # This is a best-effort implementation
-                changes.append("transparency_attempted")
-            except Exception:
-                pass
+            changes_detail["line_width"] = line_width
         
         return {
             "slide_index": slide_index,
             "shape_index": shape_index,
-            "changes_applied": changes
+            "changes_applied": changes,
+            "changes_detail": changes_detail,
+            "success": "failed" not in " ".join(changes)
         }
     
     def remove_shape(self, slide_index: int, shape_index: int) -> Dict[str, Any]:
