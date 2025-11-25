@@ -1,3 +1,55 @@
+# Deep Analysis & Enhancement: Adding Opacity Support to `ppt_add_shape.py`
+
+## Executive Summary
+
+After meticulous review of the tool, I've identified the gap and designed a **comprehensive solution** that adds full opacity/transparency support while maintaining backward compatibility. The solution requires changes to both the CLI tool and the core library.
+
+---
+
+## Gap Analysis
+
+### What the System Prompt Claims
+
+```markdown
+OVERLAY DEFAULTS (for readability backgrounds):
+├── Opacity: 0.15 (15% - subtle, non-competing)
+├── Z-Order: send_to_back (behind all content)
+```
+
+### What the Tool Currently Has
+
+```python
+# Current add_shape arguments - NO opacity support
+add_result = agent.add_shape(
+    slide_index=slide_index,
+    shape_type=resolved_shape,
+    position=position,
+    size=size,
+    fill_color=resolved_fill,
+    line_color=resolved_line,
+    line_width=line_width,
+    text=text
+)
+```
+
+### The Fix Required
+
+| Component | Current | Required |
+|-----------|---------|----------|
+| CLI `--fill-opacity` | ❌ Missing | ✅ Add parameter |
+| CLI `--line-opacity` | ❌ Missing | ✅ Add parameter (completeness) |
+| CLI `--overlay` | ❌ Missing | ✅ Add convenience preset |
+| Core `add_shape()` | No opacity param | Add `fill_opacity`, `line_opacity` |
+| Validation | No opacity checks | Add opacity validation |
+| Documentation | No overlay examples | Add comprehensive examples |
+
+---
+
+## Complete Enhanced Implementation
+
+### Enhanced `ppt_add_shape.py` (v3.1.0)
+
+```python
 #!/usr/bin/env python3
 """
 PowerPoint Add Shape Tool v3.1.0
@@ -1158,3 +1210,177 @@ Z-ORDER (LAYERING):
 
 if __name__ == "__main__":
     main()
+```
+
+---
+
+## Required Core Library Enhancement
+
+The tool now passes `fill_opacity` and `line_opacity` to the core. Here's the **minimal change required** in `powerpoint_agent_core.py`:
+
+### Core `add_shape` Method Enhancement
+
+```python
+def add_shape(
+    self,
+    slide_index: int,
+    shape_type: str,
+    position: Dict[str, Any],
+    size: Dict[str, Any],
+    fill_color: Optional[str] = None,
+    fill_opacity: float = 1.0,        # NEW PARAMETER
+    line_color: Optional[str] = None,
+    line_opacity: float = 1.0,        # NEW PARAMETER
+    line_width: float = 1.0,
+    text: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Add shape to slide with styling and optional transparency.
+    
+    Args:
+        slide_index: Target slide index
+        shape_type: Type of shape to add
+        position: Position specification
+        size: Size specification
+        fill_color: Fill color (hex string)
+        fill_opacity: Fill opacity (0.0=transparent to 1.0=opaque)
+        line_color: Line color (hex string)
+        line_opacity: Line opacity (0.0=transparent to 1.0=opaque)
+        line_width: Line width in points
+        text: Optional text inside shape
+        
+    Returns:
+        Dict with shape details including shape_index
+    """
+    # ... existing shape creation code ...
+    
+    # Get the slide and create shape
+    slide = self.presentation.slides[slide_index]
+    
+    # Calculate position and size
+    pos = self._resolve_position(position)
+    sz = self._resolve_size(size)
+    
+    # Add the shape
+    shape = slide.shapes.add_shape(
+        self._get_shape_type(shape_type),
+        pos.left, pos.top,
+        sz.width, sz.height
+    )
+    
+    # Apply fill color and opacity
+    if fill_color:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = ColorHelper.from_hex(fill_color)
+        
+        # NEW: Apply fill transparency (opacity is inverse of transparency)
+        if fill_opacity < 1.0:
+            # python-pptx uses transparency (0=opaque, 1=transparent)
+            # We use opacity (0=transparent, 1=opaque)
+            shape.fill.fore_color.brightness = 0  # Ensure no brightness adjustment
+            shape.fill.transparency = 1.0 - fill_opacity
+    else:
+        # No fill
+        shape.fill.background()
+    
+    # Apply line color and opacity
+    if line_color:
+        shape.line.color.rgb = ColorHelper.from_hex(line_color)
+        shape.line.width = Pt(line_width)
+        
+        # NEW: Apply line transparency
+        if line_opacity < 1.0:
+            shape.line.fill.solid()
+            shape.line.fill.fore_color.rgb = ColorHelper.from_hex(line_color)
+            shape.line.fill.transparency = 1.0 - line_opacity
+    else:
+        shape.line.fill.background()  # No line
+    
+    # Add text if provided
+    if text:
+        shape.text = text
+    
+    # Get shape index
+    shape_index = self._get_shape_index(slide, shape)
+    
+    return {
+        "shape_index": shape_index,
+        "position": {"left": str(pos.left), "top": str(pos.top)},
+        "size": {"width": str(sz.width), "height": str(sz.height)},
+        "fill_opacity": fill_opacity,
+        "line_opacity": line_opacity
+    }
+```
+
+---
+
+## Summary of Changes
+
+### New CLI Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--fill-opacity` | float | 1.0 | Fill opacity (0.0-1.0) |
+| `--line-opacity` | float | 1.0 | Line opacity (0.0-1.0) |
+| `--overlay` | flag | false | Preset for full-slide overlay with 15% opacity |
+
+### New Validation
+
+| Check | Behavior |
+|-------|----------|
+| Opacity range | ValueError if not 0.0-1.0 |
+| Very low opacity | Warning if < 5% |
+| Zero opacity | Warning (shape invisible) |
+| Overlay opacity > 30% | Warning (may obscure content) |
+| Text on low-opacity shape | Warning (readability) |
+| Color contrast | Adjusted for transparency effects |
+
+### New Output Fields
+
+```json
+{
+  "styling": {
+    "fill_color": "#FFFFFF",
+    "fill_opacity": 0.15,
+    "fill_transparency": 0.85,
+    "line_color": null,
+    "line_opacity": 1.0,
+    "line_width": 1.0
+  },
+  "is_overlay": true,
+  "next_step": {
+    "command": "ppt_set_z_order.py",
+    "args": {"--action": "send_to_back"},
+    "description": "Send overlay to back..."
+  }
+}
+```
+
+### Backward Compatibility
+
+| Aspect | Status |
+|--------|--------|
+| Default behavior | ✅ Unchanged (opacity 1.0) |
+| Existing scripts | ✅ Continue to work |
+| API signature | ✅ Additive only |
+| Output format | ✅ Additional fields only |
+
+---
+
+## Verification After Implementation
+
+```bash
+# Verify new parameters appear in help
+uv run tools/ppt_add_shape.py --help 2>&1 | grep -E "opacity|overlay"
+
+# Expected output:
+#   --fill-opacity FILL_OPACITY
+#                         Fill opacity: 0.0 (transparent) to 1.0 (opaque)...
+#   --line-opacity LINE_OPACITY
+#                         Line/border opacity: 0.0 (transparent) to 1.0 (opaque)...
+#   --overlay             Overlay preset: full-slide, 15% opacity, z-order reminder...
+```
+
+---
+
+**This implementation fully aligns the tool with the System Prompt v3.0 specifications for overlay transparency support.**
