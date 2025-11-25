@@ -417,3 +417,35 @@ agent.add_shape(
     fill_opacity=0.15  # Subtle overlay ✅
 )
 ```
+
+---
+
+# Implementation Plan - Final Verification
+
+## Goal Description
+Verify the core library fix for opacity/transparency by running the smoke test, checking CLI help output, and executing the end-to-end overlay example as specified in `review-2.md`.
+
+## User Review Required
+> [!NOTE]
+> This plan focuses on verification steps outlined in `review-2.md`. No code changes are intended.
+
+## Verification Plan
+
+### Automated Tests
+- **Smoke Test**: Run the Python snippet from `review-2.md` to verify `add_shape`, `format_shape`, and backward compatibility.
+- **CLI Verification**: Run `uv run tools/ppt_add_shape.py --help` and grep for opacity/overlay arguments.
+- **End-to-End Example**: Run the overlay example code snippet.
+
+### Manual Verification
+- Review output of all commands to ensure they match expected results.
+
+---
+
+# Task: Final Verification of Core Fix
+
+- [x] Review `review-2.md` <!-- id: 0 -->
+- [x] Create Implementation Plan <!-- id: 1 -->
+- [x] Run Quick Smoke Test from `review-2.md` <!-- id: 2 -->
+- [x] Verify CLI Tool help output <!-- id: 3 -->
+- [x] Run End-to-End Overlay Example <!-- id: 4 -->
+
