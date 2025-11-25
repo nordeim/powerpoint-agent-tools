@@ -2192,6 +2192,179 @@ class PowerPointAgent:
     # SHAPE OPERATIONS
     # ========================================================================
     
+    def _set_fill_opacity(self, shape, opacity: float) -> bool:
+        """
+        Set the fill opacity of a shape by manipulating the underlying XML.
+        
+        Args:
+            shape: The shape object with a fill
+            opacity: Opacity value (0.0 = fully transparent, 1.0 = fully opaque)
+            
+        Returns:
+            True if opacity was set, False if not applicable
+            
+        Note:
+            python-pptx doesn't directly expose fill transparency, so we
+            manipulate the OOXML directly. The alpha value uses a scale
+            where 100000 = 100% opaque.
+        """
+        if opacity >= 1.0:
+            # No need to set alpha for fully opaque - it's the default
+            return True
+        
+        if opacity < 0.0:
+            opacity = 0.0
+        
+        try:
+            # Access the shape's spPr (shape properties) element
+            spPr = shape._sp.spPr
+            if spPr is None:
+                return False
+            
+            # Find the solidFill element
+            solidFill = spPr.find(qn('a:solidFill'))
+            if solidFill is None:
+                return False
+            
+            # Find the color element (could be srgbClr or schemeClr)
+            color_elem = solidFill.find(qn('a:srgbClr'))
+            if color_elem is None:
+                color_elem = solidFill.find(qn('a:schemeClr'))
+            if color_elem is None:
+                return False
+            
+            # Calculate alpha value (Office uses 0-100000 scale, where 100000 = 100%)
+            alpha_value = int(opacity * 100000)
+            
+            # Remove existing alpha element if present
+            existing_alpha = color_elem.find(qn('a:alpha'))
+            if existing_alpha is not None:
+                color_elem.remove(existing_alpha)
+            
+            # Create and add new alpha element
+            # Using SubElement to create properly namespaced element
+            nsmap = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+            alpha_elem = etree.SubElement(color_elem, qn('a:alpha'))
+            alpha_elem.set('val', str(alpha_value))
+            
+            return True
+            
+        except Exception as e:
+            # Log but don't fail - opacity is enhancement, not critical
+            self._log_warning(f"Could not set fill opacity: {e}")
+            return False
+    
+    def _set_line_opacity(self, shape, opacity: float) -> bool:
+        """
+        Set the line/border opacity of a shape by manipulating the underlying XML.
+        
+        Args:
+            shape: The shape object with a line
+            opacity: Opacity value (0.0 = fully transparent, 1.0 = fully opaque)
+            
+        Returns:
+            True if opacity was set, False if not applicable
+            
+        Note:
+            Line opacity requires the line to have a solid fill. We manipulate
+            the OOXML <a:ln><a:solidFill><a:srgbClr><a:alpha> structure.
+        """
+        if opacity >= 1.0:
+            return True
+        
+        if opacity < 0.0:
+            opacity = 0.0
+        
+        try:
+            # Access the shape's spPr element
+            spPr = shape._sp.spPr
+            if spPr is None:
+                return False
+            
+            # Find the line element
+            ln = spPr.find(qn('a:ln'))
+            if ln is None:
+                return False
+            
+            # Find solidFill within line
+            solidFill = ln.find(qn('a:solidFill'))
+            if solidFill is None:
+                # Line might not have a fill yet - try to find/create one
+                return False
+            
+            # Find color element
+            color_elem = solidFill.find(qn('a:srgbClr'))
+            if color_elem is None:
+                color_elem = solidFill.find(qn('a:schemeClr'))
+            if color_elem is None:
+                return False
+            
+            # Calculate and set alpha
+            alpha_value = int(opacity * 100000)
+            
+            existing_alpha = color_elem.find(qn('a:alpha'))
+            if existing_alpha is not None:
+                color_elem.remove(existing_alpha)
+            
+            alpha_elem = etree.SubElement(color_elem, qn('a:alpha'))
+            alpha_elem.set('val', str(alpha_value))
+            
+            return True
+            
+        except Exception as e:
+            self._log_warning(f"Could not set line opacity: {e}")
+            return False
+    
+    def _ensure_line_solid_fill(self, shape, color_hex: str) -> bool:
+        """
+        Ensure the shape's line has a solid fill with the specified color.
+        This is necessary before setting line opacity.
+        
+        Args:
+            shape: The shape object
+            color_hex: Hex color string for the line
+            
+        Returns:
+            True if successful
+        """
+        try:
+            # Set line color through python-pptx first
+            shape.line.color.rgb = ColorHelper.from_hex(color_hex)
+            
+            # Now ensure the XML structure is correct for opacity
+            spPr = shape._sp.spPr
+            ln = spPr.find(qn('a:ln'))
+            
+            if ln is None:
+                return False
+            
+            # Check if solidFill exists
+            solidFill = ln.find(qn('a:solidFill'))
+            if solidFill is None:
+                # Create solidFill structure
+                solidFill = etree.SubElement(ln, qn('a:solidFill'))
+                color_elem = etree.SubElement(solidFill, qn('a:srgbClr'))
+                # Remove # from hex color
+                color_val = color_hex.lstrip('#').upper()
+                color_elem.set('val', color_val)
+            
+            return True
+            
+        except Exception as e:
+            self._log_warning(f"Could not ensure line solid fill: {e}")
+            return False
+    
+    def _log_warning(self, message: str) -> None:
+        """
+        Log a warning message. Override in subclasses for custom logging.
+        
+        Args:
+            message: Warning message to log
+        """
+        # Default implementation - can be enhanced with proper logging
+        import sys
+        print(f"WARNING: {message}", file=sys.stderr)
+    
     def add_shape(
         self,
         slide_index: int,
@@ -2199,26 +2372,57 @@ class PowerPointAgent:
         position: Dict[str, Any],
         size: Dict[str, Any],
         fill_color: Optional[str] = None,
+        fill_opacity: float = 1.0,
         line_color: Optional[str] = None,
+        line_opacity: float = 1.0,
         line_width: float = 1.0,
         text: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Add shape to slide.
+        Add shape to slide with optional transparency/opacity support.
         
         Args:
             slide_index: Target slide index
             shape_type: Shape type name (rectangle, ellipse, arrow_right, etc.)
-            position: Position dict
-            size: Size dict
-            fill_color: Fill color hex
-            line_color: Line color hex
-            line_width: Line width in points
+            position: Position dict (percentage, inches, anchor, or grid)
+            size: Size dict (percentage or inches)
+            fill_color: Fill color hex (e.g., "#0070C0") or None for no fill
+            fill_opacity: Fill opacity from 0.0 (transparent) to 1.0 (opaque).
+                         Default is 1.0 (fully opaque). Use 0.15 for subtle overlays.
+            line_color: Line/border color hex or None for no line
+            line_opacity: Line opacity from 0.0 (transparent) to 1.0 (opaque).
+                         Default is 1.0 (fully opaque).
+            line_width: Line width in points (default: 1.0)
             text: Optional text to add inside shape
             
         Returns:
-            Dict with shape_index and details
+            Dict with shape_index, position, size, and applied styling details
+            
+        Raises:
+            SlideNotFoundError: If slide index is invalid
+            ValueError: If size is not specified or opacity is out of range
+            
+        Example:
+            # Subtle white overlay for improved text readability
+            agent.add_shape(
+                slide_index=0,
+                shape_type="rectangle",
+                position={"left": "0%", "top": "0%"},
+                size={"width": "100%", "height": "100%"},
+                fill_color="#FFFFFF",
+                fill_opacity=0.15  # 15% opaque = 85% transparent
+            )
         """
+        # Validate opacity ranges
+        if not 0.0 <= fill_opacity <= 1.0:
+            raise ValueError(
+                f"fill_opacity must be between 0.0 and 1.0, got {fill_opacity}"
+            )
+        if not 0.0 <= line_opacity <= 1.0:
+            raise ValueError(
+                f"line_opacity must be between 0.0 and 1.0, got {line_opacity}"
+            )
+        
         slide = self._get_slide(slide_index)
         
         left, top = Position.from_dict(position)
@@ -2261,15 +2465,47 @@ class PowerPointAgent:
             Inches(width), Inches(height)
         )
         
-        # Apply fill color
+        # Track what was actually applied
+        styling_applied = {
+            "fill_color": None,
+            "fill_opacity": 1.0,
+            "fill_opacity_applied": False,
+            "line_color": None,
+            "line_opacity": 1.0,
+            "line_opacity_applied": False,
+            "line_width": line_width
+        }
+        
+        # Apply fill color and opacity
         if fill_color:
             shape.fill.solid()
             shape.fill.fore_color.rgb = ColorHelper.from_hex(fill_color)
+            styling_applied["fill_color"] = fill_color
+            styling_applied["fill_opacity"] = fill_opacity
+            
+            # Apply fill opacity if not fully opaque
+            if fill_opacity < 1.0:
+                opacity_set = self._set_fill_opacity(shape, fill_opacity)
+                styling_applied["fill_opacity_applied"] = opacity_set
+        else:
+            # No fill - make background transparent
+            shape.fill.background()
         
-        # Apply line color
+        # Apply line color and opacity
         if line_color:
-            shape.line.color.rgb = ColorHelper.from_hex(line_color)
+            # Ensure line has solid fill for opacity support
+            self._ensure_line_solid_fill(shape, line_color)
             shape.line.width = Pt(line_width)
+            styling_applied["line_color"] = line_color
+            styling_applied["line_opacity"] = line_opacity
+            
+            # Apply line opacity if not fully opaque
+            if line_opacity < 1.0:
+                opacity_set = self._set_line_opacity(shape, line_opacity)
+                styling_applied["line_opacity_applied"] = opacity_set
+        else:
+            # No line
+            shape.line.fill.background()
         
         # Add text if provided
         if text and shape.has_text_frame:
@@ -2282,7 +2518,10 @@ class PowerPointAgent:
             "shape_index": shape_index,
             "shape_type": shape_type,
             "position": {"left": left, "top": top},
-            "size": {"width": width, "height": height}
+            "size": {"width": width, "height": height},
+            "styling": styling_applied,
+            "has_text": text is not None,
+            "text_preview": text[:50] + "..." if text and len(text) > 50 else text
         }
     
     def format_shape(
@@ -2292,7 +2531,8 @@ class PowerPointAgent:
         fill_color: Optional[str] = None,
         line_color: Optional[str] = None,
         line_width: Optional[float] = None,
-        transparency: Optional[float] = None
+        fill_opacity: Optional[float] = None,
+        line_opacity: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Format existing shape.
