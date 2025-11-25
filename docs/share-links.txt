@@ -53,3 +53,9 @@ https://aistudio.google.com/app/prompts?state=%7B%22ids%22:%5B%221ltDtujsoINe6mO
 
 workflow: critique
 https://copilot.microsoft.com/shares/T2bDWSnme8xgYHLnS8ekk  
+
+---
+
+core opacity and agent system prompt review:
+https://chat.qwen.ai/s/7a3907db-ea94-401f-9113-4346c1abf9dd?fev=0.1.4 
+
