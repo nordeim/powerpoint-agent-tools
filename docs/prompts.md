@@ -166,6 +166,12 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome understanding of the Meticulous Approach to task execution and mking code changes! please keep up the good work! You shall adopt the following meticulous change methodology for making any proposed change or implementing any suggested improvement:
+
+Always evaluate and validate the proposed changes against the existing affected files to decide how best to add/merge the proposed sections to the current files. Then meticulously create an comprehensive implementation plan to merge the proposed changes to the intended files, include in your plan a checklist of changes to be added or merged . Try to use merging instead of outright replacement of the relevant sections in the affected files. After generating each file, thoroughly review it against the checklist. Design a test to validate the correctness and accuracy of the updated file to avoid regression. Regression is a real threat whenever updates are made, so you need to be extremely thorough and meticulous. Review and validate your implementation plan before proceeding meticulously to execute it.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:

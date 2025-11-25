@@ -136,6 +136,15 @@ OVERLAY_DEFAULTS = {
 }
 
 
+# Overlay preset defaults (aligned with System Prompt v3.0)
+OVERLAY_DEFAULTS = {
+    "position": {"left": "0%", "top": "0%"},
+    "size": {"width": "100%", "height": "100%"},
+    "fill_opacity": 0.15,  # 15% opaque = subtle, non-competing
+    "z_order_action": "send_to_back",
+}
+
+
 # ============================================================================
 # VALIDATION FUNCTIONS
 # ============================================================================
@@ -196,6 +205,405 @@ def resolve_color(color: Optional[str]) -> Optional[str]:
             pass
     
     return color
+
+
+def validate_opacity(
+    fill_opacity: float,
+    line_opacity: float
+) -> Tuple[List[str], List[str]]:
+    """
+    Validate opacity values and return warnings/recommendations.
+    
+    Args:
+        fill_opacity: Fill opacity (0.0-1.0)
+        line_opacity: Line opacity (0.0-1.0)
+        
+    Returns:
+        Tuple of (warnings, recommendations)
+        
+    Raises:
+        ValueError: If opacity values are out of range
+    """
+    warnings: List[str] = []
+    recommendations: List[str] = []
+    
+    # Validate ranges
+    if not 0.0 <= fill_opacity <= 1.0:
+        raise ValueError(
+            f"fill_opacity must be between 0.0 and 1.0, got {fill_opacity}"
+        )
+    
+    if not 0.0 <= line_opacity <= 1.0:
+        raise ValueError(
+            f"line_opacity must be between 0.0 and 1.0, got {line_opacity}"
+        )
+    
+    # Warn about extreme values
+    if fill_opacity == 0.0:
+        warnings.append(
+            "Fill opacity is 0.0 (fully transparent). Shape fill will be invisible. "
+            "Use no --fill-color if you want no fill."
+        )
+    elif fill_opacity < 0.05:
+        warnings.append(
+            f"Fill opacity {fill_opacity} is extremely low (<5%). "
+            "Shape may be nearly invisible."
+        )
+    
+    if line_opacity == 0.0 and fill_opacity == 0.0:
+        warnings.append(
+            "Both fill and line opacity are 0.0. Shape will be completely invisible."
+        )
+    
+    # Overlay-specific recommendations
+    if 0.1 <= fill_opacity <= 0.3:
+        recommendations.append(
+            f"Opacity {fill_opacity} is appropriate for overlay backgrounds. "
+            "Remember to use ppt_set_z_order.py --action send_to_back after adding."
+        )
+    elif 0.3 < fill_opacity < 0.7:
+        recommendations.append(
+            f"Opacity {fill_opacity} creates a semi-transparent effect. "
+            "Content behind may still be partially visible."
+        )
+    
+    return warnings, recommendations
+
+
+def validate_shape_params(
+    position: Dict[str, Any],
+    size: Dict[str, Any],
+    fill_color: Optional[str] = None,
+    fill_opacity: float = 1.0,
+    line_color: Optional[str] = None,
+    line_opacity: float = 1.0,
+    text: Optional[str] = None,
+    allow_offslide: bool = False,
+    is_overlay: bool = False
+) -> Dict[str, Any]:
+    """
+    Validate shape parameters and return warnings/recommendations.
+    
+    Args:
+        position: Position specification
+        size: Size specification
+        fill_color: Fill color hex
+        fill_opacity: Fill opacity (0.0-1.0)
+        line_color: Line color hex
+        line_opacity: Line opacity (0.0-1.0)
+        text: Text to add inside shape
+        allow_offslide: Allow off-slide positioning
+        is_overlay: Whether this is an overlay shape
+        
+    Returns:
+        Dict with warnings, recommendations, and validation results
+    """
+    warnings: List[str] = []
+    recommendations: List[str] = []
+    validation_results: Dict[str, Any] = {}
+    
+    # Opacity validation
+    opacity_warnings, opacity_recommendations = validate_opacity(
+        fill_opacity, line_opacity
+    )
+    warnings.extend(opacity_warnings)
+    recommendations.extend(opacity_recommendations)
+    
+    # Record opacity in validation results
+    validation_results["fill_opacity"] = fill_opacity
+    validation_results["line_opacity"] = line_opacity
+    validation_results["effective_fill_transparency"] = round(1.0 - fill_opacity, 2)
+    
+    # Position validation
+    if position:
+        _validate_position(position, warnings, allow_offslide)
+    
+    # Size validation
+    if size:
+        _validate_size(size, warnings)
+    
+    # Color contrast validation (accounting for opacity)
+    if fill_color:
+        _validate_color_contrast_with_opacity(
+            fill_color, fill_opacity, line_color, text,
+            warnings, recommendations, validation_results
+        )
+    
+    # Text validation
+    if text:
+        _validate_text(text, warnings, recommendations)
+        
+        # Warn about text on transparent shapes
+        if fill_opacity < 0.5:
+            warnings.append(
+                f"Shape has text but fill opacity is only {fill_opacity}. "
+                "Text may be hard to read against varied backgrounds."
+            )
+    
+    # Overlay-specific validation
+    if is_overlay:
+        _validate_overlay(
+            position, size, fill_opacity, 
+            warnings, recommendations, validation_results
+        )
+    
+    return {
+        "warnings": warnings,
+        "recommendations": recommendations,
+        "validation_results": validation_results,
+        "has_warnings": len(warnings) > 0
+    }
+
+
+def _validate_position(
+    position: Dict[str, Any],
+    warnings: List[str],
+    allow_offslide: bool
+) -> None:
+    """Validate position values."""
+    try:
+        for key in ["left", "top"]:
+            if key in position:
+                value_str = str(position[key])
+                if value_str.endswith('%'):
+                    pct = float(value_str.rstrip('%'))
+                    if not allow_offslide and (pct < 0 or pct > 100):
+                        warnings.append(
+                            f"Position '{key}' is {pct}% which is outside slide bounds (0-100%). "
+                            f"Shape may not be visible. Use --allow-offslide if intentional."
+                        )
+    except (ValueError, TypeError):
+        pass
+
+
+def _validate_size(size: Dict[str, Any], warnings: List[str]) -> None:
+    """Validate size values."""
+    try:
+        for key in ["width", "height"]:
+            if key in size:
+                value_str = str(size[key])
+                if value_str.endswith('%'):
+                    pct = float(value_str.rstrip('%'))
+                    if pct <= 0:
+                        warnings.append(
+                            f"Size '{key}' is {pct}% which is invalid (must be > 0%)."
+                        )
+                    elif pct < 1:
+                        warnings.append(
+                            f"Size '{key}' is {pct}% which is extremely small (<1%). "
+                            f"Shape may be invisible."
+                        )
+                    elif pct > 100:
+                        warnings.append(
+                            f"Size '{key}' is {pct}% which exceeds slide dimensions."
+                        )
+    except (ValueError, TypeError):
+        pass
+
+
+def _validate_color_contrast_with_opacity(
+    fill_color: str,
+    fill_opacity: float,
+    line_color: Optional[str],
+    text: Optional[str],
+    warnings: List[str],
+    recommendations: List[str],
+    validation_results: Dict[str, Any]
+) -> None:
+    """
+    Validate color contrast for visibility and accessibility,
+    accounting for transparency effects.
+    """
+    try:
+        from pptx.dml.color import RGBColor
+        
+        # Parse fill color
+        shape_rgb = ColorHelper.from_hex(fill_color)
+        
+        # Record base color info
+        validation_results["fill_color_hex"] = fill_color
+        validation_results["fill_color_rgb"] = {
+            "r": shape_rgb.red,
+            "g": shape_rgb.green,
+            "b": shape_rgb.blue
+        }
+        
+        # Calculate effective color when blended with white background
+        # (common slide background)
+        if fill_opacity < 1.0:
+            # Alpha blending: result = alpha * foreground + (1-alpha) * background
+            effective_r = int(fill_opacity * shape_rgb.red + (1 - fill_opacity) * 255)
+            effective_g = int(fill_opacity * shape_rgb.green + (1 - fill_opacity) * 255)
+            effective_b = int(fill_opacity * shape_rgb.blue + (1 - fill_opacity) * 255)
+            effective_rgb = RGBColor(effective_r, effective_g, effective_b)
+            
+            validation_results["effective_color_on_white"] = {
+                "r": effective_r,
+                "g": effective_g,
+                "b": effective_b,
+                "hex": f"#{effective_r:02X}{effective_g:02X}{effective_b:02X}"
+            }
+        else:
+            effective_rgb = shape_rgb
+        
+        # Check contrast against white background
+        white_bg = RGBColor(255, 255, 255)
+        bg_contrast = ColorHelper.contrast_ratio(effective_rgb, white_bg)
+        validation_results["effective_contrast_vs_white"] = round(bg_contrast, 2)
+        
+        # For semi-transparent shapes, contrast is inherently lower
+        if fill_opacity < 1.0 and bg_contrast < 1.5:
+            # This is expected for subtle overlays
+            if fill_opacity <= 0.3:
+                recommendations.append(
+                    f"Overlay has low contrast ({bg_contrast:.2f}:1) against white, "
+                    f"which is expected for opacity {fill_opacity}. "
+                    "This creates a subtle tinting effect."
+                )
+            else:
+                warnings.append(
+                    f"Shape with opacity {fill_opacity} has low effective contrast "
+                    f"({bg_contrast:.2f}:1) against white backgrounds."
+                )
+        
+        # Check contrast against black background
+        black_bg = RGBColor(0, 0, 0)
+        
+        # Calculate effective color on black background
+        if fill_opacity < 1.0:
+            effective_r_black = int(fill_opacity * shape_rgb.red)
+            effective_g_black = int(fill_opacity * shape_rgb.green)
+            effective_b_black = int(fill_opacity * shape_rgb.blue)
+            effective_rgb_black = RGBColor(
+                effective_r_black, effective_g_black, effective_b_black
+            )
+            validation_results["effective_color_on_black"] = {
+                "r": effective_r_black,
+                "g": effective_g_black,
+                "b": effective_b_black,
+                "hex": f"#{effective_r_black:02X}{effective_g_black:02X}{effective_b_black:02X}"
+            }
+        else:
+            effective_rgb_black = shape_rgb
+        
+        dark_contrast = ColorHelper.contrast_ratio(effective_rgb_black, black_bg)
+        validation_results["effective_contrast_vs_black"] = round(dark_contrast, 2)
+        
+        # If shape has text, check text readability
+        if text and fill_opacity >= 0.5:
+            # Only check text contrast if shape is reasonably opaque
+            text_rgb_white = RGBColor(255, 255, 255)
+            text_contrast = ColorHelper.contrast_ratio(text_rgb_white, effective_rgb)
+            validation_results["text_contrast_white"] = round(text_contrast, 2)
+            
+            text_rgb_black = RGBColor(0, 0, 0)
+            text_contrast_black = ColorHelper.contrast_ratio(text_rgb_black, effective_rgb)
+            validation_results["text_contrast_black"] = round(text_contrast_black, 2)
+            
+            if text_contrast < 4.5 and text_contrast_black >= 4.5:
+                recommendations.append(
+                    f"Consider using dark text on this fill for better readability "
+                    f"(black text contrast: {text_contrast_black:.2f}:1)."
+                )
+            elif text_contrast_black < 4.5 and text_contrast >= 4.5:
+                recommendations.append(
+                    f"White text provides good contrast on this fill "
+                    f"({text_contrast:.2f}:1 meets WCAG AA)."
+                )
+            elif text_contrast < 4.5 and text_contrast_black < 4.5:
+                warnings.append(
+                    f"Neither white nor black text has sufficient contrast on this "
+                    f"semi-transparent fill. Text may be hard to read."
+                )
+        
+        # Line color validation
+        if line_color:
+            line_rgb = ColorHelper.from_hex(line_color)
+            line_fill_contrast = ColorHelper.contrast_ratio(line_rgb, effective_rgb)
+            validation_results["line_fill_contrast"] = round(line_fill_contrast, 2)
+            
+            if line_fill_contrast < 1.5:
+                warnings.append(
+                    f"Line color {line_color} has low contrast ({line_fill_contrast:.2f}:1) "
+                    f"against the effective fill color. Border may not be visible."
+                )
+    
+    except Exception as e:
+        validation_results["color_validation_error"] = str(e)
+
+
+def _validate_text(
+    text: str,
+    warnings: List[str],
+    recommendations: List[str]
+) -> None:
+    """Validate text content."""
+    if len(text) > 500:
+        warnings.append(
+            f"Text content is very long ({len(text)} characters). "
+            f"Consider using a text box instead."
+        )
+    
+    if '\n' in text and text.count('\n') > 5:
+        recommendations.append(
+            "Text has multiple lines. Consider using bullet points or a text box "
+            "for better formatting control."
+        )
+
+
+def _validate_overlay(
+    position: Dict[str, Any],
+    size: Dict[str, Any],
+    fill_opacity: float,
+    warnings: List[str],
+    recommendations: List[str],
+    validation_results: Dict[str, Any]
+) -> None:
+    """Validate overlay-specific requirements."""
+    validation_results["is_overlay"] = True
+    
+    # Check if full-slide
+    is_full_slide = False
+    try:
+        left = str(position.get("left", ""))
+        top = str(position.get("top", ""))
+        width = str(size.get("width", ""))
+        height = str(size.get("height", ""))
+        
+        if (left in ["0%", "0"] and top in ["0%", "0"] and 
+            width in ["100%", "100"] and height in ["100%", "100"]):
+            is_full_slide = True
+            validation_results["is_full_slide_overlay"] = True
+    except (ValueError, TypeError):
+        pass
+    
+    # Warn if not full-slide overlay
+    if not is_full_slide:
+        recommendations.append(
+            "Overlay mode is set but shape is not full-slide. "
+            "Consider using position={'left':'0%','top':'0%'} and "
+            "size={'width':'100%','height':'100%'} for full coverage."
+        )
+    
+    # Opacity check for overlay
+    if fill_opacity > 0.3:
+        warnings.append(
+            f"Overlay opacity {fill_opacity} is relatively high (>30%). "
+            "Content behind may be significantly obscured. "
+            "System prompt recommends 0.15 for subtle overlays."
+        )
+    elif fill_opacity < 0.05:
+        warnings.append(
+            f"Overlay opacity {fill_opacity} is very low (<5%). "
+            "The overlay effect may be imperceptible."
+        )
+    
+    # Always remind about z-order
+    recommendations.append(
+        "IMPORTANT: After adding this overlay, run:\n"
+        "  ppt_set_z_order.py --file FILE --slide N --shape INDEX --action send_to_back\n"
+        "This ensures the overlay appears behind content, not on top of it."
+    )
 
 
 def validate_opacity(
