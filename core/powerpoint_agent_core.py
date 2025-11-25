@@ -66,6 +66,11 @@ from typing import Any, Dict, List, Optional, Union, Tuple
 from enum import Enum
 from datetime import datetime
 from io import BytesIO
+from lxml import etree
+from pptx.oxml.ns import qn
+
+# qn() creates qualified names for XML namespace handling
+# Example: qn('a:solidFill') -> '{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill'
 
 # ============================================================================
 # THIRD-PARTY IMPORTS WITH GRACEFUL DEGRADATION
