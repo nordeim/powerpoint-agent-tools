@@ -191,28 +191,68 @@ You do not need to check `powerpoint_agent_core.py`. Use this reference for avai
 ### **Content Creation**
 | Method | Args | Notes |
 | :--- | :--- | :--- |
-| `add_text_box()` | `slide_index, text, position, size, font_name, font_size, bold, italic, color, alignment` | See Data Structures |
-| `add_bullet_list()` | `slide_index, items: List[str], position, size, bullet_style` | Styles: `bullet`, `numbered` |
-| `set_title()` | `slide_index, title: str, subtitle: str` | Uses layout placeholders |
-| `insert_image()` | `slide_index, image_path, position, size, compress: bool` | Handles `auto` size |
-| `add_shape()` | `slide_index, shape_type, position, size, fill_color, line_color` | Types: `rectangle`, `arrow`, etc. |
-| `add_chart()` | `slide_index, chart_type, data: Dict, position, size` | Data: `{"categories":[], "series":[]}` |
-| `add_table()` | `slide_index, rows, cols, position, size, data: List[List]` | Data is 2D array |
+| `add_text_box()` | `slide_index, text, position, size, font_name=None, font_size=18, bold=False, italic=False, color=None, alignment="left"` | See Data Structures |
+| `add_bullet_list()` | `slide_index, items: List[str], position, size, bullet_style="bullet", font_size=18, font_name=None` | Styles: `bullet`, `numbered`, `none` |
+| `set_title()` | `slide_index, title: str, subtitle: str=None` | Uses layout placeholders |
+| `insert_image()` | `slide_index, image_path, position, size=None, alt_text=None, compress=False` | Handles `auto` size. alt_text for accessibility |
+| `add_shape()` | `slide_index, shape_type, position, size, fill_color=None, fill_opacity=1.0, line_color=None, line_opacity=1.0, line_width=1.0, text=None` | Types: `rectangle`, `arrow`, etc. Opacity range: 0.0-1.0 |
+| `replace_image()` | `slide_index, old_image_name: str, new_image_path, compress=False` | Replace by name or partial match |
+| `add_chart()` | `slide_index, chart_type, data: Dict, position, size, title=None` | Data: `{"categories":[], "series":[]}` |
+| `add_table()` | `slide_index, rows, cols, position, size, data: List[List]=None, header_row=True` | Data is 2D array. header_row for styling hint |
 
 ### **Formatting & Editing**
-| Method | Args |
-| :--- | :--- |
-| `format_text()` | `slide_index, shape_index, font_name, font_size, bold, color` |
-| `format_shape()` | `slide_index, shape_index, fill_color, line_color, line_width` |
-| `replace_text()` | `find: str, replace: str, match_case: bool` |
-| `replace_image()` | `slide_index, old_image_name, new_image_path` |
-| `set_image_properties()` | `slide_index, shape_index, alt_text, transparency` |
+| Method | Args | Notes |
+| :--- | :--- | :--- |
+| `format_text()` | `slide_index, shape_index, font_name=None, font_size=None, bold=None, italic=None, color=None` | Update text formatting |
+| `format_shape()` | `slide_index, shape_index, fill_color=None, fill_opacity=None, line_color=None, line_opacity=None, line_width=None` | Opacity range: 0.0-1.0. (transparency parameter deprecated - use fill_opacity) |
+| `replace_text()` | `find: str, replace: str, match_case: bool=False` | Global text replacement |
+| `remove_shape()` | `slide_index, shape_index` | Remove shape from slide |
+| `set_z_order()` | `slide_index, shape_index, action` | Actions: `bring_to_front`, `send_to_back`, `bring_forward`, `send_backward` |
+| `add_connector()` | `slide_index, connector_type, start_shape_index, end_shape_index` | Types: `straight`, `elbow`, `curve` |
+| `crop_image()` | `slide_index, shape_index, crop_box: Dict` | crop_box: `{"left": %, "top": %, "right": %, "bottom": %}` |
+| `set_image_properties()` | `slide_index, shape_index, alt_text=None, transparency=None` | Set accessibility and transparency |
 
 ### **Validation**
 | Method | Returns |
 | :--- | :--- |
 | `check_accessibility()` | `Dict` (WCAG issues) |
 | `validate_presentation()` | `Dict` (Empty slides, missing assets) |
+
+### **Chart & Presentation Operations**
+| Method | Args | Notes |
+| :--- | :--- | :--- |
+| `update_chart_data()` | `slide_index, chart_index, data: Dict` | Update existing chart data |
+| `format_chart()` | `slide_index, chart_index, title=None, legend_position=None` | Modify chart appearance |
+| `add_notes()` | `slide_index, text, mode="append"` | Modes: `append`, `prepend`, `overwrite` |
+| `extract_notes()` | *None* | Returns `Dict[int, str]` of all notes by slide |
+| `set_footer()` | `slide_index, text=None, show_page_number=False, show_date=False` | Configure slide footer |
+| `set_background()` | `slide_index=None, color=None, image_path=None` | Set slide or presentation background |
+
+### **Opacity & Transparency**
+
+The toolkit supports semi-transparent shapes and fills for enhanced visual effects (v3.0+):
+
+**Opacity Parameters:**
+- `fill_opacity`: Float from 0.0 (invisible) to 1.0 (opaque). Default: 1.0
+- `line_opacity`: Float from 0.0 (invisible) to 1.0 (opaque). Default: 1.0
+- `transparency`: **DEPRECATED** - Use `fill_opacity` instead. Inverse relationship: `opacity = 1.0 - transparency`
+
+**Common Use Case - Text Readability Overlay:**
+```python
+# Add semi-transparent white overlay (15% opaque) to improve text readability
+agent.add_shape(
+    slide_index=0,
+    shape_type="rectangle",
+    position={"left": "0%", "top": "0%"},
+    size={"width": "100%", "height": "100%"},
+    fill_color="#FFFFFF",
+    fill_opacity=0.15  # Subtle, non-competing overlay
+)
+```
+
+**Methods Supporting Opacity:**
+- `add_shape()` - `fill_opacity` and `line_opacity` parameters
+- `format_shape()` - `fill_opacity` and `line_opacity` parameters
 
 ---
 
