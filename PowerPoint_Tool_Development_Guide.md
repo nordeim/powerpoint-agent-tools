@@ -591,27 +591,185 @@ Tools are designed to work within a structured 5-phase workflow. Each tool shoul
 | **DELIVER** | Production handoff and documentation | `ppt_export_pdf.py`, `ppt_extract_notes.py`, `ppt_generate_manifest.py` | Complete audit trails, rollback commands, delivery packages |
 
 ### 8.1 Probe Resilience Pattern (NEW SUBSECTION)
-**CRITICAL**: Discovery tools must be resilient to large files and timeouts.
+**CRITICAL**: Discovery tools must be resilient to large files and timeouts. Implement the Timeout + Transient Slides + Graceful Degradation pattern.
 
-**Pattern: Timeout + Transient Slides**
+**Core Pattern: Timeout + Transient Slides + Warnings**
+
+The resilience pattern has 3 mandatory layers:
+
+**Layer 1: Timeout Detection (Interval Checks)**
 ```python
+import time
+
 def detect_layouts(prs, timeout_seconds=15):
+    """Detect layouts with timeout protection."""
     start_time = time.perf_counter()
+    results = []
     
-    for layout in prs.slide_layouts:
-        # 1. Check timeout
-        if (time.perf_counter() - start_time) > timeout_seconds:
-            warnings.append("Probe timeout exceeded - returning partial results")
-            break
-            
-        # 2. Use transient slide for accurate positions
-        try:
-            slide = prs.slides.add_slide(layout)
-            # ... analyze slide ...
-        finally:
-            # 3. Always clean up
-            # remove slide logic
+    for idx, layout in enumerate(prs.slide_layouts):
+        # Check timeout at EACH iteration (critical for large templates)
+        elapsed = time.perf_counter() - start_time
+        if elapsed > timeout_seconds:
+            warnings.append(
+                f"Probe timeout at layout {idx} ({elapsed:.2f}s > {timeout_seconds}s) - "
+                "returning partial results"
+            )
+            break  # Stop gracefully, return partial results
+        
+        results.append(process_layout(layout))
+    
+    return results
 ```
+**Real implementation**: `ppt_capability_probe.py` lines 369-375 uses this pattern to stop deep analysis mid-probe when timeout expires.
+
+**Layer 2: Transient Slides (Accurate Analysis)**
+```python
+def _add_transient_slide(prs, layout):
+    """
+    Safely add and remove a transient slide for deep analysis.
+    Uses generator pattern to guarantee cleanup via finally block.
+    
+    Real implementation: ppt_capability_probe.py lines 294-313
+    """
+    slide = None
+    added_index = -1
+    try:
+        # Add slide for analysis
+        slide = prs.slides.add_slide(layout)
+        added_index = len(prs.slides) - 1
+        yield slide  # Caller analyzes the instantiated slide
+        
+    finally:
+        # ALWAYS cleanup, even if analysis fails
+        if added_index != -1 and added_index < len(prs.slides):
+            try:
+                rId = prs.slides._sldIdLst[added_index].rId
+                prs.part.drop_rel(rId)
+                del prs.slides._sldIdLst[added_index]
+            except Exception:
+                # Suppress cleanup errors to avoid masking analysis failures
+                # File is not saved, so transient slide disappears anyway
+                pass
+
+
+# Usage pattern
+for layout in prs.slide_layouts:
+    with _add_transient_slide(prs, layout) as slide:
+        # Get accurate placeholder positions from instantiated slide
+        positions = extract_placeholder_positions(slide)
+        # Slide automatically removed when exiting context
+```
+**Why transient slides?** Template positions are theoretical until instantiated. Transient slides let you get REAL positions without mutating the file (no `save()` call = no file change = atomic read).
+
+**Layer 3: Partial Results + Warnings (Graceful Degradation)**
+```python
+def probe_presentation(filepath: Path, timeout_seconds: int = 15):
+    """Probe with graceful degradation."""
+    warnings = []
+    info = []
+    
+    # For large files, limit scope
+    all_layouts = list(prs.slide_layouts)
+    max_layouts = 50  # Cap to prevent runaway analysis
+    layouts_to_analyze = all_layouts[:max_layouts]
+    
+    if len(all_layouts) > max_layouts:
+        info.append(f"Limited analysis to first {max_layouts} of {len(all_layouts)} layouts")
+    
+    # Perform analysis with timeout
+    results = []
+    start_time = time.perf_counter()
+    for idx, layout in enumerate(layouts_to_analyze):
+        if (time.perf_counter() - start_time) > timeout_seconds:
+            warnings.append(f"Probe timeout - analyzed {idx} of {max_layouts} layouts")
+            break  # Stop, return what we have
+        results.append(analyze_layout(layout))
+    
+    # Always return partial results + metadata
+    return {
+        "status": "success",
+        "layouts_analyzed": len(results),
+        "layouts_total": len(all_layouts),
+        "partial_results": True if len(results) < len(layouts_to_analyze) else False,
+        "analysis_complete": len(results) == len(layouts_to_analyze),
+        "layouts": results,
+        "warnings": warnings,
+        "info": info
+    }
+```
+**Real implementation**: `ppt_capability_probe.py` lines 862-880 returns `analysis_complete` flag, list of partial results, and warnings.
+
+**Complete Example: Safe Discovery Tool Template**
+```python
+def probe_with_resilience(filepath: Path, deep: bool = False, timeout_seconds: int = 15):
+    """
+    Complete resilience pattern for discovery tools.
+    
+    Combines:
+    1. Pre-flight checks (file exists, not locked)
+    2. Timeout protection
+    3. Transient analysis (for deep mode)
+    4. Graceful degradation
+    5. Atomic verification
+    6. Comprehensive error handling
+    """
+    
+    # Pre-flight: Check file exists and is accessible
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    try:
+        with open(filepath, 'rb') as f:
+            f.read(1)  # Try to read 1 byte - fails if locked
+    except PermissionError:
+        raise PermissionError(f"File is locked or inaccessible: {filepath}")
+    
+    # Atomic verification: Before state
+    checksum_before = calculate_file_checksum(filepath)
+    start_time = time.perf_counter()
+    operation_id = str(uuid.uuid4())
+    warnings = []
+    
+    prs = Presentation(str(filepath))
+    results = []
+    
+    # Main analysis loop with timeout
+    for idx, layout in enumerate(prs.slide_layouts):
+        # Timeout check
+        if (time.perf_counter() - start_time) > timeout_seconds:
+            warnings.append(f"Probe timeout - analyzed {idx} layouts")
+            break
+        
+        if deep:
+            # Deep mode: Use transient slide for accurate analysis
+            with _add_transient_slide(prs, layout) as slide:
+                layout_data = analyze_layout_deep(slide)
+        else:
+            # Fast mode: Use template positions (less accurate)
+            layout_data = analyze_layout_fast(layout)
+        
+        results.append(layout_data)
+    
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    
+    # Atomic verification: After state
+    checksum_after = calculate_file_checksum(filepath)
+    atomic_safe = checksum_before == checksum_after
+    
+    return {
+        "status": "success",
+        "operation_id": operation_id,
+        "duration_ms": int(duration_ms),
+        "analysis_complete": len(results) == len(prs.slide_layouts),
+        "layouts_analyzed": len(results),
+        "layouts_total": len(prs.slide_layouts),
+        "deep_analysis": deep,
+        "atomic_verified": atomic_safe,
+        "layouts": results,
+        "warnings": warnings
+    }
+```
+**Real implementation**: `ppt_capability_probe.py` lines 823-880 (full `probe_presentation()` function) demonstrates all 6 elements.
 
 ### Tool Classification Guidelines
 When creating a new tool, classify it by phase:
