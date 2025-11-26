@@ -922,3 +922,78 @@ The enhanced guide now provides developers with everything needed to create prod
 
 https://chat.qwen.ai/s/9a0b6ee3-c7a3-47be-9252-14099b378d61?fev=0.1.4 
 
+---
+
+# Implementation Plan - Enhance Tool Development Guide
+
+## Goal Description
+Merge comprehensive updates from `suggested_improvement_tool_dev_guide.md` into `PowerPoint_Tool_Development_Guide.md` to align with v3.1.0 governance, opacity features, and workflow standards.
+
+## User Review Required
+> [!NOTE]
+> This update introduces new governance standards (Approval Tokens, Versioning) that are defined in the System Prompt but may not yet be implemented in all existing tools. This guide serves as the standard for future development and refactoring.
+
+## Proposed Changes
+
+### Documentation
+#### [MODIFY] [PowerPoint_Tool_Development_Guide.md](file:///home/project/powerpoint-agent-tools/PowerPoint_Tool_Development_Guide.md)
+
+**Merge Strategy**: Insert new sections and update existing ones to match the structure of the suggested improvement file.
+
+1.  **Governance Principles**:
+    - **Action**: Insert new section "2. Governance Principles" after "1. The Design Contract".
+    - **Content**: Clone-Before-Edit, Versioning, Approval Tokens, Shape Index Management.
+
+2.  **The Master Template**:
+    - **Action**: Update "2. The Master Template" (renumber to 3).
+    - **Content**: Replace code block with the enhanced template including versioning and error handling.
+
+3.  **Core API Cheatsheet**:
+    - **Action**: Update "4. Core API Cheatsheet" (renumber to 5).
+    - **Content**:
+        - Update `add_shape` and `format_shape` notes with opacity details.
+        - Add `add_notes` (v3.1.0+).
+        - Update `delete_slide` and `remove_shape` with approval token warnings.
+
+4.  **New Sections**:
+    - **Action**: Append the following new sections after the API Cheatsheet:
+        - "6. Error Handling Standards"
+        - "7. Opacity & Transparency (v3.1.0+)"
+        - "8. Workflow Context"
+        - "10. Testing Requirements"
+        - "11. Contribution Workflow"
+
+5.  **Implementation Checklist**:
+    - **Action**: Update "5. Implementation Checklist" (renumber to 9).
+    - **Content**: Replace with the expanded checklist covering governance and technical requirements.
+
+## Checklist of Sections to Merge
+- [ ] 2. Governance Principles
+- [ ] 3. The Master Template (Updated)
+- [ ] 5. Core API Cheatsheet (Updated)
+- [ ] 6. Error Handling Standards
+- [ ] 7. Opacity & Transparency
+- [ ] 8. Workflow Context
+- [ ] 9. Implementation Checklist (Updated)
+- [ ] 10. Testing Requirements
+- [ ] 11. Contribution Workflow
+
+## Verification Plan
+
+### Manual Verification
+- Review the generated `PowerPoint_Tool_Development_Guide.md` to ensure:
+    - All new sections are present and correctly formatted.
+    - The document flow is logical.
+    - No existing critical information was lost.
+    - Code examples are valid.
+
+---
+
+# Task: Enhance Tool Development Guide
+
+- [x] Analyze `suggested_improvement_tool_dev_guide.md` <!-- id: 0 -->
+- [x] Validate suggestions against codebase <!-- id: 1 -->
+- [x] Create Implementation Plan <!-- id: 2 -->
+- [x] Merge changes into `PowerPoint_Tool_Development_Guide.md` <!-- id: 3 -->
+- [x] Verify merged document <!-- id: 4 -->
+
