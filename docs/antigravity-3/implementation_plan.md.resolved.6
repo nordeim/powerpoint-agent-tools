@@ -1,0 +1,51 @@
+# Implementation Plan - Refine Tool Development Guide
+
+## Goal Description
+Refine [PowerPoint_Tool_Development_Guide.md](file:///home/project/powerpoint-agent-tools/PowerPoint_Tool_Development_Guide.md) based on review comments to ensure perfect alignment with the codebase and v3.1.0 standards.
+
+## User Review Required
+> [!IMPORTANT]
+> **PathValidator Rejection**: The review comment suggested adding [PathValidator](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#494-612), but this class does not exist in the codebase. I will instead recommend standard `pathlib.Path` usage for platform safety.
+> **Exit Code Alignment**: I will update the Master Template to use Exit Codes 0/1 as the default to match the codebase, while keeping the 0-5 matrix as an advanced standard.
+
+## Proposed Changes
+
+### Documentation
+#### [MODIFY] [PowerPoint_Tool_Development_Guide.md](file:///home/project/powerpoint-agent-tools/PowerPoint_Tool_Development_Guide.md)
+
+1.  **Master Template Updates**:
+    - **Action**: Update the template code block.
+    - **Change**: Revert default exit codes to 0/1 (Success/Error) to match codebase reality. Add comment about advanced codes.
+    - **Change**: Add [validate_against_schema](file:///home/project/powerpoint-agent-tools/core/strict_validator.py#458-493) import and usage example.
+
+2.  **Governance Principles**:
+    - **Action**: Update "2.3 Approval Token System".
+    - **Change**: Clarify that this is a *requirement for new destructive tools* and mandated by System Prompt v3.0.
+
+3.  **Shape Index Nuances**:
+    - **Action**: Enhance "2.4 Shape Index Management".
+    - **Change**: Explicitly list operations that invalidate indices ([add_shape](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#2368-2526), [remove_shape](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#2675-2708), [delete_slide](file:///home/project/powerpoint-agent-tools/tools/ppt_delete_slide.py#23-47), [set_z_order](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#2709-2796)) and require refresh.
+
+4.  **Probe Resilience**:
+    - **Action**: Add "8.1 Probe Resilience Pattern" under Workflow Context.
+    - **Change**: Document the timeout and transient slide pattern used in [ppt_capability_probe.py](file:///home/project/powerpoint-agent-tools/tools/ppt_capability_probe.py).
+
+5.  **Platform Safety**:
+    - **Action**: Add "6.1 Platform-Independent Paths" under Error Handling.
+    - **Change**: Recommend `pathlib.Path` over string manipulation.
+
+## Checklist of Sections to Merge
+- [ ] 2.3 Approval Token System (Clarification)
+- [ ] 2.4 Shape Index Management (Enhanced)
+- [ ] 3. The Master Template (Exit Codes 0/1, Schema Validation)
+- [ ] 6.1 Platform-Independent Paths (New)
+- [ ] 8.1 Probe Resilience Pattern (New)
+
+## Verification Plan
+
+### Manual Verification
+- Review the updated guide to ensure:
+    - Exit codes in template match 0/1.
+    - No references to non-existent [PathValidator](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#494-612).
+    - [validate_against_schema](file:///home/project/powerpoint-agent-tools/core/strict_validator.py#458-493) example is correct.
+    - Probe resilience pattern matches [ppt_capability_probe.py](file:///home/project/powerpoint-agent-tools/tools/ppt_capability_probe.py).

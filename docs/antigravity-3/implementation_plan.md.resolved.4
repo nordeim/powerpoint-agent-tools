@@ -1,0 +1,23 @@
+# Implementation Plan - Update Tool Development Guide
+
+## Goal Description
+Update [PowerPoint_Tool_Development_Guide.md](file:///home/project/powerpoint-agent-tools/PowerPoint_Tool_Development_Guide.md) to align with the actual codebase by removing incorrect references to [transparency](file:///home/project/powerpoint-agent-tools/tests/test_shape_opacity.py#338-359) support in [set_image_properties](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#3073-3117).
+
+## User Review Required
+> [!NOTE]
+> This update corrects a discrepancy where the guide claimed [set_image_properties](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#3073-3117) supported transparency, but the core library does not.
+
+## Proposed Changes
+
+### Documentation
+#### [MODIFY] [PowerPoint_Tool_Development_Guide.md](file:///home/project/powerpoint-agent-tools/PowerPoint_Tool_Development_Guide.md)
+
+1.  **API Cheatsheet - Formatting & Editing**:
+    - **Location**: Line 213.
+    - **Change**: Remove `transparency=None` from arguments and "transparency" from notes for [set_image_properties](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#3073-3117).
+    - **Reason**: [core/powerpoint_agent_core.py](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py) does not support this parameter for images.
+
+## Verification Plan
+
+### Manual Verification
+- Review the updated guide to ensure [set_image_properties](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#3073-3117) signature matches the core library.

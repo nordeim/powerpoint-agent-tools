@@ -1,0 +1,18 @@
+# Implementation Plan - Final Verification
+
+## Goal Description
+Verify the core library fix for opacity/transparency by running the smoke test, checking CLI help output, and executing the end-to-end overlay example as specified in [review-2.md](file:///home/project/powerpoint-agent-tools/review-2.md).
+
+## User Review Required
+> [!NOTE]
+> This plan focuses on verification steps outlined in [review-2.md](file:///home/project/powerpoint-agent-tools/review-2.md). No code changes are intended.
+
+## Verification Plan
+
+### Automated Tests
+- **Smoke Test**: Run the Python snippet from [review-2.md](file:///home/project/powerpoint-agent-tools/review-2.md) to verify [add_shape](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#2368-2526), [format_shape](file:///home/project/powerpoint-agent-tools/core/powerpoint_agent_core.py#2527-2674), and backward compatibility.
+- **CLI Verification**: Run `uv run tools/ppt_add_shape.py --help` and grep for opacity/overlay arguments.
+- **End-to-End Example**: Run the overlay example code snippet.
+
+### Manual Verification
+- Review output of all commands to ensure they match expected results.
