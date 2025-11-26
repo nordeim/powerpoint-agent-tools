@@ -19383,7 +19383,7 @@ pytest tests/ -v
 
 **"Enabling AI agents to engineer presentations with precision, safety, and visual intelligence"**
 
-PowerPoint Agent Tools is a suite of **37+ stateless CLI utilities** designed for AI agents to programmatically create, modify, and validate PowerPoint (`.pptx`) files.
+PowerPoint Agent Tools is a suite of **39 stateless CLI utilities** designed for AI agents to programmatically create, modify, and validate PowerPoint (`.pptx`) files.
 
 ### Key Features
 
@@ -19488,6 +19488,7 @@ powerpoint-agent-tools/
 | **PowerPointAgent** | `core/powerpoint_agent_core.py` | Context manager class; all operations |
 | **CLI Tools** | `tools/ppt_*.py` | Thin wrappers; argparse + JSON output |
 | **Strict Validator** | `core/strict_validator.py` | JSON Schema validation with caching |
+| **PathValidator** | `core/powerpoint_agent_core.py` | Security-hardened path validation |
 | **Position/Size** | `core/powerpoint_agent_core.py` | Resolve %, inches, anchor, grid |
 | **ColorHelper** | `core/powerpoint_agent_core.py` | Hex parsing, contrast calculation |
 
@@ -20369,7 +20370,7 @@ uv pip install -r requirements-dev.txt
 
 ## 9. 📖 Quick Reference
 
-### Tool Catalog (37 Tools)
+### Tool Catalog (39 Tools)
 
 | Domain | Tools |
 |--------|-------|
@@ -20395,9 +20396,13 @@ uv pip install -r requirements-dev.txt
 ### Key Constants
 
 ```python
-# Slide dimensions
-SLIDE_WIDTH_INCHES = 10.0
+# Slide dimensions (16:9 widescreen - default)
+SLIDE_WIDTH_INCHES = 13.333
 SLIDE_HEIGHT_INCHES = 7.5
+
+# Alternative dimensions (4:3 standard)
+SLIDE_WIDTH_4_3_INCHES = 10.0
+SLIDE_HEIGHT_4_3_INCHES = 7.5
 
 # Content density (6×6 rule)
 MAX_BULLETS_PER_SLIDE = 6
@@ -20543,9 +20548,9 @@ Your mission: Engineer presentations that communicate with clarity, persuade wit
 
 ```
 
-# AGENT_SYSTEM_PROMPT_enhanced.md
+# AGENT_SYSTEM_PROMPT.md
 ```md
-# 🎯 AI PRESENTATION ARCHITECT: SYSTEM PROMPT v3.0
+# 🎯 AI PRESENTATION ARCHITECT: SYSTEM PROMPT v3.1
 
 ## VERSION HISTORY
 | Version | Date | Changes |

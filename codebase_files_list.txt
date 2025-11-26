@@ -1,4 +1,4 @@
-$ find core/*py tools/*py schemas/*json requirements.txt CLAUDE.md AGENT_SYSTEM_PROMPT_enhanced.md -type f
+$ find core/*py tools/*py schemas/*json requirements.txt CLAUDE.md AGENT_SYSTEM_PROMPT.md -type f
 core/__init__.py
 core/powerpoint_agent_core.py
 core/strict_validator.py
@@ -47,4 +47,4 @@ schemas/ppt_capability_probe.schema.json
 schemas/ppt_get_info.schema.json
 requirements.txt
 CLAUDE.md
-AGENT_SYSTEM_PROMPT_enhanced.md
+AGENT_SYSTEM_PROMPT.md
