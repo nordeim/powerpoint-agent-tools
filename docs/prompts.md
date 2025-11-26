@@ -217,6 +217,33 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Please tell me your understanding of your role and responsibilities.
+
+Now, please meticulously review the attached document to have a deep understanding of the project.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous a
+pproach to planning and execution! Now, please meticulously review the attached `core/powerpoint_agent_core.py` and the suggested improvements.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously re-evaluate and re-validate your findings and assumptions against the original `core/powerpoint_agent_core.py` shared earlier. Then convert your validated findings into an implementation plan and  merge/integrate it with the attached implementation plan to create an updated consolidated plan. Then validate the consolidated updated plan against the original core file again.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously proceed to create a full/complete working drop-in replacement file for `core/powerpoint_agent_core.py` within ```python tags.
+
+---
+
+you did not follow the meticulous approach to meticulously review your generated code against the original version and validate it using your implementation checklist. Now, please meticulously review the "diff" output comparing your newly generated version against the original version. There seems to be significant regression which indicates the failure in complying with the meticulous approach.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review and validate the attached "diff" output `core_diff_output_3.txt` which compares your latest generated core file against the original version shared earlier, also validate the "diff" output against your implementation plan checklist. Do not generate any full code yet if there is still regression errors (e.g. omitted features and functions.) after a meticulous comparison and validation. Just create a remedial plan with integrated checklist to patch the latest generated code to fix any outstanding regression errors (if any).
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
