@@ -210,7 +210,7 @@ You do not need to check `powerpoint_agent_core.py`. Use this reference for avai
 | `set_z_order()` | `slide_index, shape_index, action` | Actions: `bring_to_front`, `send_to_back`, `bring_forward`, `send_backward` |
 | `add_connector()` | `slide_index, connector_type, start_shape_index, end_shape_index` | Types: `straight`, `elbow`, `curve` |
 | `crop_image()` | `slide_index, shape_index, crop_box: Dict` | crop_box: `{"left": %, "top": %, "right": %, "bottom": %}` |
-| `set_image_properties()` | `slide_index, shape_index, alt_text=None, transparency=None` | Set accessibility and transparency |
+| `set_image_properties()` | `slide_index, shape_index, alt_text=None` | Set accessibility |
 
 ### **Validation**
 | Method | Returns |
