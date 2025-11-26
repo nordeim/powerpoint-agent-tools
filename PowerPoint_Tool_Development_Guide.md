@@ -72,9 +72,9 @@ with PowerPointAgent(filepath) as agent:
 **Version Computation**: Hash of file path + slide count + slide IDs + modification timestamp
 
 ### 2.3 Approval Token System
-**CRITICAL OPERATIONS REQUIRE APPROVAL**. The following operations require approval tokens:
-- `ppt_delete_slide.py`
-- `ppt_remove_shape.py` 
+**CRITICAL OPERATIONS REQUIRE APPROVAL**. The following operations require approval tokens (mandated by System Prompt v3.0 for all new destructive tools):
+- `ppt_delete_slide.py` (Future requirement)
+- `ppt_remove_shape.py` (Future requirement)
 - Mass text replacements without dry-run
 - Background replacements on all slides
 - Any operation marked `critical: true` in manifest
@@ -129,8 +129,9 @@ def validate_approval_token(token: str, required_scope: str) -> bool:
 |-----------|--------|
 | `add_shape()` | Adds new index at end |
 | `remove_shape()` | Shifts subsequent indices down |
-| `set_z_order()` | Reorders indices |
+| `set_z_order()` | Reorders indices (requires immediate refresh) |
 | `delete_slide()` | Invalidates all indices on slide |
+| `add_slide()` | Invalidates slide indices |
 
 **Best Practices**:
 ```python
@@ -171,11 +172,8 @@ Usage:
 
 Exit Codes:
     0: Success
-    1: Error (check error_type in JSON for details)
-    2: Validation Error (schema/content invalid)  
-    3: Transient Error (timeout, I/O, network - retryable)
-    4: Permission Error (approval token missing/invalid)
-    5: Internal Error (unexpected failure)
+    1: Error (Standard)
+    2-5: Advanced Error Codes (Optional - see Error Handling Standards)
 """
 
 import sys
@@ -292,7 +290,7 @@ def main():
             "error_type": "SafetyViolationError",
             "suggestion": "Always clone files first using ppt_clone_presentation.py before editing"
         }, indent=2))
-        sys.exit(4)
+        sys.exit(1) # Standard error code
     
     # 5. ERROR HANDLING & OUTPUT
     try:
@@ -345,7 +343,7 @@ def main():
             "suggestion": "Obtain approval token for destructive operation"
         }
         print(json.dumps(error_result, indent=2))
-        sys.exit(4)
+        sys.exit(1) # Use 1 for standard permission error, 4 is advanced
         
     except ValidationError as e:
         error_result = {
@@ -356,28 +354,18 @@ def main():
             "suggestion": "Fix input data to match schema requirements"
         }
         print(json.dumps(error_result, indent=2))
-        sys.exit(2)
+        sys.exit(1) # Use 1 for standard validation error, 2 is advanced
         
     except Exception as e:
-        # Categorize exception for proper exit code
-        if isinstance(e, (TimeoutError, IOError, ConnectionError)):
-            exit_code = 3  # Transient error (retryable)
-        elif isinstance(e, PermissionError):
-            exit_code = 4  # Permission error
-        elif "internal" in str(e).lower() or "unexpected" in str(e).lower():
-            exit_code = 5  # Internal error
-        else:
-            exit_code = 1  # General error
-            
+        # Standard catch-all
         error_result = {
             "status": "error",
             "error": str(e),
             "error_type": type(e).__name__,
-            "retryable": exit_code == 3,
             "hint": "Check logs for detailed error information"
         }
         print(json.dumps(error_result, indent=2))
-        sys.exit(exit_code)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
@@ -498,6 +486,20 @@ You do not need to check `powerpoint_agent_core.py`. Use this reference for avai
 }
 ```
 
+### 6.1 Platform-Independent Paths (NEW SUBSECTION)
+**CRITICAL**: Always use `pathlib.Path` for file operations to ensure compatibility across Linux, macOS, and Windows.
+
+```python
+# ❌ WRONG - String manipulation is fragile
+file_path = "/tmp/" + filename
+if "\\" in file_path: ...
+
+# ✅ CORRECT - Use pathlib
+from pathlib import Path
+file_path = Path("/tmp") / filename
+if not file_path.exists(): ...
+```
+
 ### Tool-Specific Error Examples
 
 **Permission Error (Exit Code 4):**
@@ -587,6 +589,29 @@ Tools are designed to work within a structured 5-phase workflow. Each tool shoul
 | **CREATE** | Actual content creation and modification | `ppt_add_shape.py`, `ppt_add_slide.py`, `ppt_replace_text.py` | Version tracking, approval token enforcement, index freshness |
 | **VALIDATE** | Quality assurance and compliance checking | `ppt_validate_presentation.py`, `ppt_check_accessibility.py` | WCAG 2.1 compliance, structural validation, contrast checking |
 | **DELIVER** | Production handoff and documentation | `ppt_export_pdf.py`, `ppt_extract_notes.py`, `ppt_generate_manifest.py` | Complete audit trails, rollback commands, delivery packages |
+
+### 8.1 Probe Resilience Pattern (NEW SUBSECTION)
+**CRITICAL**: Discovery tools must be resilient to large files and timeouts.
+
+**Pattern: Timeout + Transient Slides**
+```python
+def detect_layouts(prs, timeout_seconds=15):
+    start_time = time.perf_counter()
+    
+    for layout in prs.slide_layouts:
+        # 1. Check timeout
+        if (time.perf_counter() - start_time) > timeout_seconds:
+            warnings.append("Probe timeout exceeded - returning partial results")
+            break
+            
+        # 2. Use transient slide for accurate positions
+        try:
+            slide = prs.slides.add_slide(layout)
+            # ... analyze slide ...
+        finally:
+            # 3. Always clean up
+            # remove slide logic
+```
 
 ### Tool Classification Guidelines
 When creating a new tool, classify it by phase:
