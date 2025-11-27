@@ -46,7 +46,6 @@ def set_footer(filepath: Path, text: str = None, show_number: bool = False) -> D
         agent.open(filepath)
         
         # Strategy 1: Placeholders
-        # Try to set footer on Master first
         try:
             for master in agent.prs.slide_masters:
                 for layout in master.slide_layouts:
@@ -56,7 +55,6 @@ def set_footer(filepath: Path, text: str = None, show_number: bool = False) -> D
         except Exception:
             pass
         
-        # Try to set on individual slides
         for slide_idx, slide in enumerate(agent.prs.slides):
             for shape in slide.placeholders:
                 if shape.placeholder_format.type == PP_PLACEHOLDER.FOOTER:
@@ -67,7 +65,7 @@ def set_footer(filepath: Path, text: str = None, show_number: bool = False) -> D
                         pass
 
         # Strategy 2: Fallback (Text Box)
-        # Trigger if NO slides were updated via placeholders, even if Master appeared to have them.
+        # Trigger if NO slides were updated via placeholders
         if len(slide_indices_updated) == 0:
             method_used = "text_box"
             for slide_idx in range(1, len(agent.prs.slides)):
@@ -120,8 +118,10 @@ def main():
     try:
         result = set_footer(args.file, args.text, args.show_number)
         sys.stdout.write(json.dumps(result, indent=2) + "\n")
+        sys.stdout.flush()
     except Exception as e:
         sys.stdout.write(json.dumps({"status": "error", "error": str(e)}))
+        sys.stdout.flush()
         sys.exit(1)
 
 if __name__ == "__main__":
