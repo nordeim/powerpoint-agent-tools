@@ -284,6 +284,12 @@ $ ./reference_powerpoint_demo_script.sh > ./reference_powerpoint_demo_script.log
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically how to re-imagine a comprehensive programming and troubleshooting guide   that correctly and accurately captures all your current deep understanding of the core file and tool file design and architecture. The comprehensive programming and troubleshooting guide will serve as a single source of truth for an AI coding agent or human developer to have the same deep understanding of the codebase design and architecture, including the quirks, pitfalls, gotchas, nuances, so that the AI coding agent or human developer will not repeat any of the coding errors and pitfalls. With this guide, the AI coding agent or human developer should be competent and confident enough to handle PRs and to create and modify a tool without error (hopefully). Create the guide as markdown document within ```markdown tags. Make sure you give enough examples and explanations to illustrate different scenarios and edge cases.
+
+Think and explore thoroughly first, then meticulously create an comprehensive implementation plan to create the guide as a markdown file. Review and validate your implementation plan before proceeding meticulously to execute it. 
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
