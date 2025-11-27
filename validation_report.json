@@ -1,9 +1,9 @@
 [
   {
-    "status": "valid",
+    "status": "warnings",
     "passed": true,
     "file": "bitcoin_market_report_nov2024_v2.pptx",
-    "validated_at": "2025-11-27T09:57:09.885096Z",
+    "validated_at": "2025-11-27T11:15:01.075064Z",
     "policy": {
       "name": "Standard",
       "thresholds": {
@@ -23,12 +23,12 @@
       "description": ""
     },
     "summary": {
-      "total_issues": 0,
+      "total_issues": 1,
       "critical_count": 0,
-      "warning_count": 0,
+      "warning_count": 1,
       "info_count": 0,
       "empty_slides": 0,
-      "slides_without_titles": 0,
+      "slides_without_titles": 1,
       "missing_alt_text": 0,
       "low_contrast": 0,
       "large_images": 0,
@@ -36,26 +36,39 @@
       "colors_detected": 0
     },
     "policy_violations": [],
-    "issues": [],
+    "issues": [
+      {
+        "category": "structure",
+        "severity": "warning",
+        "message": "Slide missing title",
+        "slide_index": 9,
+        "details": {}
+      }
+    ],
     "recommendations": [],
     "presentation_info": {
-      "slide_count": 9,
+      "slide_count": 10,
       "file_size_mb": 0.04,
       "aspect_ratio": "4:3"
     }
   },
   {
-    "status": "accessible",
-    "total_issues": 0,
+    "status": "issues_found",
+    "total_issues": 1,
     "issues": {
       "missing_alt_text": [],
       "low_contrast": [],
-      "missing_titles": [],
+      "missing_titles": [
+        {
+          "slide": 9,
+          "message": "Slide lacks a title for screen reader navigation"
+        }
+      ],
       "small_text": [],
       "reading_order_warnings": []
     },
-    "wcag_level": "AA",
-    "checked_slides": 9,
+    "wcag_level": "fail",
+    "checked_slides": 10,
     "file": "bitcoin_market_report_nov2024_v2.pptx"
   }
 ]
