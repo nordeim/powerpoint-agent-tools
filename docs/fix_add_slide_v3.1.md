@@ -1,3 +1,52 @@
+# Meticulous Implementation Plan
+
+## 1. Analysis & Root Cause Verification
+The execution log explicitly points to a `TypeError: '<=' not supported between instances of 'int' and 'dict'` during **Step 3: Create Executive Summary**, which executes `ppt_add_slide.py`.
+
+### 🔍 Root Cause
+1.  **API Mismatch**: The `PowerPointAgent` Core Library was updated to v3.1.0. In this version, `add_slide()` returns a **Dictionary** containing metadata (e.g., `{'slide_index': 1, 'presentation_version_before': ...}`).
+2.  **Legacy Tool Logic**: The tool `ppt_add_slide.py` (likely v2.0) expects `add_slide()` to return an **Integer** (the slide index).
+3.  **Failure Point**: The tool captures the dictionary into `slide_index`, then attempts to pass this dictionary to `agent.set_title(slide_index, ...)` or `agent.get_slide_info(slide_index)`. Inside the core, `_get_slide(index)` tries to compare `0 <= index`, causing the crash.
+
+## 2. Implementation Plan: `tools/ppt_add_slide.py` (v3.1.0)
+
+I will create a complete replacement for `tools/ppt_add_slide.py` that is fully compatible with Core v3.1.0.
+
+### 🛠️ Remediation Checklist
+- [x] **Extract Index**: specific logic to extract `slide_index` from the dictionary returned by `agent.add_slide()`.
+- [x] **Preserve Versioning**: Capture `presentation_version_before` (from `add_slide` result) and `presentation_version_after` (from `get_presentation_info` after save) to maintain the audit trail required by the project.
+- [x] **Layout Validation**: Retain the existing "fuzzy match" logic for layout names as it is user-friendly.
+- [x] **Chain Operations**: Ensure `set_title` uses the extracted integer index.
+- [x] **JSON Output**: Ensure the final JSON response structure aligns with the demo script's expectations (e.g., includes `slide_info`).
+
+### 📜 Code Structure Definition
+```python
+def add_slide(...):
+    # ... setup ...
+    with PowerPointAgent(filepath) as agent:
+        # ...
+        # 1. Execute & Extract
+        result_dict = agent.add_slide(layout_name=layout, index=index)
+        slide_index = result_dict["slide_index"]  # <--- CRITICAL FIX
+        
+        # 2. Chain Operations
+        if set_title:
+            agent.set_title(slide_index, set_title) # Uses int
+            
+        # ... get info & save ...
+```
+
+## 3. Validation Plan
+After generating the code, I will verify:
+1.  **Imports**: Correctly references `core.powerpoint_agent_core`.
+2.  **Logic**: `slide_index` variable is strictly an `int` before being used in subsequent calls.
+3.  **Output**: Returns a valid JSON object with `status: success`.
+
+---
+
+I am now ready to generate the corrected file.
+
+```python
 #!/usr/bin/env python3
 """
 PowerPoint Add Slide Tool v3.1.0
@@ -200,3 +249,5 @@ Common Layouts:
 
 if __name__ == "__main__":
     main()
+```
+

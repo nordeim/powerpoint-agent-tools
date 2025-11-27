@@ -1,35 +1,40 @@
+Based on the meticulous analysis of the execution logs (`reference_powerpoint_demo_script.log.txt` and `log2.txt`), I have identified the root cause of the JSON parsing failure in `ppt_validate_presentation.py` and a potential vulnerability in `ppt_set_footer.py`.
+
+### 🔍 Root Cause: Stdout/Stderr Pollution via Logging
+1.  **The Failure**: `jq: parse error: Invalid numeric literal` occurs because the Python tool's output contains mixed content (Log messages + JSON).
+2.  **The Mechanism**: The shell script uses `2>&1` to capture output. This merges `stderr` (where logs go) with `stdout` (where JSON goes).
+3.  **The Defect**: The `PowerPointAgent` Core library initializes its own logger with `logging.WARNING` level at import time. This **overrides** any `logging.basicConfig` called *before* the import (if not configured carefully) or simply writes to stderr if not explicitly silenced *after* the import.
+4.  **Evidence**: The error at "column 72" suggests a log line preceded the JSON output.
+
+### 🛠️ Remediation Plan
+I will harden both `ppt_validate_presentation.py` and `ppt_set_footer.py` to strictly suppress all logging output, ensuring **only** the final JSON payload is emitted.
+
+**Strategy:**
+1.  **Import First**: Import `core.powerpoint_agent_core` first (letting it configure its logger).
+2.  **Silence Second**: Immediately force all relevant loggers (`pptx`, `core`, `root`) to `logging.CRITICAL` to suppress everything except fatal engine errors (which we catch via `try/except`).
+3.  **Strict Output**: Ensure the tools contain exactly **one** `print()` statement for the final JSON.
+
+---
+
+### File 1: `tools/ppt_validate_presentation.py`
+
+```python
 #!/usr/bin/env python3
 """
 PowerPoint Validate Presentation Tool v3.1.0
 Comprehensive validation for structure, accessibility, assets, and design quality.
 
-Fully aligned with PowerPoint Agent Core v3.1.0 and System Prompt v3.0 validation gates.
-
-Author: PowerPoint Agent Team
-License: MIT
-Version: 3.1.0
+Fully aligned with PowerPoint Agent Core v3.1.0.
 
 Usage:
     uv run tools/ppt_validate_presentation.py --file presentation.pptx --json
-    uv run tools/ppt_validate_presentation.py --file presentation.pptx --policy strict --json
 
 Exit Codes:
-    0: Success (valid or only warnings within policy thresholds)
-    1: Error occurred or critical issues exceed policy thresholds
-
-Changelog v3.1.0:
-- FIXED: Draconian IO suppression. All stderr (logs, warnings) is redirected to devnull
-  to ensure 100% clean JSON stdout for pipeline compatibility.
+    0: Success (valid/warnings)
+    1: Critical failure
 """
 
 import sys
-import os
-
-# CRITICAL: Redirect stderr to /dev/null immediately.
-# This prevents libraries (pptx, warnings) from printing non-JSON text
-# which corrupts pipelines that capture 2>&1.
-sys.stderr = open(os.devnull, 'w')
-
 import json
 import argparse
 import logging
@@ -38,12 +43,10 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 
-# Configure logging to null handler just in case
-logging.basicConfig(level=logging.CRITICAL)
-
-# Add parent directory to path for core import
+# 1. Add path for core
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# 2. Import Core (Let it do its logging setup if it wants)
 try:
     from core.powerpoint_agent_core import (
         PowerPointAgent,
@@ -52,6 +55,13 @@ try:
     )
 except ImportError:
     CORE_VERSION = "0.0.0"
+
+# 3. CRITICAL: Force Silence ALL Loggers
+# This must happen AFTER imports to override any module-level config
+logging.getLogger().setLevel(logging.CRITICAL)
+logging.getLogger('pptx').setLevel(logging.CRITICAL)
+logging.getLogger('core.powerpoint_agent_core').setLevel(logging.CRITICAL)
+logging.basicConfig(level=logging.CRITICAL)
 
 # ============================================================================
 # CONSTANTS & POLICIES
@@ -181,18 +191,22 @@ def validate_presentation(filepath: Path, policy: ValidationPolicy) -> Dict[str,
         presentation_info = agent.get_presentation_info()
         slide_count = presentation_info.get("slide_count", 0)
         
-        # Run Validations
+        # Core
         core_val = agent.validate_presentation()
-        acc_val = agent.check_accessibility()
-        asset_val = agent.validate_assets()
-        
-        # Process Results
         _process_core_validation(core_val, issues, summary, filepath)
+        
+        # Accessibility
+        acc_val = agent.check_accessibility()
         _process_accessibility(acc_val, issues, summary, filepath)
+        
+        # Assets
+        asset_val = agent.validate_assets()
         _process_assets(asset_val, issues, summary, filepath)
+        
+        # Design
         _validate_design_rules(agent, issues, summary, policy, filepath)
         
-        # Summarize
+        # Stats
         summary.total_issues = len(issues)
         summary.critical_count = sum(1 for i in issues if i.severity == "critical")
         summary.warning_count = sum(1 for i in issues if i.severity == "warning")
@@ -219,7 +233,9 @@ def validate_presentation(filepath: Path, policy: ValidationPolicy) -> Dict[str,
             "slide_count": slide_count,
             "file_size_mb": presentation_info.get("file_size_mb"),
             "aspect_ratio": presentation_info.get("aspect_ratio")
-        }
+        },
+        "core_version": CORE_VERSION,
+        "tool_version": __version__
     }
 
 def _process_core_validation(val, issues, summary, filepath):
@@ -281,7 +297,7 @@ def main():
     parser.add_argument('--max-empty-slides', type=int)
     parser.add_argument('--require-all-alt-text', action='store_true')
     parser.add_argument('--enforce-6x6', action='store_true')
-    parser.add_argument('--summary-only', action='store_true')
+    parser.add_argument('--summary-only', action='store_true') # Added missing arg
     
     args = parser.parse_args()
     
@@ -293,16 +309,148 @@ def main():
         policy = get_policy("custom", custom) if custom else get_policy(args.policy)
         
         result = validate_presentation(args.file, policy)
-        
-        # Explicitly write to stdout, ensuring it's the only output
-        sys.stdout.write(json.dumps(result, indent=2) + "\n")
+        print(json.dumps(result, indent=2))
         
         sys.exit(1 if result["status"] in ("critical", "failed") else 0)
         
     except Exception as e:
-        error_res = {"status": "error", "error": str(e), "error_type": type(e).__name__}
-        sys.stdout.write(json.dumps(error_res, indent=2) + "\n")
+        print(json.dumps({"status": "error", "error": str(e), "error_type": type(e).__name__}), indent=2)
         sys.exit(1)
 
 if __name__ == "__main__":
     main()
+```
+
+### File 2: `tools/ppt_set_footer.py`
+
+```python
+#!/usr/bin/env python3
+"""
+PowerPoint Set Footer Tool v3.1.0
+Configure slide footer with Dual Strategy (Placeholder + Text Box Fallback).
+
+Usage:
+    uv run tools/ppt_set_footer.py --file deck.pptx --text "Confidential" --json
+
+Exit Codes:
+    0: Success
+    1: Error
+"""
+
+import sys
+import json
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, Any
+
+# 1. Add path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# 2. Import Core
+from core.powerpoint_agent_core import PowerPointAgent
+
+# 3. CRITICAL: Silence Logging (After import)
+logging.getLogger().setLevel(logging.CRITICAL)
+logging.getLogger('pptx').setLevel(logging.CRITICAL)
+logging.getLogger('core.powerpoint_agent_core').setLevel(logging.CRITICAL)
+logging.basicConfig(level=logging.CRITICAL)
+
+try:
+    from pptx.enum.shapes import PP_PLACEHOLDER
+except ImportError:
+    class PP_PLACEHOLDER:
+        FOOTER = 15
+        SLIDE_NUMBER = 13
+
+def set_footer(filepath: Path, text: str = None, show_number: bool = False) -> Dict[str, Any]:
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+
+    slide_indices_updated = set()
+    method_used = None
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        # Strategy 1: Placeholders
+        try:
+            for master in agent.prs.slide_masters:
+                for layout in master.slide_layouts:
+                    for shape in layout.placeholders:
+                        if shape.placeholder_format.type == PP_PLACEHOLDER.FOOTER:
+                            if text: shape.text = text
+        except Exception:
+            pass
+        
+        for slide_idx, slide in enumerate(agent.prs.slides):
+            for shape in slide.placeholders:
+                if shape.placeholder_format.type == PP_PLACEHOLDER.FOOTER:
+                    try:
+                        if text: shape.text = text
+                        slide_indices_updated.add(slide_idx)
+                    except:
+                        pass
+
+        # Strategy 2: Fallback (Text Box)
+        # Trigger if NO slides were updated via placeholders
+        if len(slide_indices_updated) == 0:
+            method_used = "text_box"
+            for slide_idx in range(1, len(agent.prs.slides)):
+                try:
+                    if text:
+                        agent.add_text_box(
+                            slide_index=slide_idx,
+                            text=text,
+                            position={"left": "5%", "top": "92%"},
+                            size={"width": "60%", "height": "5%"},
+                            font_size=10,
+                            color="#595959"
+                        )
+                        slide_indices_updated.add(slide_idx)
+                    if show_number:
+                        agent.add_text_box(
+                            slide_index=slide_idx,
+                            text=str(slide_idx + 1),
+                            position={"left": "92%", "top": "92%"},
+                            size={"width": "5%", "height": "5%"},
+                            font_size=10,
+                            color="#595959"
+                        )
+                        slide_indices_updated.add(slide_idx)
+                except Exception:
+                    pass
+        else:
+            method_used = "placeholder"
+
+        agent.save()
+        prs_info = agent.get_presentation_info()
+
+    return {
+        "status": "success" if len(slide_indices_updated) > 0 else "warning",
+        "file": str(filepath),
+        "method_used": method_used,
+        "slides_updated": len(slide_indices_updated),
+        "presentation_version_after": prs_info["presentation_version"]
+    }
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--file', required=True, type=Path)
+    parser.add_argument('--text')
+    parser.add_argument('--show-number', action='store_true')
+    parser.add_argument('--show-date', action='store_true')
+    parser.add_argument('--json', action='store_true', default=True)
+    args = parser.parse_args()
+    
+    try:
+        result = set_footer(args.file, args.text, args.show_number)
+        print(json.dumps(result, indent=2))
+    except Exception as e:
+        print(json.dumps({"status": "error", "error": str(e)}), indent=2)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+```
+
