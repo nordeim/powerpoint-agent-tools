@@ -1,130 +1,61 @@
 [
   {
-    "status": "warnings",
+    "status": "valid",
+    "passed": true,
     "file": "bitcoin_market_report_nov2024_v2.pptx",
-    "total_issues": 4,
+    "validated_at": "2025-11-27T09:57:09.885096Z",
+    "policy": {
+      "name": "Standard",
+      "thresholds": {
+        "max_critical_issues": 0,
+        "max_accessibility_issues": 5,
+        "max_design_warnings": 10,
+        "max_empty_slides": 0,
+        "max_slides_without_titles": 3,
+        "max_missing_alt_text": 5,
+        "max_low_contrast": 3,
+        "max_large_images": 5,
+        "require_all_alt_text": false,
+        "enforce_6x6_rule": false,
+        "max_fonts": 5,
+        "max_colors": 10
+      },
+      "description": ""
+    },
     "summary": {
+      "total_issues": 0,
+      "critical_count": 0,
+      "warning_count": 0,
+      "info_count": 0,
       "empty_slides": 0,
       "slides_without_titles": 0,
       "missing_alt_text": 0,
-      "low_contrast": 4,
-      "low_resolution_images": 0,
-      "large_images": 0
+      "low_contrast": 0,
+      "large_images": 0,
+      "fonts_used": 0,
+      "colors_detected": 0
     },
-    "details": {
-      "validation": {
-        "status": "valid",
-        "total_issues": 0,
-        "issues": {
-          "empty_slides": [],
-          "text_overflow": [],
-          "inconsistent_fonts": [
-            "Calibri"
-          ],
-          "slides_without_titles": []
-        }
-      },
-      "accessibility": {
-        "status": "issues_found",
-        "total_issues": 4,
-        "issues": {
-          "missing_alt_text": [],
-          "low_contrast": [
-            {
-              "slide": 2,
-              "shape": 4,
-              "text": "Price Drop: $120K → $95K",
-              "contrast_ratio": 1.0,
-              "required": 3.0
-            },
-            {
-              "slide": 3,
-              "shape": 4,
-              "text": "Liquidity: $700M → $535M",
-              "contrast_ratio": 1.0,
-              "required": 3.0
-            },
-            {
-              "slide": 5,
-              "shape": 4,
-              "text": "First time in 7 months",
-              "contrast_ratio": 1.0,
-              "required": 3.0
-            },
-            {
-              "slide": 6,
-              "shape": 4,
-              "text": "Support Break: $100K",
-              "contrast_ratio": 1.0,
-              "required": 3.0
-            }
-          ],
-          "missing_titles": [],
-          "reading_order_issues": [],
-          "large_file_size_warning": false
-        },
-        "wcag_level": "fail"
-      },
-      "assets": {
-        "status": "valid",
-        "total_issues": 0,
-        "issues": {
-          "low_resolution_images": [],
-          "large_images": [],
-          "total_embedded_size": 0,
-          "external_links": []
-        }
-      }
-    },
-    "recommendations": [
-      {
-        "priority": "medium",
-        "issue": "Low color contrast text",
-        "action": "Improve text/background contrast for readability",
-        "count": 4
-      }
-    ]
+    "policy_violations": [],
+    "issues": [],
+    "recommendations": [],
+    "presentation_info": {
+      "slide_count": 9,
+      "file_size_mb": 0.04,
+      "aspect_ratio": "4:3"
+    }
   },
   {
-    "status": "issues_found",
-    "total_issues": 4,
+    "status": "accessible",
+    "total_issues": 0,
     "issues": {
       "missing_alt_text": [],
-      "low_contrast": [
-        {
-          "slide": 2,
-          "shape": 4,
-          "text": "Price Drop: $120K → $95K",
-          "contrast_ratio": 1.0,
-          "required": 3.0
-        },
-        {
-          "slide": 3,
-          "shape": 4,
-          "text": "Liquidity: $700M → $535M",
-          "contrast_ratio": 1.0,
-          "required": 3.0
-        },
-        {
-          "slide": 5,
-          "shape": 4,
-          "text": "First time in 7 months",
-          "contrast_ratio": 1.0,
-          "required": 3.0
-        },
-        {
-          "slide": 6,
-          "shape": 4,
-          "text": "Support Break: $100K",
-          "contrast_ratio": 1.0,
-          "required": 3.0
-        }
-      ],
+      "low_contrast": [],
       "missing_titles": [],
-      "reading_order_issues": [],
-      "large_file_size_warning": false
+      "small_text": [],
+      "reading_order_warnings": []
     },
-    "wcag_level": "fail",
+    "wcag_level": "AA",
+    "checked_slides": 9,
     "file": "bitcoin_market_report_nov2024_v2.pptx"
   }
 ]
