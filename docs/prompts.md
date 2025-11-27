@@ -305,6 +305,14 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Based on your last good generated version of `core/powerpoint_agent_core.py`, please please think deeper and think harder to deeply explore thoroughly and systematically how best to extract from it all the useful details and content like exports with detailed descriptions, to produce a comprehensive and accurate programming handbook for the core file that will help in developing and troubleshooting the downstream tool file. Meaning to create a programming model and description that accurately mirrors the actual `powerpoint_agent_core.py`, the same information that you will get from actually studying the actual code, information that will give very good insights into the features and capabilities available from the actual core file, information that is sufficient to troubleshoot any tool related issue, information that is a good distillation of the actual code for the core file.
+
+Fully immersed in the core agent's inner workings. Focus on creating the most comprehensive guide possible. You will delve into the source code, meticulously documenting all exports, logic, dependencies, and architectural patterns. I'm focusing on capturing the nuances of the code, not just high-level overviews. This involves the classes: PowerPointAgent, FileLock, PathValidator, and so on. My aim is to make this the source of truth for developers.
+
+Create the progamming handbook for  `powerpoint_agent_core.py`  as a markdown document within ```markdown tags. Think and explore thoroughly first, then meticulously create an comprehensive implementation plan to create the programming handbook as a markdown file. Review and validate your implementation plan before proceeding meticulously to execute it. 
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
