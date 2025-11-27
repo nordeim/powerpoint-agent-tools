@@ -290,6 +290,17 @@ Think and explore thoroughly first, then meticulously create an comprehensive im
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review and analyze the two attached "development/programming guide" documents to critique and compare them. Check for any discrepancies between them.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please think deeper and think harder to deeply explore thoroughly and systematically how to re-imagine a *unified* comprehensive programming and troubleshooting guide that combines the best practices from both base documents. Important to note: do NOT add anything not from the two base documents.
+
+
+Think and explore thoroughly first, then meticulously create an comprehensive implementation plan to create the comprehensive "combined/unified" guide as a markdown file. Include an integrated checklist for the new guide. Review and validate your implementation plan before proceeding meticulously to execute it. After generating the complete validated "unified" guide document, meticulously review it again for correctness and accuracy, validate it against the checklist. 
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
