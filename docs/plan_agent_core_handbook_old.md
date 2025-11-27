@@ -1,6 +1,54 @@
-# PowerPoint Agent Core: Programming Handbook (v3.1.1)
+# Implementation Plan: PowerPoint Agent Core Handbook (v3.1.0)
 
-**Version:** 3.1.1  
+## 1. Objective
+Create a definitive "Programming Model & API Handbook" for `core/powerpoint_agent_core.py` (v3.1.0). This document will serve as the technical manual for developers (AI or human) building tools on top of this library. It will distill the actual code logic, method signatures, return structures, and internal behaviors into a usable reference.
+
+## 2. Source of Truth
+The content is derived strictly from the `powerpoint_agent_core.py` v3.1.0 file generated in the previous steps, which includes:
+*   Security hardening (Path traversal, `errno` locking).
+*   Governance (Approval tokens).
+*   Observability (Geo-aware version hashing).
+*   Logic restoration (`_copy_shape`, etc.).
+
+## 3. Document Structure
+
+### Part 1: Core Philosophy & Architecture
+*   **Scope**: What the core does vs. what tools do.
+*   **State Management**: The Context Manager pattern (`with PowerPointAgent...`).
+*   **Safety Mechanisms**: File locking, atomic writes, path validation.
+
+### Part 2: Data Structures & Schemas
+*   **Input Schemas**: Detailed JSON structures for `Position`, `Size`, `Color`, and `Crop`.
+*   **Output Schemas**: The standard dictionary structure returned by mutation methods (including versioning fields).
+
+### Part 3: The `PowerPointAgent` API Reference
+A detailed breakdown of methods grouped by domain, detailing **Arguments**, **Return Values**, **Side Effects**, and **Specific Exceptions**.
+*   File Operations (`open`, `save`, `clone`)
+*   Slide Operations (`add`, `delete`, `reorder`)
+*   Content Operations (`text`, `lists`, `titles`)
+*   Visuals (`shapes`, `images`, `z-order`, `opacity`)
+*   Data Viz (`charts`, `tables`)
+*   Validation & Info (`accessibility`, `versioning`)
+
+### Part 4: Security & Governance Model
+*   **Approval Tokens**: How `_validate_token` works and which methods enforce it.
+*   **Path Validation**: Directory restrictions and traversal protection.
+
+### Part 5: Internal "Magic" (For Troubleshooting)
+*   **XML Hacking**: How Opacity and Z-Order are implemented via `lxml` (since `python-pptx` lacks them).
+*   **Version Hashing**: The exact logic of the SHA-256 calculation (Text + Geometry).
+*   **Error Hierarchy**: The class inheritance tree of exceptions.
+
+---
+
+## 4. Execution
+
+I will now generate the `PowerPoint_Agent_Core_Handbook.md`.
+
+```markdown
+# PowerPoint Agent Core: Programming Handbook (v3.1.0)
+
+**Version:** 3.1.0  
 **Library:** `core/powerpoint_agent_core.py`  
 **License:** MIT  
 
@@ -10,7 +58,7 @@
 
 The `PowerPointAgent` core library is the foundational engine for the PowerPoint Agent Tools ecosystem. It provides a **stateless, atomic, and security-hardened** interface for manipulating `.pptx` files. Unlike the raw `python-pptx` library, this core handles file locking, complex positioning logic, accessibility compliance, and operation auditing (versioning).
 
-### 1.1 Key Capabilities (v3.1.1)
+### 1.1 Key Capabilities (v3.1.0)
 *   **Context-Safe**: Handles file opening/closing/locking automatically.
 *   **Observability**: Tracks presentation state via deterministic SHA-256 hashing (Geometry + Content).
 *   **Governance**: Enforces "Approval Tokens" for destructive actions (`delete_slide`, `remove_shape`).
@@ -42,63 +90,11 @@ with PowerPointAgent(filepath) as agent:
 
 ---
 
-## 3. Critical Protocols (Non-Negotiable)
-
-### 3.1 Version Tracking Protocol
-Every mutation method **must** capture the presentation state before and after execution to maintain the audit trail.
-
-**Standard Pattern**:
-```python
-# 1. Capture version BEFORE changes
-version_before = agent.get_presentation_version()
-
-# 2. Perform operations
-result = agent.some_operation()
-
-# 3. Capture version AFTER changes
-version_after = agent.get_presentation_version()
-
-# 4. Return both versions in response
-return {
-    "status": "success",
-    "presentation_version_before": version_before,
-    "presentation_version_after": version_after,
-    "result": result
-}
-```
-
-### 3.2 Shape Index Freshness Protocol
-Structural operations invalidate shape indices. Tools **must** refresh their knowledge of the slide state after any of these operations before performing further actions on shapes.
-
-**Invalidating Operations**:
-| Operation | Effect | Required Action |
-|-----------|--------|-----------------|
-| `add_shape()` | Adds index at end | Refresh if targeting new shape |
-| `remove_shape()` | Shifts subsequent indices down | **CRITICAL**: Refresh immediately |
-| `set_z_order()` | Reorders indices | **CRITICAL**: Refresh immediately |
-| `delete_slide()` | Invalidates all indices | Reload slide info |
-| `add_slide()` | New slide context | Query new slide info |
-
-**Correct Pattern**:
-```python
-# 1. Perform structural change
-agent.remove_shape(slide_index=0, shape_index=5)
-
-# 2. REFRESH INDICES (Do not assume index 6 is now 5)
-slide_info = agent.get_slide_info(slide_index=0)
-
-# 3. Find target shape by name/properties in refreshed list
-target_shape = next(s for s in slide_info["shapes"] if s["name"] == "TargetBox")
-agent.format_shape(slide_index=0, shape_index=target_shape["index"], ...)
-```
-
----
-
-## 4. Data Structures & Input Schemas
+## 3. Data Structures & Input Schemas
 
 The Core uses flexible dictionary-based inputs to abstract layout complexity.
 
-### 4.1 Positioning (`Position.from_dict`)
+### 3.1 Positioning (`Position.from_dict`)
 Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 
 | Type | Schema | Description |
@@ -110,22 +106,26 @@ Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 
 **Anchor Points**: `top_left`, `top_center`, `top_right`, `center_left`, `center`, `center_right`, `bottom_left`, `bottom_center`, `bottom_right`.
 
-### 4.2 Sizing (`Size.from_dict`)
+### 3.2 Sizing (`Size.from_dict`)
 | Type | Schema | Description |
 |------|--------|-------------|
 | **Percentage** | `{"width": "50%", "height": "50%"}` | % of slide width/height. |
 | **Absolute** | `{"width": 5.0, "height": 3.0}` | Inches. |
 | **Auto** | `{"width": "50%", "height": "auto"}` | Preserves aspect ratio. |
 
+### 3.3 Colors
+*   **Format**: Hex strings (`"#FF0000"` or `"0070C0"`).
+*   **Validation**: Validated by `ColorHelper`. Invalid hex raises `ValueError`.
+
 ---
 
-## 5. API Reference
+## 4. API Reference
 
-### 5.1 File Operations
+### 4.1 File Operations
 
 #### `open(filepath, acquire_lock=True)`
-*   **Purpose**: Loads presentation and optionally acquires file lock.
-*   **Safety**: Uses `errno.EEXIST` (via `os.open` with `O_CREAT|O_EXCL`) for atomic locking across POSIX and Windows.
+*   **Purpose**: Loads presentation and optionally acquires cross-platform file lock.
+*   **Safety**: Uses `errno.EEXIST` (POSIX) / `FileExistsError` (Windows) for atomic locking.
 *   **Throws**: `PathValidationError`, `FileLockError`, `PowerPointAgentError`.
 
 #### `save(filepath=None)`
@@ -136,10 +136,19 @@ Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 *   **Purpose**: Creates a working copy.
 *   **Returns**: A *new* `PowerPointAgent` instance pointed at the cloned file.
 
-### 5.2 Slide Operations
+### 4.2 Slide Operations
 
 #### `add_slide(layout_name, index=None)`
-*   **Returns**: `Dict` (v3.1+) containing `slide_index`, `layout_name`, `total_slides`, `presentation_version_before/after`.
+*   **Returns**:
+    ```json
+    {
+      "slide_index": 5,
+      "layout_name": "Title and Content",
+      "total_slides": 6,
+      "presentation_version_before": "...",
+      "presentation_version_after": "..."
+    }
+    ```
 *   **Validation**: Raises `SlideNotFoundError` if `index` is out of bounds (removed silent clamping).
 
 #### `delete_slide(index, approval_token=None)`
@@ -149,7 +158,7 @@ Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 #### `duplicate_slide(index)` / `reorder_slides(from_index, to_index)`
 *   **Behavior**: Performs deep copy of shapes including text runs and styles.
 
-### 5.3 Shape & Visual Operations
+### 4.3 Shape & Visual Operations
 
 #### `add_shape(slide_index, shape_type, position, size, ...)`
 *   **Arguments**:
@@ -161,7 +170,7 @@ Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 
 #### `format_shape(slide_index, shape_index, ...)`
 *   **Arguments**: `fill_color`, `fill_opacity`, `line_color`, etc.
-*   **Deprecation**: `transparency` param is deprecated; explicit conversion to `1.0 - fill_opacity` occurs, logging a warning.
+*   **Deprecation**: `transparency` param is deprecated; auto-converts to `1.0 - fill_opacity` with a warning.
 
 #### `remove_shape(slide_index, shape_index, approval_token=None)`
 *   **Security**: **Requires** valid `approval_token` matching scope `remove:shape`.
@@ -172,7 +181,7 @@ Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 *   **Internal**: Physically moves the XML element in `<p:spTree>`.
 *   **Critical Side Effect**: **Invalidates Shape Indices**. Tools must warn users to re-query `get_slide_info`.
 
-### 5.4 Text & Content
+### 4.4 Text & Content
 
 #### `add_text_box` / `add_bullet_list`
 *   **Features**: Auto-fit text, specific font styling, alignment mapping.
@@ -186,30 +195,27 @@ Used in `add_shape`, `add_text_box`, `insert_image`, etc.
 *   **Mechanism**: Iterates through *all* slides to find placeholders (type 7, 6, 5).
 *   **Returns**: `slides_processed` count. (Note: Does not create text boxes; relies on Tool layer for fallback).
 
-### 5.5 Charts & Images
+### 4.5 Charts & Images
 
 #### `add_chart(chart_type, data, ...)`
 *   **Supported Types**: Column, Bar, Line, Pie, Area, Scatter, Doughnut.
 *   **Data Format**: `{"categories": ["A", "B"], "series": [{"name": "S1", "values": [1, 2]}]}`.
 
 #### `update_chart_data(slide_index, chart_index, data)`
-*   **Strategy**:
-    1.  Try `chart.replace_data()` (Best, preserves format).
-    2.  Catch `AttributeError` (Older pptx versions).
-    3.  Fallback: Recreate chart in-place (Preserves position/size/title, resets some style).
+*   **Robustness**: Tries `chart.replace_data()`. If that fails (version compat), it **recreates** the chart in-place to ensure data is applied.
 
 #### `insert_image` / `replace_image`
 *   **Features**: Auto-aspect ratio calculation, optional compression (if Pillow installed), Alt Text setting.
 
 ---
 
-## 6. Security & Governance
+## 5. Security & Governance
 
-### 6.1 Path Validation (`PathValidator`)
+### 5.1 Path Validation (`PathValidator`)
 *   **Traversal Protection**: If `allowed_base_dirs` is set, checks `path.is_relative_to(base)`.
 *   **Extension Check**: Enforces `.pptx`, `.pptm`, `.potx`.
 
-### 6.2 Approval Tokens
+### 5.2 Approval Tokens
 Destructive methods call `_validate_token(token, scope)`.
 *   **Scope Constants**:
     *   `APPROVAL_SCOPE_DELETE_SLIDE` ("delete:slide")
@@ -218,9 +224,9 @@ Destructive methods call `_validate_token(token, scope)`.
 
 ---
 
-## 7. Observability & Versioning
+## 6. Observability & Versioning
 
-### 7.1 Presentation Versioning (`get_presentation_version`)
+### 6.1 Presentation Versioning (`get_presentation_version`)
 Returns a SHA-256 hash (prefix 16 chars) representing the state.
 
 **Input for Hash**:
@@ -229,63 +235,57 @@ Returns a SHA-256 hash (prefix 16 chars) representing the state.
 3.  **Shape Geometry**: `{left}:{top}:{width}:{height}` (Detects moves/resizes).
 4.  **Text Content**: SHA-256 of text runs.
 
-### 7.2 Error Handling Matrix
+**Usage**:
+*   Tools capture `version_before` immediately after opening.
+*   Tools capture `version_after` immediately before returning.
+*   This allows the Orchestrator to detect "Phantom Edits" (race conditions).
 
-| Code | Category | Meaning | Response Format |
-|---|---|---|---|
-| 0 | Success | Completed | `{"status": "success", ...}` |
-| 1 | Usage | Invalid args | `{"status": "error", "error_type": "ValueError", ...}` |
-| 2 | Validation | Schema invalid | `{"status": "error", "error_type": "ValidationError", ...}` |
-| 3 | Transient | Lock/Network | `{"status": "error", "error_type": "FileLockError", ...}` |
-| 4 | Permission | Token missing | `{"status": "error", "error_type": "ApprovalTokenError", ...}` |
-| 5 | Internal | Crash | `{"status": "error", "error_type": "PowerPointAgentError", ...}` |
+### 6.2 Logging
+*   **Logger**: `core.powerpoint_agent_core`
+*   **Stream**: `sys.stderr` (Strictly separated from stdout to protect JSON pipelines).
 
 ---
 
-## 8. Performance Characteristics
+## 7. Internal Troubleshooting
 
-Understanding the cost of operations is vital for building efficient agents.
+### 7.1 "Ghost Slides"
+*   **Symptom**: Validation reports issues on `slide_index: 9` when you only added 9 slides (0-8).
+*   **Cause**: Calling `add_slide` inside a loop that executes one time too many, or a tool crashing *after* creation but *before* configuration.
+*   **Detection**: `ppt_validate_presentation.py` will flag "Empty slide" or "Slide missing title".
 
-| Operation | Complexity | 10-Slide Deck | 50-Slide Deck | Notes |
-|-----------|------------|---------------|---------------|-------|
-| `get_presentation_version()` | O(N) Shapes | ~15ms | ~75ms | Scales linearly with total shape count. Called twice per mutation. |
-| `capability_probe(deep=True)` | O(M) Layouts | ~120ms | ~600ms+ | Creates/destroys slides. Has 15s timeout. |
-| `add_shape()` | O(1) | ~8ms | ~8ms | Constant time (XML injection). |
-| `replace_text(global)` | O(N) TextRuns | ~25ms | ~125ms | Regex matching across all text runs. |
-| `save()` | I/O Bound | ~50ms | ~200ms+ | Dominated by disk write speed and file size (images). |
+### 7.2 Opacity Not Working
+*   **Cause**: `python-pptx` doesn't support alpha channels.
+*   **Fix**: The Core uses `_set_fill_opacity` to inject XML.
+*   **Requirement**: The shape must have a **Solid Fill** first. `add_shape` handles this automatically.
 
-**Optimization Guidelines**:
-*   **Batching**: Not supported natively (stateless tools), but context managers in custom scripts can batch mutations before a single `save()`.
-*   **Shallow Probes**: Use `deep=False` in `capability_probe` unless layout geometry is strictly required.
-*   **Limits**: Avoid decks >100 slides or >50MB for interactive agent sessions to prevent timeouts.
+### 7.3 "Invalid Numeric Literal" in JSON
+*   **Cause**: `stdout` pollution. A library printed text mixed with the JSON.
+*   **Fix in Tools**:
+    ```python
+    import sys, os
+    sys.stderr = open(os.devnull, 'w')  # The "Nuclear Option"
+    ```
+    (Note: The Core itself logs to stderr, so this must be done in the *Tool* wrapper).
 
 ---
 
-## 9. Internal "Magic" (Troubleshooting)
+## 8. Exception Hierarchy
 
-### 9.1 Opacity Injection
-`python-pptx` lacks transparency support. We use `lxml` to inject:
-```xml
-<a:solidFill>
-  <a:srgbClr val="FF0000">
-    <a:alpha val="50000"/> <!-- 50% Opacity -->
-  </a:srgbClr>
-</a:solidFill>
+All exceptions inherit from `PowerPointAgentError` and provide `to_dict()`.
+
+*   `PowerPointAgentError`
+    *   `SlideNotFoundError`
+    *   `ShapeNotFoundError`
+    *   `ChartNotFoundError`
+    *   `LayoutNotFoundError`
+    *   `ImageNotFoundError`
+    *   `InvalidPositionError`
+    *   `TemplateError`
+    *   `ThemeError`
+    *   `AccessibilityError`
+    *   `AssetValidationError`
+    *   `FileLockError`
+    *   `PathValidationError`
+    *   `ApprovalTokenError` (New in v3.1.0)
 ```
-**Note**: Office uses 0-100,000 scale. Core converts 0.0-1.0 floats automatically.
 
-### 9.2 Z-Order Manipulation
-We physically move the `<p:sp>` element within the `<p:spTree>` XML list.
-*   `bring_to_front`: Move to end of list.
-*   `send_to_back`: Move to index 2 (after background/master refs).
-
----
-
-## 10. Backward Compatibility (Migration)
-
-### v3.0 → v3.1 Migration Guide
-*   **Return Values**: Methods like `add_slide` and `add_shape` now return **Dictionaries**, not Integers.
-    *   *Old*: `idx = agent.add_slide(...)`
-    *   *New*: `res = agent.add_slide(...); idx = res["slide_index"]`
-*   **Transparency**: Use `fill_opacity` instead of `transparency`.
-*   **Safety**: `add_slide(index=999)` now raises `SlideNotFoundError` instead of clamping to end. Catch this exception if loose behavior is needed.

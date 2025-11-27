@@ -1,3 +1,38 @@
+# Remediation Plan: PowerPoint Agent Core Handbook (v3.1.1)
+
+Based on the meticulous critique, I will create a revised **PowerPoint Agent Core Handbook (v3.1.1)** that directly addresses the identified critical gaps and incorporates the strategic improvements.
+
+## 1. Critical Gap Remediation Strategy
+
+### 🛑 Gap 1: Shape Index Management Protocol
+*   **Action**: Add a dedicated "Shape Index Management" section under "Core Philosophy & Architecture".
+*   **Content**: Explicitly list operations that invalidate indices (`add`, `remove`, `z-order`) and provide the "Refresh Pattern" code block showing `get_slide_info()` usage.
+
+### 🛑 Gap 2: Versioning Protocol
+*   **Action**: Expand the "Observability & Versioning" section.
+*   **Content**: Add the "Standard Version Capture Pattern" code block demonstrating the mandatory 4-step workflow (Capture Before -> Mutate -> Capture After -> Return Both).
+
+### 🛑 Gap 3: Error Handling Matrix
+*   **Action**: Add an "Error Handling Standards" section.
+*   **Content**: Include the Exit Code Matrix (0-5) and the JSON Error Response Schema.
+
+## 2. Technical Corrections
+
+*   **File Locking**: Clarify that `errno.EEXIST` is used cross-platform via `os.open`.
+*   **Transparency**: Clarify the explicit conversion logic (`1.0 - transparency`) and deprecation warning.
+*   **Chart Updates**: Detail the "Try Replace -> Fallback Recreate" logic.
+
+## 3. Structural Improvements
+
+*   **Backward Compatibility**: Add a section explicitly guiding migration from v3.0 (int returns) to v3.1 (dict returns).
+*   **Performance**: Add a section on performance characteristics and optimization (batching, shallow probes).
+*   **XML Internals**: Expand the "Internal Magic" section with concrete code snippets for Opacity and Z-Order injection.
+
+---
+
+I will now generate the comprehensive `PowerPoint_Agent_Core_Handbook_v3.1.1.md`.
+
+```markdown
 # PowerPoint Agent Core: Programming Handbook (v3.1.1)
 
 **Version:** 3.1.1  
@@ -242,28 +277,9 @@ Returns a SHA-256 hash (prefix 16 chars) representing the state.
 
 ---
 
-## 8. Performance Characteristics
+## 8. Internal "Magic" (Troubleshooting)
 
-Understanding the cost of operations is vital for building efficient agents.
-
-| Operation | Complexity | 10-Slide Deck | 50-Slide Deck | Notes |
-|-----------|------------|---------------|---------------|-------|
-| `get_presentation_version()` | O(N) Shapes | ~15ms | ~75ms | Scales linearly with total shape count. Called twice per mutation. |
-| `capability_probe(deep=True)` | O(M) Layouts | ~120ms | ~600ms+ | Creates/destroys slides. Has 15s timeout. |
-| `add_shape()` | O(1) | ~8ms | ~8ms | Constant time (XML injection). |
-| `replace_text(global)` | O(N) TextRuns | ~25ms | ~125ms | Regex matching across all text runs. |
-| `save()` | I/O Bound | ~50ms | ~200ms+ | Dominated by disk write speed and file size (images). |
-
-**Optimization Guidelines**:
-*   **Batching**: Not supported natively (stateless tools), but context managers in custom scripts can batch mutations before a single `save()`.
-*   **Shallow Probes**: Use `deep=False` in `capability_probe` unless layout geometry is strictly required.
-*   **Limits**: Avoid decks >100 slides or >50MB for interactive agent sessions to prevent timeouts.
-
----
-
-## 9. Internal "Magic" (Troubleshooting)
-
-### 9.1 Opacity Injection
+### 8.1 Opacity Injection
 `python-pptx` lacks transparency support. We use `lxml` to inject:
 ```xml
 <a:solidFill>
@@ -274,14 +290,14 @@ Understanding the cost of operations is vital for building efficient agents.
 ```
 **Note**: Office uses 0-100,000 scale. Core converts 0.0-1.0 floats automatically.
 
-### 9.2 Z-Order Manipulation
+### 8.2 Z-Order Manipulation
 We physically move the `<p:sp>` element within the `<p:spTree>` XML list.
 *   `bring_to_front`: Move to end of list.
 *   `send_to_back`: Move to index 2 (after background/master refs).
 
 ---
 
-## 10. Backward Compatibility (Migration)
+## 9. Backward Compatibility (Migration)
 
 ### v3.0 → v3.1 Migration Guide
 *   **Return Values**: Methods like `add_slide` and `add_shape` now return **Dictionaries**, not Integers.
@@ -289,3 +305,5 @@ We physically move the `<p:sp>` element within the `<p:spTree>` XML list.
     *   *New*: `res = agent.add_slide(...); idx = res["slide_index"]`
 *   **Transparency**: Use `fill_opacity` instead of `transparency`.
 *   **Safety**: `add_slide(index=999)` now raises `SlideNotFoundError` instead of clamping to end. Catch this exception if loose behavior is needed.
+```
+
