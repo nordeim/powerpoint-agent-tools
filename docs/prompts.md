@@ -248,6 +248,18 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome understanding! Now, please meticulously review the attached documents to have a deep understanding of the WHAT, WHY and HOW of the project and its codebase design and architecture.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review and compare the original improvement plan, `suggested_core_improvement_plan_20251127.md`, for the core file and the consolidated improvement plan `suggested_core_consolidated_plan_20251127.md` that supersedes the earlier one. Then meticulously review the actual changes captured in the attached `core_diff_output.txt` to check and confirm whether the verified improvements had been made correctly and accurately. Also check whether there was any regression in terms of original feature and function omission.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review and analyze the actual updated core file attached. Validate the actual changes against the consolidated implementation plan.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
