@@ -1,43 +1,107 @@
 #!/usr/bin/env python3
 """
-PowerPoint Create New Tool
+PowerPoint Create New Tool v3.1.0
 Create a new PowerPoint presentation with specified slides
 
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.0
+
 Usage:
-    uv python ppt_create_new.py --output presentation.pptx --slides 5 --layout "Title and Content" --json
+    uv run tools/ppt_create_new.py --output presentation.pptx --slides 5 --layout "Title and Content" --json
 
 Exit Codes:
     0: Success
-    1: Error occurred
+    1: Error occurred (check error_type in JSON for details)
+
+Note:
+    For creating presentations from existing templates with branding,
+    consider using ppt_create_from_template.py instead.
 """
 
 import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null to prevent library noise from corrupting JSON output
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
-# Add parent directory to path for core import
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError
+    PowerPointAgent, 
+    PowerPointAgentError,
+    LayoutNotFoundError
 )
+
+__version__ = "3.1.0"
 
 
 def create_new_presentation(
     output: Path,
     slides: int,
-    template: Path = None,
+    template: Optional[Path] = None,
     layout: str = "Title and Content"
 ) -> Dict[str, Any]:
-    """Create new PowerPoint presentation."""
+    """
+    Create a new PowerPoint presentation with specified number of slides.
     
+    Creates a blank presentation (or from optional template) and populates
+    it with the requested number of slides. The first slide uses "Title Slide"
+    layout if available, subsequent slides use the specified layout.
+    
+    Args:
+        output: Path where the new presentation will be saved
+        slides: Number of slides to create (1-100)
+        template: Optional path to template .pptx file (default: None for blank)
+        layout: Layout name for slides after the first (default: "Title and Content")
+        
+    Returns:
+        Dict containing:
+            - status: "success"
+            - file: Absolute path to created file
+            - slides_created: Number of slides created
+            - slide_indices: List of slide indices
+            - file_size_bytes: Size of created file
+            - slide_dimensions: Width, height, and aspect ratio
+            - available_layouts: List of all available layouts
+            - layout_used: Layout name used for non-title slides
+            - template_used: Path to template if used, else None
+            - presentation_version: State hash for change tracking
+            - tool_version: Version of this tool
+            
+    Raises:
+        ValueError: If slide count is invalid (not 1-100)
+        FileNotFoundError: If template specified but not found
+        
+    Example:
+        >>> result = create_new_presentation(
+        ...     output=Path("pitch_deck.pptx"),
+        ...     slides=10,
+        ...     layout="Title and Content"
+        ... )
+        >>> print(result["slides_created"])
+        10
+    """
+    # Validate slide count
     if slides < 1:
         raise ValueError("Must create at least 1 slide")
     
     if slides > 100:
         raise ValueError("Maximum 100 slides per creation (performance limit)")
+    
+    # Validate template if provided
+    if template is not None:
+        if not template.exists():
+            raise FileNotFoundError(f"Template file not found: {template}")
+        if not template.suffix.lower() == '.pptx':
+            raise ValueError(f"Template must be .pptx file, got: {template.suffix}")
     
     with PowerPointAgent() as agent:
         # Create from template or blank
@@ -46,50 +110,66 @@ def create_new_presentation(
         # Get available layouts
         available_layouts = agent.get_available_layouts()
         
-        # Validate layout
+        # Validate and resolve layout
+        resolved_layout = layout
         if layout not in available_layouts:
-            # Try to find closest match
+            # Try to find closest match (case-insensitive partial match)
             layout_lower = layout.lower()
+            matched = False
             for avail in available_layouts:
                 if layout_lower in avail.lower():
-                    layout = avail
+                    resolved_layout = avail
+                    matched = True
                     break
-            else:
+            
+            if not matched:
                 # Use first available layout as fallback
-                layout = available_layouts[0] if available_layouts else "Title Slide"
+                resolved_layout = available_layouts[0] if available_layouts else "Title Slide"
         
         # Add requested number of slides
-        slide_indices = []
+        slide_indices: List[int] = []
+        
         for i in range(slides):
             # First slide uses "Title Slide" if available, others use specified layout
             if i == 0 and "Title Slide" in available_layouts:
                 slide_layout = "Title Slide"
             else:
-                slide_layout = layout
+                slide_layout = resolved_layout
             
-            idx = agent.add_slide(layout_name=slide_layout)
+            result = agent.add_slide(layout_name=slide_layout)
+            # Handle both v3.0.x (int) and v3.1.x (Dict) return types
+            if isinstance(result, dict):
+                idx = result.get("slide_index", result.get("index", i))
+            else:
+                idx = result
             slide_indices.append(idx)
         
-        # Save
+        # Save the presentation
         agent.save(output)
         
-        # Get presentation info
+        # Get final presentation info
         info = agent.get_presentation_info()
+        presentation_version = info.get("presentation_version", None)
+    
+    # Calculate file size
+    file_size = output.stat().st_size if output.exists() else 0
     
     return {
         "status": "success",
-        "file": str(output),
+        "file": str(output.resolve()),
         "slides_created": slides,
         "slide_indices": slide_indices,
-        "file_size_bytes": output.stat().st_size if output.exists() else 0,
+        "file_size_bytes": file_size,
         "slide_dimensions": {
-            "width_inches": info["slide_width_inches"],
-            "height_inches": info["slide_height_inches"],
-            "aspect_ratio": info["aspect_ratio"]
+            "width_inches": info.get("slide_width_inches", 13.333),
+            "height_inches": info.get("slide_height_inches", 7.5),
+            "aspect_ratio": info.get("aspect_ratio", "16:9")
         },
-        "available_layouts": info["layouts"],
-        "layout_used": layout,
-        "template_used": str(template) if template else None
+        "available_layouts": info.get("layouts", available_layouts),
+        "layout_used": resolved_layout,
+        "template_used": str(template.resolve()) if template else None,
+        "presentation_version": presentation_version,
+        "tool_version": __version__
     }
 
 
@@ -100,16 +180,16 @@ def main():
         epilog="""
 Examples:
   # Create presentation with 5 blank slides
-  uv python ppt_create_new.py --output presentation.pptx --slides 5 --json
+  uv run tools/ppt_create_new.py --output presentation.pptx --slides 5 --json
   
   # Create with specific layout
-  uv python ppt_create_new.py --output pitch_deck.pptx --slides 10 --layout "Title and Content" --json
+  uv run tools/ppt_create_new.py --output pitch_deck.pptx --slides 10 --layout "Title and Content" --json
   
-  # Create from template
-  uv python ppt_create_new.py --output new_deck.pptx --slides 3 --template corporate_template.pptx --json
+  # Create from template (for simple cases; use ppt_create_from_template.py for advanced)
+  uv run tools/ppt_create_new.py --output new_deck.pptx --slides 3 --template corporate_template.pptx --json
   
   # Create single title slide
-  uv python ppt_create_new.py --output title.pptx --slides 1 --layout "Title Slide" --json
+  uv run tools/ppt_create_new.py --output title.pptx --slides 1 --layout "Title Slide" --json
 
 Available Layouts (typical):
   - Title Slide
@@ -122,19 +202,31 @@ Available Layouts (typical):
   - Content with Caption
   - Picture with Caption
 
+First Slide Behavior:
+  The first slide automatically uses "Title Slide" layout if available,
+  regardless of the --layout parameter. Subsequent slides use --layout.
+
+For Template-Based Creation:
+  If you need to preserve template content or work with branded templates,
+  use ppt_create_from_template.py instead. This tool is optimized for
+  creating presentations from scratch.
+
 Output Format:
   {
     "status": "success",
-    "file": "presentation.pptx",
+    "file": "/path/to/presentation.pptx",
     "slides_created": 5,
+    "slide_indices": [0, 1, 2, 3, 4],
     "file_size_bytes": 28432,
     "slide_dimensions": {
-      "width_inches": 10.0,
+      "width_inches": 13.333,
       "height_inches": 7.5,
       "aspect_ratio": "16:9"
     },
     "available_layouts": ["Title Slide", "Title and Content", ...],
-    "layout_used": "Title and Content"
+    "layout_used": "Title and Content",
+    "presentation_version": "a1b2c3d4...",
+    "tool_version": "3.1.0"
   }
         """
     )
@@ -156,67 +248,88 @@ Output Format:
     parser.add_argument(
         '--template',
         type=Path,
+        default=None,
         help='Optional template file to use (.pptx)'
     )
     
     parser.add_argument(
         '--layout',
         default='Title and Content',
-        help='Layout to use for slides (default: "Title and Content")'
+        help='Layout to use for slides after the first (default: "Title and Content")'
     )
     
     parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
     
     try:
-        # Validate template if specified
-        if args.template:
-            if not args.template.exists():
-                raise FileNotFoundError(f"Template file not found: {args.template}")
-            if not args.template.suffix.lower() == '.pptx':
-                raise ValueError(f"Template must be .pptx file, got: {args.template.suffix}")
+        # Ensure output has .pptx extension
+        output_path = args.output
+        if not output_path.suffix.lower() == '.pptx':
+            output_path = output_path.with_suffix('.pptx')
         
-        # Validate output path
-        if not args.output.suffix.lower() == '.pptx':
-            args.output = args.output.with_suffix('.pptx')
-        
-        # Create presentation
         result = create_new_presentation(
-            output=args.output,
+            output=output_path,
             slides=args.slides,
             template=args.template,
             layout=args.layout
         )
         
         if args.json:
-            print(json.dumps(result, indent=2))
+            sys.stdout.write(json.dumps(result, indent=2) + "\n")
         else:
-            print(f"✅ Created presentation: {result['file']}")
-            print(f"   Slides: {result['slides_created']}")
-            print(f"   Layout: {result['layout_used']}")
-            print(f"   Dimensions: {result['slide_dimensions']['aspect_ratio']}")
+            sys.stdout.write(f"Created presentation: {result['file']}\n")
+            sys.stdout.write(f"  Slides: {result['slides_created']}\n")
+            sys.stdout.write(f"  Layout: {result['layout_used']}\n")
+            sys.stdout.write(f"  Dimensions: {result['slide_dimensions']['aspect_ratio']}\n")
             if args.template:
-                print(f"   Template: {result['template_used']}")
+                sys.stdout.write(f"  Template: {result['template_used']}\n")
         
         sys.exit(0)
+        
+    except FileNotFoundError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "FileNotFoundError",
+            "suggestion": "Verify the template file path exists and is accessible"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+        
+    except ValueError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "ValueError",
+            "suggestion": "Check slide count (1-100) and template file extension (.pptx)"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+        
+    except PowerPointAgentError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "details": getattr(e, 'details', {})
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "tool_version": __version__
         }
-        
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
         sys.exit(1)
 
 
