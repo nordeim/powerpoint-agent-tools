@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 """
-PowerPoint Add Table Tool v3.1.0
-Add data table to slide with comprehensive validation.
-
-Author: PowerPoint Agent Team
-License: MIT
-Version: 3.1.0
+PowerPoint Add Table Tool
+Add data table to slide
 
 Usage:
-    uv run tools/ppt_add_table.py --file presentation.pptx --slide 1 --rows 5 --cols 3 \\
-        --data table_data.json --position '{"left":"10%","top":"25%"}' \\
-        --size '{"width":"80%","height":"50%"}' --json
+    uv python ppt_add_table.py --file presentation.pptx --slide 1 --rows 5 --cols 3 --data table_data.json --position '{"left":"10%","top":"25%"}' --size '{"width":"80%","height":"50%"}' --json
 
 Exit Codes:
     0: Success
@@ -18,24 +12,16 @@ Exit Codes:
 """
 
 import sys
-import os
-
-sys.stderr = open(os.devnull, 'w')
-
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent,
-    PowerPointAgentError,
-    SlideNotFoundError,
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
 )
-
-__version__ = "3.1.0"
 
 
 def validate_table_params(
@@ -47,21 +33,12 @@ def validate_table_params(
 ) -> Dict[str, Any]:
     """
     Validate table parameters and return warnings/recommendations.
-    
-    Args:
-        rows: Number of rows
-        cols: Number of columns
-        position: Position specification dict
-        size: Size specification dict
-        allow_offslide: Whether to allow off-slide positioning
-        
-    Returns:
-        Dict with warnings, recommendations, and validation_results
     """
-    warnings: List[str] = []
-    recommendations: List[str] = []
-    validation_results: Dict[str, Any] = {}
+    warnings = []
+    recommendations = []
+    validation_results = {}
     
+    # Position validation (if percentage-based)
     if position:
         try:
             if "left" in position:
@@ -83,33 +60,36 @@ def validate_table_params(
                             f"Top position {top_pct}% is outside slide bounds (0-100%). "
                             "Table may not be visible. Use --allow-offslide if intentional."
                         )
-        except (ValueError, TypeError):
+        except:
             pass
     
+    # Size validation
     if size:
         try:
+            # Check if table is too small for the number of rows/cols
+            # Heuristic: ~3% height per row, ~5% width per col minimum for readability
             if "height" in size:
                 height_str = str(size["height"])
                 if height_str.endswith('%'):
                     height_pct = float(height_str.rstrip('%'))
-                    min_height = rows * 2
+                    min_height = rows * 2  # 2% per row minimum
                     if height_pct < min_height:
                         warnings.append(
-                            f"Table height {height_pct}% is very small for {rows} rows "
-                            f"(recommended: >{min_height}%). Text may be unreadable."
+                            f"Table height {height_pct}% is very small for {rows} rows (recommended: >{min_height}%). "
+                            "Text may be unreadable."
                         )
             
             if "width" in size:
                 width_str = str(size["width"])
                 if width_str.endswith('%'):
                     width_pct = float(width_str.rstrip('%'))
-                    min_width = cols * 5
+                    min_width = cols * 5  # 5% per col minimum
                     if width_pct < min_width:
                         warnings.append(
-                            f"Table width {width_pct}% is very small for {cols} columns "
-                            f"(recommended: >{min_width}%). Text may be unreadable."
+                            f"Table width {width_pct}% is very small for {cols} columns (recommended: >{min_width}%). "
+                            "Text may be unreadable."
                         )
-        except (ValueError, TypeError):
+        except:
             pass
             
     return {
@@ -126,38 +106,16 @@ def add_table(
     cols: int,
     position: Dict[str, Any],
     size: Dict[str, Any],
-    data: Optional[List[List[Any]]] = None,
-    headers: Optional[List[str]] = None,
+    data: List[List[Any]] = None,
+    headers: List[str] = None,
     allow_offslide: bool = False
 ) -> Dict[str, Any]:
-    """
-    Add table to slide with validation.
+    """Add table to slide with validation."""
     
-    Args:
-        filepath: Path to PowerPoint file (.pptx)
-        slide_index: Target slide index (0-based)
-        rows: Number of rows (including header row if headers provided)
-        cols: Number of columns
-        position: Position specification dict
-        size: Size specification dict
-        data: Optional 2D list of cell values
-        headers: Optional list of header strings
-        allow_offslide: Allow positioning outside slide bounds
-        
-    Returns:
-        Dict with operation results, validation info, and version tracking
-        
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If parameters are invalid
-        SlideNotFoundError: If slide index out of range
-    """
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
-    
-    if filepath.suffix.lower() != '.pptx':
-        raise ValueError("Only .pptx files are supported")
-    
+        
+    # Validate parameters
     validation = validate_table_params(rows, cols, position, size, allow_offslide)
     
     if rows < 1 or cols < 1:
@@ -166,44 +124,42 @@ def add_table(
     if rows > 50 or cols > 20:
         raise ValueError("Maximum table size: 50 rows × 20 columns (readability limit)")
     
-    table_data: List[List[Any]] = []
+    # Prepare data with headers
+    table_data = []
     
     if headers:
         if len(headers) != cols:
             raise ValueError(f"Headers count ({len(headers)}) must match columns ({cols})")
         table_data.append(headers)
-        data_rows = rows - 1
+        data_rows = rows - 1  # One row used for headers
     else:
         data_rows = rows
     
+    # Add data rows
     if data:
         if len(data) > data_rows:
-            raise ValueError(
-                f"Too many data rows ({len(data)}) for table size ({data_rows} data rows)"
-            )
+            raise ValueError(f"Too many data rows ({len(data)}) for table size ({data_rows} data rows)")
         
-        for row_idx, row in enumerate(data):
+        for row in data:
             if len(row) != cols:
-                raise ValueError(
-                    f"Data row {row_idx} has {len(row)} items, expected {cols}"
-                )
-            table_data.append([str(cell) for cell in row])
+                raise ValueError(f"Data row has {len(row)} items, expected {cols}")
+            table_data.append(row)
         
+        # Pad with empty rows if needed
         while len(table_data) < rows:
             table_data.append([""] * cols)
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
         
-        version_before = agent.get_presentation_version()
-        
+        # Validate slide index
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides - 1})",
-                details={"requested": slide_index, "available": total_slides}
+                f"Slide index {slide_index} out of range (0-{total_slides-1})"
             )
         
+        # Add table
         agent.add_table(
             slide_index=slide_index,
             rows=rows,
@@ -213,27 +169,24 @@ def add_table(
             data=table_data if table_data else None
         )
         
+        # Save
         agent.save()
-        
-        version_after = agent.get_presentation_version()
     
-    result: Dict[str, Any] = {
-        "status": "success" if not validation["warnings"] else "warning",
-        "file": str(filepath.resolve()),
+    result = {
+        "status": "success",
+        "file": str(filepath),
         "slide_index": slide_index,
         "rows": rows,
         "cols": cols,
         "has_headers": headers is not None,
         "data_rows_filled": len(data) if data else 0,
         "total_cells": rows * cols,
-        "validation": validation["validation_results"],
-        "presentation_version_before": version_before,
-        "presentation_version_after": version_after,
-        "tool_version": __version__
+        "validation": validation["validation_results"]
     }
     
     if validation["warnings"]:
         result["warnings"] = validation["warnings"]
+        result["status"] = "warning"
         
     if validation["recommendations"]:
         result["recommendations"] = validation["recommendations"]
@@ -261,7 +214,7 @@ Examples:
 ]
 EOF
   
-  uv run tools/ppt_add_table.py \\
+  uv python ppt_add_table.py \\
     --file presentation.pptx \\
     --slide 3 \\
     --rows 4 \\
@@ -282,7 +235,7 @@ EOF
 ]
 EOF
   
-  uv run tools/ppt_add_table.py \\
+  uv python ppt_add_table.py \\
     --file presentation.pptx \\
     --slide 4 \\
     --rows 5 \\
@@ -302,7 +255,7 @@ EOF
 ]
 EOF
   
-  uv run tools/ppt_add_table.py \\
+  uv python ppt_add_table.py \\
     --file presentation.pptx \\
     --slide 5 \\
     --rows 4 \\
@@ -314,7 +267,7 @@ EOF
     --json
   
   # Empty table (for manual filling)
-  uv run tools/ppt_add_table.py \\
+  uv python ppt_add_table.py \\
     --file presentation.pptx \\
     --slide 6 \\
     --rows 6 \\
@@ -323,6 +276,10 @@ EOF
     --position '{"left":"10%","top":"25%"}' \\
     --size '{"width":"80%","height":"60%"}' \\
     --json
+  
+  # From CSV file (convert first)
+  # cat data.csv | python -c "import csv, json, sys; print(json.dumps(list(csv.reader(sys.stdin))))" > data.json
+  # Then use --data data.json
 
 Best Practices:
   - Keep tables under 10 rows for readability
@@ -350,7 +307,7 @@ When to Use Tables vs Charts:
         '--file',
         required=True,
         type=Path,
-        help='PowerPoint file path (.pptx)'
+        help='PowerPoint file path'
     )
     
     parser.add_argument(
@@ -407,32 +364,34 @@ When to Use Tables vs Charts:
     parser.add_argument(
         '--allow-offslide',
         action='store_true',
-        help='Allow positioning outside slide bounds'
+        help='Allow positioning outside slide bounds (disables off-slide warnings)'
     )
     
     parser.add_argument(
         '--json',
         action='store_true',
-        default=True,
-        help='Output JSON response (default: true)'
+        help='Output JSON response'
     )
     
     args = parser.parse_args()
     
     try:
+        # Parse headers
         headers = None
         if args.headers:
             headers = [h.strip() for h in args.headers.split(',')]
         
+        # Load table data
         data = None
         if args.data:
             if not args.data.exists():
                 raise FileNotFoundError(f"Data file not found: {args.data}")
-            with open(args.data, 'r', encoding='utf-8') as f:
+            with open(args.data, 'r') as f:
                 data = json.load(f)
         elif args.data_string:
             data = json.loads(args.data_string)
         
+        # Validate data is 2D array
         if data is not None:
             if not isinstance(data, list):
                 raise ValueError("Data must be a 2D array (list of lists)")
@@ -451,58 +410,29 @@ When to Use Tables vs Charts:
             allow_offslide=args.allow_offslide
         )
         
-        print(json.dumps(result, indent=2))
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"✅ Added {result['rows']}×{result['cols']} table to slide {result['slide_index']}")
+            if result['has_headers']:
+                print(f"   Headers: Yes")
+            print(f"   Data rows filled: {result['data_rows_filled']}")
+            print(f"   Total cells: {result['total_cells']}")
+        
         sys.exit(0)
-        
-    except FileNotFoundError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "FileNotFoundError",
-            "suggestion": "Verify the file path exists and is accessible."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
-    except SlideNotFoundError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "SlideNotFoundError",
-            "details": getattr(e, 'details', {}),
-            "suggestion": "Use ppt_get_info.py to check available slides."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
-    except ValueError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "ValueError",
-            "suggestion": "Check table dimensions, data format, and position/size JSON."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
-    except json.JSONDecodeError as e:
-        error_result = {
-            "status": "error",
-            "error": f"Invalid JSON: {str(e)}",
-            "error_type": "JSONDecodeError",
-            "suggestion": "Validate JSON syntax. Use single quotes around JSON strings."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__,
-            "tool_version": __version__
+            "error_type": type(e).__name__
         }
-        print(json.dumps(error_result, indent=2))
+        
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e}", file=sys.stderr)
+        
         sys.exit(1)
 
 

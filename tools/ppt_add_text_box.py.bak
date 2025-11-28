@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-PowerPoint Add Text Box Tool v3.1.0
+PowerPoint Add Text Box Tool v3.0
 Add text box with flexible positioning, comprehensive validation, and accessibility checking.
+
+Fully aligned with PowerPoint Agent Core v3.0 and System Prompt v3.0.
 
 Author: PowerPoint Agent Team
 License: MIT
-Version: 3.1.0
+Version: 3.0.0
 
 Usage:
     uv run tools/ppt_add_text_box.py --file deck.pptx --slide 0 \\
@@ -16,6 +18,17 @@ Exit Codes:
     0: Success
     1: Error occurred
 
+Changelog v3.0.0:
+- Aligned with PowerPoint Agent Core v3.0
+- Returns shape_index from core for subsequent operations
+- Added presentation version tracking
+- Added word wrap control
+- Added vertical alignment option
+- Added color presets support
+- Enhanced validation (unchanged good parts from v2.0)
+- Improved error handling with v3.0 exception types
+- Consistent JSON output structure
+
 Position Formats:
   1. Percentage: {"left": "20%", "top": "30%"}
   2. Inches: {"left": 2.0, "top": 3.0}
@@ -24,26 +37,30 @@ Position Formats:
 """
 
 import sys
-import os
-
-sys.stderr = open(os.devnull, 'w')
-
 import json
 import argparse
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+# Add parent directory to path for core import
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
     PowerPointAgent,
     PowerPointAgentError,
     SlideNotFoundError,
+    InvalidPositionError,
     ColorHelper,
+    __version__ as CORE_VERSION
 )
 
-__version__ = "3.1.0"
+# ============================================================================
+# CONSTANTS
+# ============================================================================
 
+__version__ = "3.0.0"
+
+# Color presets (matching other v3.0 tools)
 COLOR_PRESETS = {
     "black": "#000000",
     "white": "#FFFFFF",
@@ -58,6 +75,7 @@ COLOR_PRESETS = {
     "muted": "#808080",
 }
 
+# Font presets
 FONT_PRESETS = {
     "default": "Calibri",
     "heading": "Calibri Light",
@@ -67,6 +85,10 @@ FONT_PRESETS = {
     "sans": "Arial",
 }
 
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
 def resolve_color(color: Optional[str]) -> Optional[str]:
     """
@@ -83,9 +105,11 @@ def resolve_color(color: Optional[str]) -> Optional[str]:
     
     color_lower = color.lower().strip()
     
+    # Check presets
     if color_lower in COLOR_PRESETS:
         return COLOR_PRESETS[color_lower]
     
+    # Ensure # prefix for hex colors
     if not color.startswith('#') and len(color) == 6:
         try:
             int(color, 16)
@@ -142,6 +166,7 @@ def validate_text_box(
     recommendations: List[str] = []
     validation_results: Dict[str, Any] = {}
     
+    # Text length validation
     text_length = len(text)
     line_count = text.count('\n') + 1
     
@@ -161,6 +186,7 @@ def validate_text_box(
             f"Multi-line text is {text_length} characters. Very long text blocks reduce readability."
         )
     
+    # Font size validation
     validation_results["font_size"] = font_size
     validation_results["font_size_accessible"] = font_size >= 14
     
@@ -178,11 +204,14 @@ def validate_text_box(
             f"Font size {font_size}pt is below recommended 14pt for projected content"
         )
     
+    # Color contrast validation
     if color:
         try:
             text_color = ColorHelper.from_hex(color)
+            
+            # Import RGBColor for background color
             from pptx.dml.color import RGBColor
-            bg_color = RGBColor(255, 255, 255)
+            bg_color = RGBColor(255, 255, 255)  # Assume white background
             
             is_large_text = font_size >= 18
             contrast_ratio = ColorHelper.contrast_ratio(text_color, bg_color)
@@ -207,44 +236,13 @@ def validate_text_box(
         except Exception as e:
             validation_results["color_error"] = str(e)
     
+    # Position validation
     if position:
-        try:
-            for key in ["left", "top"]:
-                if key in position:
-                    value_str = str(position[key])
-                    if value_str.endswith('%'):
-                        pct = float(value_str.rstrip('%'))
-                        if not allow_offslide and (pct < 0 or pct > 100):
-                            warnings.append(
-                                f"Position '{key}' is {pct}% which is outside slide bounds (0-100%). "
-                                f"Text box may not be visible."
-                            )
-        except (ValueError, TypeError):
-            pass
+        _validate_position(position, warnings, allow_offslide)
     
+    # Size validation
     if size:
-        try:
-            if "height" in size:
-                height_str = str(size["height"])
-                if height_str.endswith('%'):
-                    height_pct = float(height_str.rstrip('%'))
-                    min_height = font_size * 0.15
-                    if height_pct < min_height:
-                        warnings.append(
-                            f"Height {height_pct}% may be too small for {font_size}pt text. "
-                            f"Consider at least {min_height:.1f}%."
-                        )
-            
-            if "width" in size:
-                width_str = str(size["width"])
-                if width_str.endswith('%'):
-                    width_pct = float(width_str.rstrip('%'))
-                    if width_pct < 5:
-                        warnings.append(
-                            f"Width {width_pct}% is very narrow. Text may be excessively wrapped."
-                        )
-        except (ValueError, TypeError):
-            pass
+        _validate_size(size, font_size, warnings)
     
     return {
         "warnings": warnings,
@@ -253,6 +251,63 @@ def validate_text_box(
         "has_warnings": len(warnings) > 0
     }
 
+
+def _validate_position(
+    position: Dict[str, Any],
+    warnings: List[str],
+    allow_offslide: bool
+) -> None:
+    """Validate position values."""
+    try:
+        for key in ["left", "top"]:
+            if key in position:
+                value_str = str(position[key])
+                if value_str.endswith('%'):
+                    pct = float(value_str.rstrip('%'))
+                    if not allow_offslide and (pct < 0 or pct > 100):
+                        warnings.append(
+                            f"Position '{key}' is {pct}% which is outside slide bounds (0-100%). "
+                            f"Text box may not be visible."
+                        )
+    except (ValueError, TypeError):
+        pass
+
+
+def _validate_size(
+    size: Dict[str, Any],
+    font_size: int,
+    warnings: List[str]
+) -> None:
+    """Validate size values."""
+    try:
+        if "height" in size:
+            height_str = str(size["height"])
+            if height_str.endswith('%'):
+                height_pct = float(height_str.rstrip('%'))
+                # Estimate minimum height needed for font size
+                # Rough approximation: 1pt ≈ 0.1% of slide height
+                min_height = font_size * 0.15
+                if height_pct < min_height:
+                    warnings.append(
+                        f"Height {height_pct}% may be too small for {font_size}pt text. "
+                        f"Consider at least {min_height:.1f}%."
+                    )
+        
+        if "width" in size:
+            width_str = str(size["width"])
+            if width_str.endswith('%'):
+                width_pct = float(width_str.rstrip('%'))
+                if width_pct < 5:
+                    warnings.append(
+                        f"Width {width_pct}% is very narrow. Text may be excessively wrapped."
+                    )
+    except (ValueError, TypeError):
+        pass
+
+
+# ============================================================================
+# MAIN FUNCTION
+# ============================================================================
 
 def add_text_box(
     filepath: Path,
@@ -274,7 +329,7 @@ def add_text_box(
     Add text box with comprehensive validation and formatting.
     
     Args:
-        filepath: Path to PowerPoint file (.pptx)
+        filepath: Path to PowerPoint file
         slide_index: Slide index (0-based)
         text: Text content
         position: Position dict (supports %, inches, anchor, grid)
@@ -291,21 +346,16 @@ def add_text_box(
         
     Returns:
         Result dict with shape_index and validation info
-        
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If file format invalid
-        SlideNotFoundError: If slide index out of range
     """
+    # Validate file exists
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
-    if filepath.suffix.lower() != '.pptx':
-        raise ValueError("Only .pptx files are supported")
-    
+    # Resolve color and font
     resolved_color = resolve_color(color)
     resolved_font = resolve_font(font_name)
     
+    # Validate parameters
     validation = validate_text_box(
         text=text,
         font_size=font_size,
@@ -318,15 +368,22 @@ def add_text_box(
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
         
+        # Validate slide index
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides - 1})",
-                details={"requested": slide_index, "available": total_slides}
+                f"Slide index {slide_index} out of range",
+                details={
+                    "slide_index": slide_index,
+                    "total_slides": total_slides,
+                    "valid_range": f"0-{total_slides-1}"
+                }
             )
         
+        # Get presentation version before
         version_before = agent.get_presentation_version()
         
+        # Add text box using v3.0 core
         add_result = agent.add_text_box(
             slide_index=slide_index,
             text=text,
@@ -340,20 +397,23 @@ def add_text_box(
             alignment=alignment
         )
         
+        # Save changes
         agent.save()
         
+        # Get updated info
         version_after = agent.get_presentation_version()
         slide_info = agent.get_slide_info(slide_index)
     
+    # Build result
     result = {
         "status": "success" if not validation["has_warnings"] else "warning",
-        "file": str(filepath.resolve()),
+        "file": str(filepath),
         "slide_index": slide_index,
-        "shape_index": add_result.get("shape_index") if isinstance(add_result, dict) else add_result,
+        "shape_index": add_result.get("shape_index"),
         "text": text,
         "text_length": len(text),
-        "position": add_result.get("position", position) if isinstance(add_result, dict) else position,
-        "size": add_result.get("size", size) if isinstance(add_result, dict) else size,
+        "position": add_result.get("position", position),
+        "size": add_result.get("size", size),
         "formatting": {
             "font_name": resolved_font,
             "font_size": font_size,
@@ -366,8 +426,11 @@ def add_text_box(
         },
         "slide_shape_count": slide_info.get("shape_count", 0),
         "validation": validation["validation_results"],
-        "presentation_version_before": version_before,
-        "presentation_version_after": version_after,
+        "presentation_version": {
+            "before": version_before,
+            "after": version_after
+        },
+        "core_version": CORE_VERSION,
         "tool_version": __version__
     }
     
@@ -380,11 +443,17 @@ def add_text_box(
     return result
 
 
+# ============================================================================
+# CLI INTERFACE
+# ============================================================================
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Add text box to PowerPoint slide",
+        description="Add text box to PowerPoint slide (v3.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 POSITION FORMATS:
 
   Percentage (recommended):
@@ -402,6 +471,8 @@ POSITION FORMATS:
   Grid (12-column):
     {"grid_row": 2, "grid_col": 3, "grid_size": 12}
 
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 COLOR PRESETS:
 
   black (#000000)      white (#FFFFFF)      primary (#0070C0)
@@ -413,6 +484,8 @@ FONT PRESETS:
 
   default (Calibri)    heading (Calibri Light)   body (Calibri)
   code (Consolas)      serif (Georgia)           sans (Arial)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 EXAMPLES:
 
@@ -440,25 +513,63 @@ EXAMPLES:
     --size '{"width":"20%","height":"5%"}' \\
     --font-size 10 --color muted --json
 
+  # Multi-line text block
+  uv run tools/ppt_add_text_box.py \\
+    --file deck.pptx --slide 2 \\
+    --text "Line 1: Key Point\\nLine 2: Details\\nLine 3: Conclusion" \\
+    --position '{"left":"15%","top":"30%"}' \\
+    --size '{"width":"70%","height":"40%"}' \\
+    --font-size 18 --json
+
+  # Warning callout with color
+  uv run tools/ppt_add_text_box.py \\
+    --file deck.pptx --slide 3 \\
+    --text "⚠️ Important: Review by Friday" \\
+    --position '{"left":"10%","top":"70%"}' \\
+    --size '{"width":"80%","height":"12%"}' \\
+    --font-size 20 --bold --color danger --alignment center --json
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ACCESSIBILITY GUIDELINES:
 
   Font Size:
-    - Minimum: 10pt (absolute minimum)
-    - Recommended: 14pt+ for projected presentations
-    - Large text: 18pt+ (relaxed contrast requirements)
+    • Minimum: 10pt (absolute minimum)
+    • Recommended: 14pt+ for projected presentations
+    • Large text: 18pt+ (relaxed contrast requirements)
 
   Color Contrast (WCAG 2.1 AA):
-    - Normal text (<18pt): 4.5:1 minimum
-    - Large text (>=18pt): 3.0:1 minimum
-    - Best colors: black, dark_gray, primary
+    • Normal text (<18pt): 4.5:1 minimum
+    • Large text (≥18pt): 3.0:1 minimum
+    • Best colors: black, dark_gray, primary
+
+  Text Length:
+    • Single line: ≤100 characters recommended
+    • Multi-line: ≤500 characters total
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+VALIDATION:
+
+  The tool automatically validates:
+    • Text length and readability
+    • Font size accessibility
+    • Color contrast (WCAG AA)
+    • Position bounds
+    • Size adequacy
+
+  Warnings are included in output but don't prevent creation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         """
     )
     
+    # Required arguments
     parser.add_argument(
         '--file',
         required=True,
         type=Path,
-        help='PowerPoint file path (.pptx)'
+        help='PowerPoint file path'
     )
     
     parser.add_argument(
@@ -481,6 +592,7 @@ ACCESSIBILITY GUIDELINES:
         help='Position dict as JSON'
     )
     
+    # Optional arguments
     parser.add_argument(
         '--size',
         type=json.loads,
@@ -497,7 +609,7 @@ ACCESSIBILITY GUIDELINES:
         '--font-size',
         type=int,
         default=18,
-        help='Font size in points (default: 18, recommended: >=14)'
+        help='Font size in points (default: 18, recommended: ≥14)'
     )
     
     parser.add_argument(
@@ -550,17 +662,26 @@ ACCESSIBILITY GUIDELINES:
         help='Output JSON response (default: true)'
     )
     
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {__version__} (core: {CORE_VERSION})'
+    )
+    
     args = parser.parse_args()
     
     try:
+        # Handle size defaults
         size = args.size if args.size else {}
         position = args.position
         
+        # Allow size in position dict for convenience
         if "width" in position and "width" not in size:
             size["width"] = position.get("width")
         if "height" in position and "height" not in size:
             size["height"] = position.get("height")
         
+        # Apply defaults
         if "width" not in size:
             size["width"] = "40%"
         if "height" not in size:
@@ -583,7 +704,18 @@ ACCESSIBILITY GUIDELINES:
             allow_offslide=args.allow_offslide
         )
         
-        print(json.dumps(result, indent=2))
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            status_icon = "✅" if result["status"] == "success" else "⚠️"
+            print(f"{status_icon} Added text box to slide {result['slide_index']}")
+            print(f"   Shape index: {result['shape_index']}")
+            print(f"   Text: {result['text'][:50]}{'...' if len(result['text']) > 50 else ''}")
+            if result.get("warnings"):
+                print("\n   Warnings:")
+                for warning in result["warnings"]:
+                    print(f"   ⚠️  {warning}")
+        
         sys.exit(0)
         
     except json.JSONDecodeError as e:
@@ -591,60 +723,76 @@ ACCESSIBILITY GUIDELINES:
             "status": "error",
             "error": f"Invalid JSON: {e}",
             "error_type": "JSONDecodeError",
-            "suggestion": "Use single quotes around JSON: '{\"left\":\"20%\",\"top\":\"30%\"}'"
+            "hint": "Use single quotes around JSON: '{\"left\":\"20%\",\"top\":\"30%\"}'"
         }
-        print(json.dumps(error_result, indent=2))
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: Invalid JSON - {e}", file=sys.stderr)
         sys.exit(1)
         
     except FileNotFoundError as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": "FileNotFoundError",
-            "suggestion": "Verify the file path exists and is accessible."
+            "error_type": "FileNotFoundError"
         }
-        print(json.dumps(error_result, indent=2))
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e}", file=sys.stderr)
         sys.exit(1)
         
     except SlideNotFoundError as e:
         error_result = {
             "status": "error",
-            "error": str(e),
+            "error": e.message,
             "error_type": "SlideNotFoundError",
-            "details": getattr(e, 'details', {}),
+            "details": e.details,
             "suggestion": "Use ppt_get_info.py to check available slide indices."
         }
-        print(json.dumps(error_result, indent=2))
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e.message}", file=sys.stderr)
         sys.exit(1)
         
-    except ValueError as e:
+    except InvalidPositionError as e:
         error_result = {
             "status": "error",
-            "error": str(e),
-            "error_type": "ValueError",
-            "suggestion": "Check file format is .pptx and parameters are valid."
+            "error": e.message,
+            "error_type": "InvalidPositionError",
+            "details": e.details
         }
-        print(json.dumps(error_result, indent=2))
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e.message}", file=sys.stderr)
         sys.exit(1)
         
     except PowerPointAgentError as e:
         error_result = {
             "status": "error",
-            "error": str(e),
+            "error": e.message,
             "error_type": type(e).__name__,
-            "suggestion": "Check the presentation file is valid and not corrupted."
+            "details": e.details
         }
-        print(json.dumps(error_result, indent=2))
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e.message}", file=sys.stderr)
         sys.exit(1)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__,
-            "tool_version": __version__
+            "error_type": type(e).__name__
         }
-        print(json.dumps(error_result, indent=2))
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

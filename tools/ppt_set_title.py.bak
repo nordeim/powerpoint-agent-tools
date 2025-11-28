@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """
-PowerPoint Set Title Tool v3.1.0
-Set slide title and optional subtitle with comprehensive validation.
+PowerPoint Set Title Tool
+Set slide title and optional subtitle with validation
 
-Author: PowerPoint Agent Team
-License: MIT
-Version: 3.1.0
+Version 2.0.0 - Enhanced Validation and JSON-First
 
-Usage:
-    uv run tools/ppt_set_title.py --file presentation.pptx --slide 0 --title "Q4 Results" --json
-    uv run tools/ppt_set_title.py --file deck.pptx --slide 0 --title "2024 Strategy" \\
-        --subtitle "Growth & Innovation" --json
-
-Exit Codes:
-    0: Success
-    1: Error occurred
+Changes from v1.x:
+- Enhanced: Now validates title length and provides readability warnings
+- Enhanced: Checks for placeholder availability
+- Enhanced: JSON-first output (always returns JSON)
+- Enhanced: Better error messages and suggestions
+- Enhanced: Layout compatibility warnings
+- Enhanced: Comprehensive documentation and examples
+- Fixed: Consistent response format across all scenarios
+- Fixed: Proper integration with core library v1.1.0 (fixed placeholder types)
 
 Best Practices:
 - Keep titles under 60 characters for readability
@@ -22,40 +21,51 @@ Best Practices:
 - Use "Title Slide" layout for first slide (index 0)
 - Use title case: "This Is Title Case"
 - Subtitles provide context, not repetition
+
+Usage:
+    # Set title only
+    uv run tools/ppt_set_title.py --file presentation.pptx --slide 0 --title "Q4 Results" --json
+    
+    # Set title and subtitle
+    uv run tools/ppt_set_title.py --file deck.pptx --slide 0 --title "2024 Strategy" --subtitle "Growth & Innovation" --json
+    
+    # Update existing title
+    uv run tools/ppt_set_title.py --file presentation.pptx --slide 5 --title "New Section Title" --json
+
+Exit Codes:
+    0: Success
+    1: Error occurred
 """
 
 import sys
-import os
-
-sys.stderr = open(os.devnull, 'w')
-
 import json
 import argparse
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent,
-    PowerPointAgentError,
-    SlideNotFoundError,
+    PowerPointAgent, PowerPointAgentError, SlideNotFoundError
 )
-
-__version__ = "3.1.0"
 
 
 def set_title(
     filepath: Path,
     slide_index: int,
     title: str,
-    subtitle: Optional[str] = None
+    subtitle: str = None
 ) -> Dict[str, Any]:
     """
     Set slide title and subtitle with validation.
     
+    This tool integrates with core library v1.1.0 which correctly handles:
+    - PP_PLACEHOLDER.TITLE (type 1)
+    - PP_PLACEHOLDER.CENTER_TITLE (type 3)
+    - PP_PLACEHOLDER.SUBTITLE (type 4) - FIXED in v1.1.0
+    
     Args:
-        filepath: Path to PowerPoint file (.pptx)
+        filepath: Path to PowerPoint file
         slide_index: Slide index (0-based)
         title: Title text
         subtitle: Optional subtitle text
@@ -63,31 +73,22 @@ def set_title(
     Returns:
         Dict containing:
         - status: "success" or "warning"
-        - file: Absolute file path
+        - file: File path
         - slide_index: Modified slide
         - title: Title set
         - subtitle: Subtitle set (if any)
         - layout: Current layout name
         - warnings: List of validation warnings
         - recommendations: Suggested improvements
-        - presentation_version_before: Version hash before
-        - presentation_version_after: Version hash after
-        - tool_version: Tool version
-        
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If file format invalid
-        SlideNotFoundError: If slide index out of range
     """
+    
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
-    if filepath.suffix.lower() != '.pptx':
-        raise ValueError("Only .pptx files are supported")
+    warnings = []
+    recommendations = []
     
-    warnings: List[str] = []
-    recommendations: List[str] = []
-    
+    # Validation: Title length
     if len(title) > 60:
         warnings.append(
             f"Title is {len(title)} characters (recommended: ≤60 for readability). "
@@ -100,12 +101,14 @@ def set_title(
             "Strong recommendation to shorten."
         )
     
+    # Validation: Subtitle length
     if subtitle and len(subtitle) > 100:
         warnings.append(
             f"Subtitle is {len(subtitle)} characters (recommended: ≤100). "
             "Long subtitles reduce readability."
         )
     
+    # Validation: Title case check (basic)
     if title == title.upper() and len(title) > 10:
         recommendations.append(
             "Title is all uppercase. Consider using title case for better readability: "
@@ -120,29 +123,31 @@ def set_title(
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
         
-        version_before = agent.get_presentation_version()
-        
+        # Validate slide index
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides - 1})",
-                details={"requested": slide_index, "available": total_slides}
+                f"Slide index {slide_index} out of range (0-{total_slides-1}). "
+                f"This presentation has {total_slides} slides."
             )
         
+        # Get slide info before modification
         slide_info_before = agent.get_slide_info(slide_index)
-        layout_name = slide_info_before.get("layout", "Unknown")
+        layout_name = slide_info_before["layout"]
         
+        # Layout recommendations
         if slide_index == 0 and "Title Slide" not in layout_name:
             recommendations.append(
                 f"First slide has layout '{layout_name}'. "
                 "Consider using 'Title Slide' layout for cover slides."
             )
         
+        # Check for title/subtitle placeholders
         has_title_placeholder = False
         has_subtitle_placeholder = False
         
-        for shape in slide_info_before.get("shapes", []):
-            shape_type = shape.get("type", "")
+        for shape in slide_info_before["shapes"]:
+            shape_type = shape["type"]
             if "TITLE" in shape_type or "CENTER_TITLE" in shape_type:
                 has_title_placeholder = True
             if "SUBTITLE" in shape_type:
@@ -160,24 +165,26 @@ def set_title(
                 "Subtitle will not be displayed. Consider using 'Title Slide' layout."
             )
         
+        # Set title (delegates to core library v1.1.0 with fixed placeholder types)
         agent.set_title(slide_index, title, subtitle)
         
+        # Get slide info after modification for verification
         slide_info_after = agent.get_slide_info(slide_index)
         
+        # Save
         agent.save()
-        
-        version_after = agent.get_presentation_version()
     
+    # Build response
     status = "success" if len(warnings) == 0 else "warning"
     
-    result: Dict[str, Any] = {
+    result = {
         "status": status,
-        "file": str(filepath.resolve()),
+        "file": str(filepath),
         "slide_index": slide_index,
         "title": title,
         "subtitle": subtitle,
         "layout": layout_name,
-        "shape_count": slide_info_after.get("shape_count", 0),
+        "shape_count": slide_info_after["shape_count"],
         "placeholders_found": {
             "title": has_title_placeholder,
             "subtitle": has_subtitle_placeholder
@@ -187,10 +194,7 @@ def set_title(
             "title_length_ok": len(title) <= 60,
             "subtitle_length": len(subtitle) if subtitle else 0,
             "subtitle_length_ok": len(subtitle) <= 100 if subtitle else True
-        },
-        "presentation_version_before": version_before,
-        "presentation_version_after": version_after,
-        "tool_version": __version__
+        }
     }
     
     if warnings:
@@ -204,7 +208,7 @@ def set_title(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Set PowerPoint slide title and subtitle with validation",
+        description="Set PowerPoint slide title and subtitle with validation (v2.0.0)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -228,6 +232,14 @@ Examples:
     --file presentation.pptx \\
     --slide 5 \\
     --title "Market Analysis" \\
+    --json
+  
+  # Set title on last slide
+  uv run tools/ppt_set_title.py \\
+    --file presentation.pptx \\
+    --slide 10 \\
+    --title "Thank You" \\
+    --subtitle "Questions?" \\
     --json
 
 Best Practices:
@@ -258,11 +270,46 @@ Validation:
   - Placeholder availability checks
   - Layout compatibility warnings
 
+Output Format:
+  Always returns JSON with:
+  - status: "success" or "warning"
+  - validation: Length checks and recommendations
+  - warnings: Issues that should be addressed
+  - recommendations: Optional improvements
+  
+  Example success output:
+  {
+    "status": "success",
+    "slide_index": 0,
+    "title": "Q4 Results",
+    "subtitle": "Financial Review",
+    "layout": "Title Slide",
+    "validation": {
+      "title_length": 10,
+      "title_length_ok": true
+    }
+  }
+  
+  Example with warnings:
+  {
+    "status": "warning",
+    "title": "This Is A Very Long Title That Exceeds Recommended Length",
+    "warnings": [
+      "Title is 61 characters (recommended: ≤60)"
+    ],
+    "recommendations": [
+      "Consider shortening for better visual impact"
+    ]
+  }
+
 Related Tools:
   - ppt_get_slide_info.py: Inspect slide layout and placeholders
   - ppt_set_slide_layout.py: Change slide layout
   - ppt_get_info.py: Get presentation info (total slides, layouts)
   - ppt_add_text_box.py: Add custom text if placeholders unavailable
+
+Version: 2.0.0
+Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
     
@@ -270,7 +317,7 @@ Related Tools:
         '--file',
         required=True,
         type=Path,
-        help='PowerPoint file path (.pptx)'
+        help='PowerPoint file path'
     )
     
     parser.add_argument(
@@ -311,54 +358,15 @@ Related Tools:
         print(json.dumps(result, indent=2))
         sys.exit(0)
         
-    except FileNotFoundError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "FileNotFoundError",
-            "suggestion": "Verify the file path exists and is accessible."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
-    except SlideNotFoundError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "SlideNotFoundError",
-            "details": getattr(e, 'details', {}),
-            "suggestion": "Use ppt_get_info.py to check available slides."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
-    except ValueError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "ValueError",
-            "suggestion": "Ensure file is .pptx format."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
-    except PowerPointAgentError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": type(e).__name__,
-            "suggestion": "Check the presentation file is valid."
-        }
-        print(json.dumps(error_result, indent=2))
-        sys.exit(1)
-        
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
             "error_type": type(e).__name__,
-            "tool_version": __version__
+            "file": str(args.file) if args.file else None,
+            "slide_index": args.slide if hasattr(args, 'slide') else None
         }
+        
         print(json.dumps(error_result, indent=2))
         sys.exit(1)
 
