@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""
+PowerPoint Add Slide Tool v3.1.0
+Add new slide to existing presentation with specific layout.
+Compatible with PowerPoint Agent Core v3.1.0 (Dictionary Returns).
+
+Usage:
+    uv run tools/ppt_add_slide.py --file presentation.pptx --layout "Title and Content" --index 2 --json
+
+Exit Codes:
+    0: Success
+    1: Error occurred
+"""
+
+import sys
+import json
+import argparse
+from pathlib import Path
+from typing import Dict, Any
+
+# Ensure we can import from core
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.powerpoint_agent_core import (
+    PowerPointAgent, PowerPointAgentError
+)
+
+
+def add_slide(
+    filepath: Path,
+    layout: str,
+    index: int = None,
+    set_title: str = None
+) -> Dict[str, Any]:
+    """
+    Add slide to presentation.
+    
+    Handles the v3.1.0 Core API where add_slide returns a dictionary.
+    """
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath)
+        
+        # Get available layouts for validation
+        available_layouts = agent.get_available_layouts()
+        
+        # Validate layout with fuzzy matching
+        if layout not in available_layouts:
+            layout_lower = layout.lower()
+            match_found = False
+            for avail in available_layouts:
+                if layout_lower in avail.lower():
+                    layout = avail
+                    match_found = True
+                    break
+            
+            if not match_found:
+                raise ValueError(
+                    f"Layout '{layout}' not found. "
+                    f"Available: {available_layouts}"
+                )
+        
+        # Add slide (Core v3.1.0 returns a dict)
+        add_result = agent.add_slide(layout_name=layout, index=index)
+        
+        # CRITICAL FIX: Extract the integer index from the returned dictionary
+        # The error "TypeError: '<=' not supported between 'int' and 'dict'" 
+        # occurred because the previous tool assumed add_result was an int.
+        slide_index = add_result["slide_index"]
+        version_before = add_result.get("presentation_version_before")
+        
+        # Set title if provided
+        title_set_result = None
+        if set_title:
+            # Pass the extracted integer index
+            title_set_result = agent.set_title(slide_index, set_title)
+        
+        # Get slide info before saving (for verification)
+        slide_info = agent.get_slide_info(slide_index)
+        
+        # Save the file
+        agent.save()
+        
+        # Get updated presentation info (includes final version hash)
+        prs_info = agent.get_presentation_info()
+    
+    # Construct comprehensive response
+    return {
+        "status": "success",
+        "file": str(filepath),
+        "slide_index": slide_index,
+        "layout": layout,
+        "title_set": set_title,
+        "title_set_success": title_set_result.get("title_set") if title_set_result else False,
+        "total_slides": prs_info["slide_count"],
+        "slide_info": {
+            "shape_count": slide_info["shape_count"],
+            "has_notes": slide_info["has_notes"]
+        },
+        # Version Tracking (Observability)
+        "presentation_version_before": version_before,
+        "presentation_version_after": prs_info["presentation_version"]
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Add new slide to PowerPoint presentation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Add slide at end
+  uv run tools/ppt_add_slide.py --file presentation.pptx --layout "Title and Content" --json
+  
+  # Add slide at specific position
+  uv run tools/ppt_add_slide.py --file deck.pptx --layout "Section Header" --index 2 --json
+  
+  # Add slide with title
+  uv run tools/ppt_add_slide.py --file presentation.pptx --layout "Title Slide" --title "Q4 Results" --json
+
+Common Layouts:
+  - Title Slide
+  - Title and Content
+  - Section Header
+  - Two Content
+  - Blank
+        """
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file path'
+    )
+    
+    parser.add_argument(
+        '--layout',
+        required=True,
+        help='Layout name for new slide'
+    )
+    
+    parser.add_argument(
+        '--index',
+        type=int,
+        help='Position to insert slide (0-based, default: end)'
+    )
+    
+    parser.add_argument(
+        '--title',
+        help='Optional title text to set'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        help='Output JSON response'
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        result = add_slide(
+            filepath=args.file,
+            layout=args.layout,
+            index=args.index,
+            set_title=args.title
+        )
+        
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"✅ Added slide to: {result['file']}")
+            print(f"   Layout: {result['layout']}")
+            print(f"   Position: {result['slide_index']}")
+            print(f"   Total slides: {result['total_slides']}")
+            if args.title:
+                print(f"   Title set: {result['title_set_success']}")
+            print(f"   Version: {result['presentation_version_after']}")
+        
+        sys.exit(0)
+        
+    except Exception as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+        
+        if args.json:
+            print(json.dumps(error_result, indent=2))
+        else:
+            print(f"❌ Error: {e}", file=sys.stderr)
+        
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
