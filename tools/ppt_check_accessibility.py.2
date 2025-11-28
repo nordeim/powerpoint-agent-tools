@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""
+PowerPoint Check Accessibility Tool v3.1.0
+Run WCAG 2.1 accessibility checks on presentation.
+
+This tool validates presentations against WCAG 2.1 AA accessibility standards,
+checking for:
+- Missing alt text on images
+- Low color contrast ratios
+- Reading order issues
+- Font size compliance
+
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.0
+
+Usage:
+    uv run tools/ppt_check_accessibility.py --file presentation.pptx --json
+
+Exit Codes:
+    0: Success (check 'passed' field in output for compliance status)
+    1: Error occurred (file not found, crash, etc.)
+
+Design Principles:
+    - Read-only operation (no file mutation)
+    - JSON-first output with consistent contract
+    - Comprehensive WCAG 2.1 AA coverage
+    - Actionable remediation suggestions
+"""
+
+import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null immediately.
+# This prevents libraries (pptx, warnings) from printing non-JSON text
+# which corrupts pipelines that capture stdout.
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
+import json
+import argparse
+import logging
+import uuid
+import time
+from pathlib import Path
+from typing import Dict, Any
+from datetime import datetime
+
+# Suppress any logging that might leak
+logging.basicConfig(level=logging.CRITICAL)
+
+# Add parent directory to path for core import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+__version__ = "3.1.0"
+
+try:
+    from core.powerpoint_agent_core import (
+        PowerPointAgent,
+        PowerPointAgentError
+    )
+    CORE_AVAILABLE = True
+except ImportError as import_error:
+    CORE_AVAILABLE = False
+    IMPORT_ERROR_MSG = str(import_error)
+
+
+def check_accessibility(filepath: Path) -> Dict[str, Any]:
+    """
+    Run accessibility checks on a PowerPoint presentation.
+    
+    Args:
+        filepath: Path to PowerPoint file
+        
+    Returns:
+        Dict with accessibility check results in standard format
+        
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        PowerPointAgentError: If presentation cannot be loaded
+    """
+    start_time = time.perf_counter()
+    operation_id = str(uuid.uuid4())
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath, acquire_lock=False)
+        
+        presentation_version = agent.get_presentation_version()
+        presentation_info = agent.get_presentation_info()
+        
+        raw_result = agent.check_accessibility()
+    
+    duration_ms = int((time.perf_counter() - start_time) * 1000)
+    
+    issues = raw_result.get("issues", {})
+    missing_alt_text = issues.get("missing_alt_text", [])
+    low_contrast = issues.get("low_contrast", [])
+    reading_order_issues = issues.get("reading_order", [])
+    small_fonts = issues.get("small_fonts", [])
+    
+    total_issues = (
+        len(missing_alt_text) + 
+        len(low_contrast) + 
+        len(reading_order_issues) + 
+        len(small_fonts)
+    )
+    
+    critical_count = len(missing_alt_text) + len(low_contrast)
+    warning_count = len(reading_order_issues)
+    info_count = len(small_fonts)
+    
+    passed = critical_count == 0
+    
+    remediation = []
+    for item in missing_alt_text:
+        slide_idx = item.get("slide", item.get("slide_index", 0))
+        shape_idx = item.get("shape", item.get("shape_index", 0))
+        remediation.append({
+            "issue": "missing_alt_text",
+            "slide_index": slide_idx,
+            "shape_index": shape_idx,
+            "fix_command": f"uv run tools/ppt_set_image_properties.py --file \"{filepath}\" --slide {slide_idx} --shape {shape_idx} --alt-text \"[DESCRIPTION]\" --json",
+            "priority": "critical"
+        })
+    
+    for item in low_contrast:
+        slide_idx = item.get("slide", item.get("slide_index", 0))
+        shape_idx = item.get("shape", item.get("shape_index", 0))
+        remediation.append({
+            "issue": "low_contrast",
+            "slide_index": slide_idx,
+            "shape_index": shape_idx,
+            "fix_command": f"uv run tools/ppt_format_text.py --file \"{filepath}\" --slide {slide_idx} --shape {shape_idx} --color \"#000000\" --json",
+            "priority": "critical"
+        })
+    
+    return {
+        "status": "success",
+        "file": str(filepath.resolve()),
+        "tool_version": __version__,
+        "operation_id": operation_id,
+        "duration_ms": duration_ms,
+        "checked_at": datetime.now().isoformat(),
+        "presentation_version": presentation_version,
+        "passed": passed,
+        "wcag_level": "AA",
+        "summary": {
+            "total_issues": total_issues,
+            "critical_count": critical_count,
+            "warning_count": warning_count,
+            "info_count": info_count,
+            "missing_alt_text_count": len(missing_alt_text),
+            "low_contrast_count": len(low_contrast),
+            "reading_order_issues_count": len(reading_order_issues),
+            "small_font_count": len(small_fonts),
+            "slide_count": presentation_info.get("slide_count", 0)
+        },
+        "issues": {
+            "missing_alt_text": missing_alt_text,
+            "low_contrast": low_contrast,
+            "reading_order": reading_order_issues,
+            "small_fonts": small_fonts
+        },
+        "remediation": remediation,
+        "compliance_status": "compliant" if passed else "non_compliant"
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Check PowerPoint accessibility (WCAG 2.1 AA) - v{__version__}",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f"""
+Examples:
+    uv run tools/ppt_check_accessibility.py --file presentation.pptx --json
+    
+Output includes:
+    - passed: Boolean indicating WCAG 2.1 AA compliance
+    - summary: Issue counts by category
+    - issues: Detailed list of accessibility violations
+    - remediation: Suggested fix commands
+
+Version: {__version__}
+        """
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file path'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        default=True,
+        help='Output JSON response (default: true)'
+    )
+    
+    args = parser.parse_args()
+    
+    if not CORE_AVAILABLE:
+        error_result = {
+            "status": "error",
+            "error": f"Core module import failed: {IMPORT_ERROR_MSG}",
+            "error_type": "ImportError",
+            "tool_version": __version__,
+            "suggestion": "Ensure core/powerpoint_agent_core.py is available and dependencies are installed"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+    
+    try:
+        result = check_accessibility(filepath=args.file)
+        sys.stdout.write(json.dumps(result, indent=2) + "\n")
+        sys.exit(0)
+        
+    except FileNotFoundError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "FileNotFoundError",
+            "tool_version": __version__,
+            "suggestion": "Verify the file path exists and is accessible"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+        
+    except Exception as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "tool_version": __version__,
+            "suggestion": "Check that the file is a valid .pptx and not corrupted"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

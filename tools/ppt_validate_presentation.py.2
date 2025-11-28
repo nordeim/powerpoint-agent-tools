@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""
+PowerPoint Validate Presentation Tool v3.1.0
+Comprehensive validation for structure, accessibility, assets, and design quality.
+
+Fully aligned with PowerPoint Agent Core v3.1.0 and System Prompt v3.0 validation gates.
+
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.0
+
+Usage:
+    uv run tools/ppt_validate_presentation.py --file presentation.pptx --json
+    uv run tools/ppt_validate_presentation.py --file presentation.pptx --policy strict --json
+    uv run tools/ppt_validate_presentation.py --file presentation.pptx --require-all-alt-text --json
+
+Exit Codes:
+    0: Success (valid or only warnings within policy thresholds)
+    1: Usage error (invalid arguments)
+    2: Validation failed (critical issues exceed policy thresholds)
+
+Design Principles:
+    - Read-only operation (no file mutation)
+    - Policy-driven validation thresholds
+    - Actionable remediation suggestions
+    - Complete audit trail with version tracking
+"""
+
+import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null immediately.
+# This prevents libraries (pptx, warnings) from printing non-JSON text
+# which corrupts pipelines that capture stdout.
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
+import json
+import argparse
+import logging
+import uuid
+import time
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Set
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+
+# Suppress any logging
+logging.basicConfig(level=logging.CRITICAL)
+
+# Add parent directory to path for core import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+__version__ = "3.1.0"
+
+try:
+    from core.powerpoint_agent_core import (
+        PowerPointAgent,
+        PowerPointAgentError
+    )
+    CORE_AVAILABLE = True
+    IMPORT_ERROR = None
+except ImportError as e:
+    CORE_AVAILABLE = False
+    IMPORT_ERROR = str(e)
+
+VALIDATION_POLICIES = {
+    "lenient": {
+        "name": "Lenient",
+        "description": "Relaxed thresholds for draft presentations",
+        "thresholds": {
+            "max_critical_issues": 10,
+            "max_accessibility_issues": 20,
+            "max_design_warnings": 50,
+            "max_empty_slides": 5,
+            "max_slides_without_titles": 10,
+            "max_missing_alt_text": 20,
+            "max_low_contrast": 10,
+            "max_large_images": 10,
+            "require_all_alt_text": False,
+            "enforce_6x6_rule": False,
+            "max_fonts": 10,
+            "max_colors": 20,
+            "max_bullets_per_slide": 10,
+            "max_words_per_bullet": 15
+        }
+    },
+    "standard": {
+        "name": "Standard",
+        "description": "Balanced thresholds for typical presentations",
+        "thresholds": {
+            "max_critical_issues": 0,
+            "max_accessibility_issues": 5,
+            "max_design_warnings": 10,
+            "max_empty_slides": 0,
+            "max_slides_without_titles": 3,
+            "max_missing_alt_text": 5,
+            "max_low_contrast": 3,
+            "max_large_images": 5,
+            "require_all_alt_text": False,
+            "enforce_6x6_rule": False,
+            "max_fonts": 5,
+            "max_colors": 10,
+            "max_bullets_per_slide": 8,
+            "max_words_per_bullet": 10
+        }
+    },
+    "strict": {
+        "name": "Strict",
+        "description": "Production-ready thresholds for final presentations",
+        "thresholds": {
+            "max_critical_issues": 0,
+            "max_accessibility_issues": 0,
+            "max_design_warnings": 3,
+            "max_empty_slides": 0,
+            "max_slides_without_titles": 0,
+            "max_missing_alt_text": 0,
+            "max_low_contrast": 0,
+            "max_large_images": 3,
+            "require_all_alt_text": True,
+            "enforce_6x6_rule": True,
+            "max_fonts": 3,
+            "max_colors": 5,
+            "max_bullets_per_slide": 6,
+            "max_words_per_bullet": 6
+        }
+    }
+}
+
+
+@dataclass
+class ValidationIssue:
+    """Represents a single validation issue."""
+    category: str
+    severity: str
+    message: str
+    slide_index: Optional[int] = None
+    shape_index: Optional[int] = None
+    fix_command: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "category": self.category,
+            "severity": self.severity,
+            "message": self.message
+        }
+        if self.slide_index is not None:
+            result["slide_index"] = self.slide_index
+        if self.shape_index is not None:
+            result["shape_index"] = self.shape_index
+        if self.fix_command:
+            result["fix_command"] = self.fix_command
+        if self.details:
+            result["details"] = self.details
+        return result
+
+
+@dataclass
+class ValidationSummary:
+    """Summary statistics for validation results."""
+    total_issues: int = 0
+    critical_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+    empty_slides: int = 0
+    slides_without_titles: int = 0
+    missing_alt_text: int = 0
+    low_contrast: int = 0
+    large_images: int = 0
+    fonts_used: int = 0
+    colors_detected: int = 0
+    bullets_exceeding_limit: int = 0
+    words_exceeding_limit: int = 0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ValidationPolicy:
+    """Validation policy configuration."""
+    name: str
+    thresholds: Dict[str, Any]
+    description: str = ""
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "thresholds": self.thresholds
+        }
+
+
+def get_policy(policy_name: str, custom_thresholds: Optional[Dict[str, Any]] = None) -> ValidationPolicy:
+    """
+    Get validation policy by name with optional custom overrides.
+    
+    Args:
+        policy_name: Name of predefined policy or "custom"
+        custom_thresholds: Optional dict of threshold overrides
+        
+    Returns:
+        ValidationPolicy instance
+    """
+    if policy_name == "custom" and custom_thresholds:
+        base = VALIDATION_POLICIES["standard"]["thresholds"].copy()
+        base.update(custom_thresholds)
+        return ValidationPolicy(
+            name="Custom",
+            thresholds=base,
+            description="Custom policy with user-specified thresholds"
+        )
+    
+    config = VALIDATION_POLICIES.get(policy_name, VALIDATION_POLICIES["standard"])
+    return ValidationPolicy(
+        name=config["name"],
+        thresholds=config["thresholds"],
+        description=config.get("description", "")
+    )
+
+
+def validate_presentation(filepath: Path, policy: ValidationPolicy) -> Dict[str, Any]:
+    """
+    Run comprehensive validation on a PowerPoint presentation.
+    
+    Args:
+        filepath: Path to PowerPoint file
+        policy: Validation policy with thresholds
+        
+    Returns:
+        Complete validation report dict
+        
+    Raises:
+        FileNotFoundError: If file doesn't exist
+    """
+    start_time = time.perf_counter()
+    operation_id = str(uuid.uuid4())
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    issues: List[ValidationIssue] = []
+    summary = ValidationSummary()
+    colors_found: Set[str] = set()
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath, acquire_lock=False)
+        
+        presentation_version = agent.get_presentation_version()
+        presentation_info = agent.get_presentation_info()
+        slide_count = presentation_info.get("slide_count", 0)
+        
+        core_validation = agent.validate_presentation()
+        accessibility_result = agent.check_accessibility()
+        asset_result = agent.validate_assets()
+        
+        _process_core_validation(core_validation, issues, summary, colors_found)
+        _process_accessibility(accessibility_result, issues, summary, str(filepath))
+        _process_assets(asset_result, issues, summary)
+        _validate_design_rules(agent, issues, summary, policy, 
