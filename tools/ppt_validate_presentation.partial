@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+"""
+PowerPoint Validate Presentation Tool v3.1.0
+Comprehensive validation for structure, accessibility, assets, and design quality.
+
+Fully aligned with PowerPoint Agent Core v3.1.0 and System Prompt v3.0 validation gates.
+
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.0
+
+Usage:
+    uv run tools/ppt_validate_presentation.py --file presentation.pptx --json
+    uv run tools/ppt_validate_presentation.py --file presentation.pptx --policy strict --json
+
+Exit Codes:
+    0: Success (valid or only warnings within policy thresholds)
+    1: Error occurred 
+    2: Validation failed (critical issues exceed policy thresholds)
+
+Design Principles:
+    - Read-only operation (acquire_lock=False)
+    - Policy-based validation with configurable thresholds
+    - Comprehensive issue categorization
+    - Actionable recommendations with fix commands
+"""
+
+import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null immediately.
+# This prevents libraries (pptx, warnings) from printing non-JSON text
+# which corrupts pipelines that capture 2>&1.
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
+import json
+import argparse
+import logging
+import time
+import uuid
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+
+# Configure logging to null handler
+logging.basicConfig(level=logging.CRITICAL)
+
+# Add parent directory to path for core import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+__version__ = "3.1.0"
+
+VALIDATION_POLICIES = {
+    "lenient": {
+        "name": "Lenient",
+        "description": "Minimal validation, allows most issues",
+        "thresholds": {
+            "max_critical_issues": 10,
+            "max_accessibility_issues": 20,
+            "max_design_warnings": 50,
+            "max_empty_slides": 5,
+            "max_slides_without_titles": 10,
+            "max_missing_alt_text": 20,
+            "max_low_contrast": 10,
+            "max_large_images": 10,
+            "require_all_alt_text": False,
+            "enforce_6x6_rule": False,
+            "max_fonts": 10,
+            "max_colors": 20,
+        }
+    },
+    "standard": {
+        "name": "Standard",
+        "description": "Balanced validation for general use",
+        "thresholds": {
+            "max_critical_issues": 0,
+            "max_accessibility_issues": 5,
+            "max_design_warnings": 10,
+            "max_empty_slides": 0,
+            "max_slides_without_titles": 3,
+            "max_missing_alt_text": 5,
+            "max_low_contrast": 3,
+            "max_large_images": 5,
+            "require_all_alt_text": False,
+            "enforce_6x6_rule": False,
+            "max_fonts": 5,
+            "max_colors": 10,
+        }
+    },
+    "strict": {
+        "name": "Strict",
+        "description": "Maximum validation for production deliverables",
+        "thresholds": {
+            "max_critical_issues": 0,
+            "max_accessibility_issues": 0,
+            "max_design_warnings": 3,
+            "max_empty_slides": 0,
+            "max_slides_without_titles": 0,
+            "max_missing_alt_text": 0,
+            "max_low_contrast": 0,
+            "max_large_images": 3,
+            "require_all_alt_text": True,
+            "enforce_6x6_rule": True,
+            "max_fonts": 3,
+            "max_colors": 5,
+        }
+    }
+}
+
+# ============================================================================
+# IMPORTS WITH ERROR HANDLING
+# ============================================================================
+
+try:
+    from core.powerpoint_agent_core import (
+        PowerPointAgent,
+        PowerPointAgentError
+    )
+    CORE_AVAILABLE = True
+except ImportError as e:
+    CORE_AVAILABLE = False
+    IMPORT_ERROR = str(e)
+
+
+# ============================================================================
+# DATA CLASSES
+# ============================================================================
+
+@dataclass
+class ValidationIssue:
+    """Represents a single validation issue."""
+    category: str
+    severity: str
+    message: str
+    slide_index: Optional[int] = None
+    shape_index: Optional[int] = None
+    fix_command: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "category": self.category,
+            "severity": self.severity,
+            "message": self.message
+        }
+        if self.slide_index is not None:
+            result["slide_index"] = self.slide_index
+        if self.shape_index is not None:
+            result["shape_index"] = self.shape_index
+        if self.fix_command:
+            result["fix_command"] = self.fix_command
+        if self.details:
+            result["details"] = self.details
+        return result
+
+
+@dataclass
+class ValidationSummary:
+    """Summary of validation results."""
+    total_issues: int = 0
+    critical_count: int = 0
+    warning_count: int = 0
+    info_count: int = 0
+    empty_slides: int = 0
+    slides_without_titles: int = 0
+    missing_alt_text: int = 0
+    low_contrast: int = 0
+    large_images: int = 0
+    fonts_used: int = 0
+    colors_detected: int = 0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ValidationPolicy:
+    """Validation policy configuration."""
+    name: str
+    thresholds: Dict[str, Any]
+    description: str = ""
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "description": self.description,
+            "thresholds": self.thresholds
+        }
+
+
+# ============================================================================
+# POLICY MANAGEMENT
+# ============================================================================
+
+def get_policy(policy_name: str, custom_thresholds: Optional[Dict[str, Any]] = None) -> ValidationPolicy:
+    """
+    Get a validation policy by name or create a custom one.
+    
+    Args:
+        policy_name: Name of built-in policy or "custom"
+        custom_thresholds: Custom threshold overrides
+        
+    Returns:
+        ValidationPolicy instance
+    """
+    if policy_name == "custom" and custom_thresholds:
+        base = VALIDATION_POLICIES["standard"]["thresholds"].copy()
+        base.update(custom_thresholds)
+        return ValidationPolicy(
+            name="Custom",
+            thresholds=base,
+            description="Custom policy with 
