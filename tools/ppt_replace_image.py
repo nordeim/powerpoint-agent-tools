@@ -1,17 +1,34 @@
 #!/usr/bin/env python3
 """
-PowerPoint Replace Image Tool
-Replace existing image (useful for logo/photo updates)
+PowerPoint Replace Image Tool v3.1.0
+Replace an existing image with a new one (preserves position and size)
+
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.0
 
 Usage:
-    uv python ppt_replace_image.py --file presentation.pptx --slide 0 --old-image "logo" --new-image new_logo.png --json
+    uv run tools/ppt_replace_image.py --file presentation.pptx --slide 0 --old-image "logo" --new-image new_logo.png --json
 
 Exit Codes:
     0: Success
-    1: Error occurred
+    1: Error occurred (check error_type in JSON for details)
+
+Use Cases:
+    - Logo updates during rebranding
+    - Product photo updates
+    - Chart/diagram refreshes
+    - Team photo updates
 """
 
 import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null to prevent library noise from corrupting JSON output
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
 import json
 import argparse
 from pathlib import Path
@@ -20,9 +37,23 @@ from typing import Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError, SlideNotFoundError,
-    ImageNotFoundError
+    PowerPointAgent, 
+    PowerPointAgentError, 
+    SlideNotFoundError
 )
+
+__version__ = "3.1.0"
+
+# Define fallback exception if not available in core
+try:
+    from core.powerpoint_agent_core import ImageNotFoundError
+except ImportError:
+    class ImageNotFoundError(PowerPointAgentError):
+        """Exception raised when image is not found."""
+        def __init__(self, message: str, details: Dict = None):
+            self.message = message
+            self.details = details or {}
+            super().__init__(message)
 
 
 def replace_image(
@@ -32,25 +63,87 @@ def replace_image(
     new_image: Path,
     compress: bool = False
 ) -> Dict[str, Any]:
-    """Replace image in presentation."""
+    """
+    Replace an existing image with a new one.
     
+    Searches for an image by name (exact or partial match) and replaces
+    it with the new image while preserving the original position and size.
+    
+    Args:
+        filepath: Path to the PowerPoint file to modify
+        slide_index: Index of the slide containing the image (0-based)
+        old_image: Name or partial name of the image to replace
+        new_image: Path to the new image file
+        compress: Whether to compress the new image (default: False)
+        
+    Returns:
+        Dict containing:
+            - status: "success"
+            - file: Absolute path to modified file
+            - slide_index: Index of the slide
+            - old_image: Name/pattern that was searched
+            - new_image: Path to the new image
+            - new_image_size_bytes: Size of new image file
+            - new_image_size_mb: Size in MB
+            - compressed: Whether compression was applied
+            - replaced: True if replacement succeeded
+            - presentation_version_before: State hash before replacement
+            - presentation_version_after: State hash after replacement
+            - tool_version: Version of this tool
+            
+    Raises:
+        FileNotFoundError: If PowerPoint or new image file doesn't exist
+        SlideNotFoundError: If slide index is out of range
+        ImageNotFoundError: If old image is not found on the slide
+        
+    Example:
+        >>> result = replace_image(
+        ...     filepath=Path("presentation.pptx"),
+        ...     slide_index=0,
+        ...     old_image="company_logo",
+        ...     new_image=Path("new_logo.png")
+        ... )
+        >>> print(result["replaced"])
+        True
+    """
+    # Validate presentation file exists
     if not filepath.exists():
-        raise FileNotFoundError(f"File not found: {filepath}")
+        raise FileNotFoundError(f"Presentation file not found: {filepath}")
     
+    # Validate new image file exists
     if not new_image.exists():
-        raise ImageNotFoundError(f"New image not found: {new_image}")
+        raise ImageNotFoundError(
+            f"New image file not found: {new_image}",
+            details={"new_image_path": str(new_image)}
+        )
+    
+    # Validate image format
+    valid_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif'}
+    if new_image.suffix.lower() not in valid_extensions:
+        raise ValueError(
+            f"Unsupported image format: {new_image.suffix}. "
+            f"Supported formats: {', '.join(sorted(valid_extensions))}"
+        )
     
     with PowerPointAgent(filepath) as agent:
         agent.open(filepath)
+        
+        # Capture version BEFORE replacement
+        info_before = agent.get_presentation_info()
+        version_before = info_before.get("presentation_version")
         
         # Validate slide index
         total_slides = agent.get_slide_count()
         if not 0 <= slide_index < total_slides:
             raise SlideNotFoundError(
-                f"Slide index {slide_index} out of range (0-{total_slides-1})"
+                f"Slide index {slide_index} out of range (0-{total_slides - 1})",
+                details={
+                    "requested_index": slide_index,
+                    "available_slides": total_slides
+                }
             )
         
-        # Try to replace by name
+        # Attempt replacement
         replaced = agent.replace_image(
             slide_index=slide_index,
             old_image_name=old_image,
@@ -60,26 +153,37 @@ def replace_image(
         
         if not replaced:
             raise ImageNotFoundError(
-                f"Image '{old_image}' not found on slide {slide_index}. "
-                "Use ppt_get_slide_info.py to list images."
+                f"Image matching '{old_image}' not found on slide {slide_index}. "
+                "Use ppt_get_slide_info.py to list available images.",
+                details={
+                    "search_pattern": old_image,
+                    "slide_index": slide_index
+                }
             )
         
-        # Save
+        # Save changes
         agent.save()
+        
+        # Capture version AFTER replacement
+        info_after = agent.get_presentation_info()
+        version_after = info_after.get("presentation_version")
     
     # Get new image size
     new_size = new_image.stat().st_size
     
     return {
         "status": "success",
-        "file": str(filepath),
+        "file": str(filepath.resolve()),
         "slide_index": slide_index,
         "old_image": old_image,
-        "new_image": str(new_image),
+        "new_image": str(new_image.resolve()),
         "new_image_size_bytes": new_size,
         "new_image_size_mb": round(new_size / (1024 * 1024), 2),
         "compressed": compress,
-        "replaced": True
+        "replaced": True,
+        "presentation_version_before": version_before,
+        "presentation_version_after": version_after,
+        "tool_version": __version__
     }
 
 
@@ -90,15 +194,15 @@ def main():
         epilog="""
 Examples:
   # Replace logo by name
-  uv python ppt_replace_image.py \\
+  uv run tools/ppt_replace_image.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --old-image "company_logo" \\
     --new-image new_logo.png \\
     --json
   
-  # Replace and compress
-  uv python ppt_replace_image.py \\
+  # Replace with compression
+  uv run tools/ppt_replace_image.py \\
     --file presentation.pptx \\
     --slide 5 \\
     --old-image "product_photo" \\
@@ -106,8 +210,8 @@ Examples:
     --compress \\
     --json
   
-  # Replace image with partial name match
-  uv python ppt_replace_image.py \\
+  # Partial name match
+  uv run tools/ppt_replace_image.py \\
     --file presentation.pptx \\
     --slide 0 \\
     --old-image "logo" \\
@@ -115,37 +219,42 @@ Examples:
     --json
 
 Finding Images:
-  # List images on slide
-  uv python ppt_get_slide_info.py \\
-    --file presentation.pptx \\
-    --slide 0 \\
-    --json
-
-Use Cases:
-  - Logo updates (rebranding)
-  - Product photo updates
-  - Team photo updates
-  - Chart/diagram updates
-  - Screenshot updates
+  Use ppt_get_slide_info.py to list images on a slide:
+  uv run tools/ppt_get_slide_info.py --file deck.pptx --slide 0 --json
 
 Search Strategy:
   The tool searches for images by:
   1. Exact name match
   2. Partial name match (contains)
-  3. First match wins
+  3. First match is replaced
 
-Image Compression:
-  --compress flag reduces size by:
-  - Resizing to max 1920px width
-  - Converting to JPEG at 85% quality
+Compression (--compress):
+  - Resizes to max 1920px width
+  - Converts to JPEG at 85% quality
   - Typically reduces size 50-70%
+  - Recommended for images > 1MB
 
 Best Practices:
   - Use descriptive image names in PowerPoint
-  - Keep new images similar dimensions to old
-  - Use --compress for large images (>1MB)
-  - Test on a copy first
+  - Keep new image dimensions similar to original
+  - Use --compress for large replacement images
+  - Test on a cloned copy first
   - Verify aspect ratios match
+
+Output Format:
+  {
+    "status": "success",
+    "file": "/path/to/presentation.pptx",
+    "slide_index": 0,
+    "old_image": "company_logo",
+    "new_image": "/path/to/new_logo.png",
+    "new_image_size_mb": 0.15,
+    "compressed": false,
+    "replaced": true,
+    "presentation_version_before": "a1b2c3d4...",
+    "presentation_version_after": "e5f6g7h8...",
+    "tool_version": "3.1.0"
+  }
         """
     )
     
@@ -166,7 +275,7 @@ Best Practices:
     parser.add_argument(
         '--old-image',
         required=True,
-        help='Name or pattern of image to replace'
+        help='Name or partial name of image to replace'
     )
     
     parser.add_argument(
@@ -185,7 +294,8 @@ Best Practices:
     parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
@@ -199,30 +309,59 @@ Best Practices:
             compress=args.compress
         )
         
-        if args.json:
-            print(json.dumps(result, indent=2))
-        else:
-            print(f"✅ Replaced image on slide {result['slide_index']}")
-            print(f"   Old: {result['old_image']}")
-            print(f"   New: {result['new_image']}")
-            print(f"   Size: {result['new_image_size_mb']} MB")
-            if args.compress:
-                print(f"   Compressed: Yes")
-        
+        sys.stdout.write(json.dumps(result, indent=2) + "\n")
         sys.exit(0)
+        
+    except (FileNotFoundError, ImageNotFoundError) as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "details": getattr(e, 'details', {}),
+            "suggestion": "Use ppt_get_slide_info.py to list available images on the slide"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+        
+    except SlideNotFoundError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "SlideNotFoundError",
+            "details": getattr(e, 'details', {}),
+            "suggestion": "Use ppt_get_info.py to check available slide indices"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+        
+    except ValueError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "ValueError",
+            "suggestion": "Check image file format (PNG, JPG, GIF, BMP supported)"
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
+        
+    except PowerPointAgentError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "details": getattr(e, 'details', {})
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.exit(1)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "tool_version": __version__
         }
-        
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
         sys.exit(1)
 
 
