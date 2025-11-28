@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-PowerPoint Capability Probe Tool v3.1.0
-Detect and report presentation template capabilities, layouts, and theme properties.
+PowerPoint Capability Probe Tool
+Detect and report presentation template capabilities, layouts, and theme properties
+
+Version 1.1.1 - Schema Alignment & Strict Validation
 
 This tool provides comprehensive introspection of PowerPoint presentations to detect:
 - Available layouts and their placeholders (with accurate runtime positions)
@@ -12,6 +14,19 @@ This tool provides comprehensive introspection of PowerPoint presentations to de
 
 Critical for AI agents and automation workflows to understand template capabilities
 before generating content.
+
+Changes in v1.1.0:
+- Fixed: JSON contract consistency (added status, operation_id, duration_ms)
+- Fixed: Placeholder type detection (uses python-pptx enum, not guessed numbers)
+- Enhanced: Position accuracy (transient slide instantiation in deep mode)
+- Enhanced: Theme extraction (uses font_scheme API, robust color conversion)
+- Enhanced: Capability detection (includes layout indices, per-master stats)
+- Added: Library version reporting (python-pptx, Pillow)
+- Added: Top-level warnings and info arrays
+- Added: Multiple masters support
+- Added: Edge case handling (locked files, large templates, timeouts)
+- Added: Comprehensive validation before output
+- Updated: v1.1.1 - Aligned with schema v1.1.1 and added strict validation
 
 Usage:
     # Basic probe (essential info)
@@ -33,78 +48,36 @@ Design Principles:
     - Accurate data via transient slide instantiation
     - Graceful degradation for missing features
     - Performance-optimized with timeout protection
-
-Author: PowerPoint Agent Team
-License: MIT
-Version: 3.1.0
 """
 
 import sys
-import os
-
-# --- HYGIENE BLOCK START ---
-# CRITICAL: Redirect stderr to /dev/null immediately to prevent library noise.
-# This guarantees that `jq` or other parsers only see your JSON on stdout.
-sys.stderr = open(os.devnull, 'w')
-# --- HYGIENE BLOCK END ---
-
 import json
 import argparse
 import hashlib
 import uuid
 import time
-import logging
 import importlib.metadata
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
-from fractions import Fraction
+from io import BytesIO
 
-# Configure logging to null handler
-logging.basicConfig(level=logging.CRITICAL)
-
-# Add parent directory to path for core import
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# ============================================================================
-# CONSTANTS
-# ============================================================================
-
-__version__ = "3.1.0"
-SCHEMA_VERSION = "capability_probe.v3.1.0"
-DEFAULT_TIMEOUT_SECONDS = 15
-DEFAULT_MAX_LAYOUTS = 50
-
-# ============================================================================
-# SAFE IMPORTS
-# ============================================================================
 
 try:
     from pptx import Presentation
     from pptx.enum.shapes import PP_PLACEHOLDER
-    PPTX_AVAILABLE = True
 except ImportError:
-    PPTX_AVAILABLE = False
-    PP_PLACEHOLDER = None
+    print(json.dumps({
+        "status": "error",
+        "error": "python-pptx not installed",
+        "error_type": "ImportError"
+    }, indent=2))
+    sys.exit(1)
 
-try:
-    from core.powerpoint_agent_core import PowerPointAgentError
-except ImportError:
-    class PowerPointAgentError(Exception):
-        """Fallback exception class."""
-        pass
+from core.powerpoint_agent_core import PowerPointAgentError
+from core.strict_validator import validate_against_schema
 
-try:
-    from core.strict_validator import validate_against_schema
-    STRICT_VALIDATOR_AVAILABLE = True
-except ImportError:
-    STRICT_VALIDATOR_AVAILABLE = False
-    def validate_against_schema(data, schema_path):
-        pass
-
-# ============================================================================
-# LIBRARY VERSION DETECTION
-# ============================================================================
 
 def get_library_versions() -> Dict[str, str]:
     """
@@ -117,30 +90,16 @@ def get_library_versions() -> Dict[str, str]:
     
     try:
         versions["python-pptx"] = importlib.metadata.version("python-pptx")
-    except importlib.metadata.PackageNotFoundError:
-        versions["python-pptx"] = "not_installed"
-    except Exception:
+    except:
         versions["python-pptx"] = "unknown"
     
     try:
         versions["Pillow"] = importlib.metadata.version("Pillow")
-    except importlib.metadata.PackageNotFoundError:
+    except:
         versions["Pillow"] = "not_installed"
-    except Exception:
-        versions["Pillow"] = "unknown"
-    
-    try:
-        versions["lxml"] = importlib.metadata.version("lxml")
-    except importlib.metadata.PackageNotFoundError:
-        versions["lxml"] = "not_installed"
-    except Exception:
-        versions["lxml"] = "unknown"
     
     return versions
 
-# ============================================================================
-# PLACEHOLDER TYPE MAPPING
-# ============================================================================
 
 def build_placeholder_type_map() -> Dict[int, str]:
     """
@@ -153,23 +112,15 @@ def build_placeholder_type_map() -> Dict[int, str]:
     """
     type_map = {}
     
-    if PP_PLACEHOLDER is None:
-        return type_map
-    
     for name in dir(PP_PLACEHOLDER):
-        if name.isupper() and not name.startswith('_'):
+        if name.isupper():
             try:
                 member = getattr(PP_PLACEHOLDER, name)
-                if isinstance(member, int):
-                    code = member
-                elif hasattr(member, 'value'):
-                    code = member.value
-                else:
-                    continue
+                code = member if isinstance(member, int) else getattr(member, "value", None)
                 if code is not None:
                     type_map[int(code)] = name
-            except (AttributeError, TypeError, ValueError):
-                continue
+            except:
+                pass
     
     return type_map
 
@@ -189,9 +140,6 @@ def get_placeholder_type_name(ph_type_code: int) -> str:
     """
     return PLACEHOLDER_TYPE_MAP.get(ph_type_code, f"UNKNOWN_{ph_type_code}")
 
-# ============================================================================
-# FILE UTILITIES
-# ============================================================================
 
 def calculate_file_checksum(filepath: Path) -> str:
     """
@@ -209,9 +157,6 @@ def calculate_file_checksum(filepath: Path) -> str:
             md5.update(chunk)
     return md5.hexdigest()
 
-# ============================================================================
-# COLOR UTILITIES
-# ============================================================================
 
 def rgb_to_hex(rgb_color) -> str:
     """
@@ -225,12 +170,9 @@ def rgb_to_hex(rgb_color) -> str:
     """
     try:
         return f"#{rgb_color.r:02X}{rgb_color.g:02X}{rgb_color.b:02X}"
-    except (AttributeError, TypeError):
+    except:
         return "#000000"
 
-# ============================================================================
-# DIMENSION DETECTION
-# ============================================================================
 
 def detect_slide_dimensions(prs) -> Dict[str, Any]:
     """
@@ -252,17 +194,15 @@ def detect_slide_dimensions(prs) -> Dict[str, Any]:
     width_pixels = int(width_inches * dpi_estimate)
     height_pixels = int(height_inches * dpi_estimate)
     
-    ratio = width_inches / height_inches if height_inches > 0 else 0
-    
+    ratio = width_inches / height_inches
     if abs(ratio - 16/9) < 0.01:
         aspect_ratio = "16:9"
     elif abs(ratio - 4/3) < 0.01:
         aspect_ratio = "4:3"
-    elif width_pixels > 0 and height_pixels > 0:
+    else:
+        from fractions import Fraction
         frac = Fraction(width_pixels, height_pixels).limit_denominator(20)
         aspect_ratio = f"{frac.numerator}:{frac.denominator}"
-    else:
-        aspect_ratio = "unknown"
     
     return {
         "width_inches": round(width_inches, 2),
@@ -276,16 +216,8 @@ def detect_slide_dimensions(prs) -> Dict[str, Any]:
         "dpi_estimate": dpi_estimate
     }
 
-# ============================================================================
-# PLACEHOLDER ANALYSIS
-# ============================================================================
 
-def analyze_placeholder(
-    shape, 
-    slide_width: float, 
-    slide_height: float, 
-    instantiated: bool = False
-) -> Dict[str, Any]:
+def analyze_placeholder(shape, slide_width: float, slide_height: float, instantiated: bool = False) -> Dict[str, Any]:
     """
     Analyze a single placeholder and return comprehensive info.
     
@@ -299,22 +231,20 @@ def analyze_placeholder(
         Dict with type, position, size information
     """
     ph_format = shape.placeholder_format
-    ph_type = ph_format.type if hasattr(ph_format.type, '__int__') else int(ph_format.type) if ph_format.type else 0
+    ph_type = ph_format.type
     ph_type_name = get_placeholder_type_name(ph_type)
     
     try:
-        left_emu = int(shape.left) if hasattr(shape, 'left') and shape.left is not None else 0
-        top_emu = int(shape.top) if hasattr(shape, 'top') and shape.top is not None else 0
-        width_emu = int(shape.width) if hasattr(shape, 'width') and shape.width is not None else 0
-        height_emu = int(shape.height) if hasattr(shape, 'height') and shape.height is not None else 0
+        left_emu = shape.left if hasattr(shape, 'left') else 0
+        top_emu = shape.top if hasattr(shape, 'top') else 0
+        width_emu = shape.width if hasattr(shape, 'width') else 0
+        height_emu = shape.height if hasattr(shape, 'height') else 0
         
-        # Convert EMU to inches (914400 EMU per inch)
         left_inches = left_emu / 914400
         top_inches = top_emu / 914400
         width_inches = width_emu / 914400
         height_inches = height_emu / 914400
         
-        # Calculate percentages
         left_percent = (left_inches / slide_width * 100) if slide_width > 0 else 0
         top_percent = (top_inches / slide_height * 100) if slide_height > 0 else 0
         width_percent = (width_inches / slide_width * 100) if slide_width > 0 else 0
@@ -355,32 +285,16 @@ def analyze_placeholder(
         return {
             "type": ph_type_name,
             "type_code": ph_type,
-            "idx": ph_format.idx if hasattr(ph_format, 'idx') else None,
+            "idx": ph_format.idx,
             "error": str(e),
             "position_source": "error"
         }
 
-# ============================================================================
-# TRANSIENT SLIDE PATTERN
-# ============================================================================
 
 def _add_transient_slide(prs, layout):
     """
     Helper to safely add and remove a transient slide for deep analysis.
-    
-    Uses generator pattern to guarantee cleanup via finally block.
-    This is the production probe resilience pattern - Layer 2.
-    
-    Args:
-        prs: Presentation object
-        layout: Layout to instantiate
-        
-    Yields:
-        Temporary slide object for analysis
-        
-    Note:
-        Never call save() while a transient slide exists.
-        The slide is automatically cleaned up when the generator exits.
+    Yields the slide object, then ensures cleanup in finally block.
     """
     slide = None
     added_index = -1
@@ -391,35 +305,22 @@ def _add_transient_slide(prs, layout):
     finally:
         if added_index != -1 and added_index < len(prs.slides):
             try:
+                # Defensive check: ensure we are deleting the slide we added
+                # In a single-threaded atomic read, this should always be true
                 rId = prs.slides._sldIdLst[added_index].rId
                 prs.part.drop_rel(rId)
                 del prs.slides._sldIdLst[added_index]
             except Exception:
-                # Suppress cleanup errors to avoid masking analysis failures
-                # File is not saved, so transient slide disappears anyway
+                # If cleanup fails, we can't do much but suppress to avoid masking analysis errors
                 pass
 
-# ============================================================================
-# LAYOUT DETECTION
-# ============================================================================
 
-def detect_layouts_with_instantiation(
-    prs, 
-    slide_width: float, 
-    slide_height: float, 
-    deep: bool, 
-    warnings: List[str], 
-    timeout_start: Optional[float] = None, 
-    timeout_seconds: Optional[int] = None, 
-    max_layouts: Optional[int] = None
-) -> List[Dict[str, Any]]:
+def detect_layouts_with_instantiation(prs, slide_width: float, slide_height: float, deep: bool, warnings: List[str], timeout_start: Optional[float] = None, timeout_seconds: Optional[int] = None, max_layouts: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Detect all layouts, optionally instantiating them for accurate positions.
     
     In deep mode, creates transient slides in-memory to get runtime positions,
     then discards them without saving (maintains atomic read guarantee).
-    
-    This implements the probe resilience pattern - Layer 1 (timeout) and Layer 2 (transient).
     
     Args:
         prs: Presentation object
@@ -436,60 +337,66 @@ def detect_layouts_with_instantiation(
     """
     layouts = []
     
-    # Build mapping: layout partname -> master index for stability
+    # Build mapping: layout id -> master index
     master_map = {}
     try:
         for m_idx, master in enumerate(prs.slide_masters):
-            for layout in master.slide_layouts:
+            for l in master.slide_layouts:
+                # Use partname as a stable key instead of id()
+                # This handles cases where python-pptx might wrap objects differently
                 try:
-                    key = layout.part.partname
-                except AttributeError:
-                    key = f"master_{m_idx}_layout_{id(layout)}"
+                    key = l.part.partname
+                except:
+                    key = id(l)
                 master_map[key] = m_idx
-    except Exception:
+    except:
         pass
 
-    # Get layouts to process with optional limit
-    all_layouts = list(prs.slide_layouts)
-    layouts_to_process = all_layouts
+    layouts_to_process = list(prs.slide_layouts)
+    if max_layouts and len(layouts_to_process) > max_layouts:
+        layouts_to_process = layouts_to_process[:max_layouts]
+
+    # Capture original indices before slicing if needed, but since we slice from 0, 
+    # enumerate index matches original index for the subset. 
+    # However, to be robust against future changes where we might filter differently,
+    # let's capture the real index from the full list if possible, or just rely on the fact
+    # that we are iterating the main list.
     
-    if max_layouts and len(all_layouts) > max_layouts:
-        layouts_to_process = all_layouts[:max_layouts]
+    # Since we can't easily get the "original index" from the layout object itself without 
+    # iterating the full list again, and we know we are just slicing the top, 
+    # the current enumeration is correct for "index in the file".
+    # But let's be explicit about "original_index" for clarity.
     
     for idx, layout in enumerate(layouts_to_process):
-        # Layer 1: Timeout check at each iteration
+        # Timeout check
         if timeout_start and timeout_seconds:
-            elapsed = time.perf_counter() - timeout_start
-            if elapsed > timeout_seconds:
-                warnings.append(
-                    f"Probe timeout at layout {idx} ({elapsed:.2f}s > {timeout_seconds}s) - "
-                    "returning partial results"
-                )
+            if (time.perf_counter() - timeout_start) > timeout_seconds:
+                warnings.append(f"Probe exceeded {timeout_seconds}s timeout during layout analysis")
                 break
 
-        # Determine original index in full list
+        # Use actual index from the presentation's layout list for robustness
         try:
-            original_idx = all_layouts.index(layout)
+            original_idx = prs.slide_layouts.index(layout)
         except ValueError:
-            original_idx = idx
+            original_idx = idx # Fallback if something weird happens
 
-        # Get stable key for master mapping
+        # Determine master index using stable key
         try:
-            layout_key = layout.part.partname
-        except AttributeError:
-            layout_key = f"layout_{id(layout)}"
+            key = layout.part.partname
+        except:
+            key = id(layout)
             
         layout_info = {
             "index": idx,
             "original_index": original_idx, 
             "name": layout.name,
             "placeholder_count": len(layout.placeholders),
-            "master_index": master_map.get(layout_key)
+            "master_index": master_map.get(key, None)
         }
         
         if deep:
-            # Layer 2: Transient slide instantiation for accurate positions
             try:
+                # Use helper for safe transient slide lifecycle
                 instantiation_success = False
                 for temp_slide in _add_transient_slide(prs, layout):
                     instantiation_success = True
@@ -499,7 +406,7 @@ def detect_layouts_with_instantiation(
                     for shape in temp_slide.placeholders:
                         try:
                             instantiated_map[shape.placeholder_format.idx] = shape
-                        except (AttributeError, TypeError):
+                        except:
                             pass
                     
                     placeholders = []
@@ -509,23 +416,14 @@ def detect_layouts_with_instantiation(
                             ph_idx = layout_ph.placeholder_format.idx
                             if ph_idx in instantiated_map:
                                 # Use instantiated shape for accurate position
-                                ph_info = analyze_placeholder(
-                                    instantiated_map[ph_idx], 
-                                    slide_width, 
-                                    slide_height, 
-                                    instantiated=True
-                                )
+                                ph_info = analyze_placeholder(instantiated_map[ph_idx], slide_width, slide_height, instantiated=True)
                             else:
-                                # Fallback to layout shape
-                                ph_info = analyze_placeholder(
-                                    layout_ph, 
-                                    slide_width, 
-                                    slide_height, 
-                                    instantiated=False
-                                )
+                                # Fallback to layout shape (e.g. master placeholders not instantiated)
+                                ph_info = analyze_placeholder(layout_ph, slide_width, slide_height, instantiated=False)
                             placeholders.append(ph_info)
-                        except Exception:
+                        except:
                             pass
+                    
                     
                     layout_info["placeholders"] = placeholders
                     layout_info["instantiation_complete"] = len(placeholders) == len(layout.placeholders)
@@ -533,18 +431,17 @@ def detect_layouts_with_instantiation(
                     layout_info["placeholder_instantiated"] = len(placeholders)
 
                 if not instantiation_success:
-                    raise RuntimeError("Transient slide creation failed")
+                     raise Exception("Transient slide creation failed")
                 
             except Exception as e:
                 warnings.append(f"Could not instantiate layout '{layout.name}': {str(e)}")
                 
-                # Fallback to template positions
                 placeholders = []
                 for shape in layout.placeholders:
                     try:
                         ph_info = analyze_placeholder(shape, slide_width, slide_height, instantiated=False)
                         placeholders.append(ph_info)
-                    except Exception:
+                    except:
                         pass
                 
                 layout_info["placeholders"] = placeholders
@@ -553,20 +450,26 @@ def detect_layouts_with_instantiation(
                 layout_info["placeholder_instantiated"] = len(placeholders)
                 layout_info["_warning"] = "Using template positions (instantiation failed)"
         
-        # Build placeholder type summary (always, for quick reference)
+        if deep and layout_info.get("placeholder_instantiated", 0) != layout_info.get("placeholder_expected", 0):
+             if "_warning" not in layout_info:
+                 layout_info["_warning"] = "Using template positions (instantiation incomplete)"
+             # Also append to top-level warnings if not already there (optional, but good for visibility)
+             # We'll rely on the layout-level warning for now to avoid spamming top-level warnings
+             pass
+        
         placeholder_map = {}
         placeholder_types = []
         for shape in layout.placeholders:
             try:
                 ph_type = shape.placeholder_format.type
-                ph_type_code = ph_type if isinstance(ph_type, int) else int(ph_type) if ph_type else 0
-                ph_type_name = get_placeholder_type_name(ph_type_code)
+                ph_type_name = get_placeholder_type_name(ph_type)
                 
+                # Build map
                 placeholder_map[ph_type_name] = placeholder_map.get(ph_type_name, 0) + 1
                 
                 if ph_type_name not in placeholder_types:
                     placeholder_types.append(ph_type_name)
-            except Exception:
+            except:
                 pass
         
         layout_info["placeholder_types"] = placeholder_types
@@ -576,9 +479,6 @@ def detect_layouts_with_instantiation(
     
     return layouts
 
-# ============================================================================
-# THEME EXTRACTION
-# ============================================================================
 
 def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     """
@@ -596,15 +496,14 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     try:
         # Handle both Presentation (use first master) and SlideMaster objects
         if hasattr(master_or_prs, 'slide_masters'):
-            if len(master_or_prs.slide_masters) == 0:
-                warnings.append("No slide masters found")
-                return {}
             slide_master = master_or_prs.slide_masters[0]
         else:
             slide_master = master_or_prs
 
+        # Use getattr for safety if theme is missing
         theme = getattr(slide_master, 'theme', None)
         if not theme:
+            # Don't raise, just return empty to allow partial extraction
             warnings.append("Theme object unavailable")
             return {}
             
@@ -615,8 +514,7 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
         
         color_attrs = [
             'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6',
-            'background1', 'background2', 'text1', 'text2', 
-            'hyperlink', 'followed_hyperlink'
+            'background1', 'background2', 'text1', 'text2', 'hyperlink', 'followed_hyperlink'
         ]
         
         non_rgb_found = False
@@ -624,18 +522,20 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
             try:
                 color = getattr(color_scheme, color_name, None)
                 if color:
-                    if hasattr(color, 'r') and hasattr(color, 'g') and hasattr(color, 'b'):
+                    # Check if it's an RGBColor (has .r, .g, .b)
+                    if hasattr(color, 'r'):
                         colors[color_name] = rgb_to_hex(color)
                     else:
+                        # Fallback for scheme-based colors
                         colors[color_name] = f"schemeColor:{color_name}"
                         non_rgb_found = True
-            except Exception:
+            except:
                 pass
         
         if not colors:
             warnings.append("Theme color scheme unavailable or empty")
         elif non_rgb_found:
-            warnings.append("Theme colors include non-RGB scheme references")
+            warnings.append("Theme colors include non-RGB scheme references; semantic schemeColor values returned")
             
     except Exception as e:
         warnings.append(f"Theme color extraction failed: {str(e)}")
@@ -643,18 +543,8 @@ def extract_theme_colors(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     return colors
 
 
-def _font_name(font_obj) -> Optional[str]:
-    """
-    Helper to safely get typeface from font object.
-    
-    Args:
-        font_obj: Font object from python-pptx
-        
-    Returns:
-        Font name string or None
-    """
-    if font_obj is None:
-        return None
+def _font_name(font_obj):
+    """Helper to safely get typeface from font object."""
     return getattr(font_obj, 'typeface', str(font_obj)) if font_obj else None
 
 
@@ -675,11 +565,6 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     try:
         # Handle both Presentation (use first master) and SlideMaster objects
         if hasattr(master_or_prs, 'slide_masters'):
-            if len(master_or_prs.slide_masters) == 0:
-                fallback_used = True
-                fonts = {"heading": "Calibri", "body": "Calibri"}
-                warnings.append("No slide masters found - using default fonts")
-                return fonts
             slide_master = master_or_prs.slide_masters[0]
         else:
             slide_master = master_or_prs
@@ -697,13 +582,15 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
                     ea = getattr(major, 'east_asian', None)
                     cs = getattr(major, 'complex_script', None)
                     
+                    # Precedence: Latin > East Asian > Complex Script
                     heading_font = _font_name(latin) or _font_name(ea) or _font_name(cs)
                     if heading_font:
                         fonts['heading'] = heading_font
                     
-                    if ea and _font_name(ea):
+                    # Also capture specific scripts if available
+                    if ea:
                         fonts['heading_east_asian'] = _font_name(ea)
-                    if cs and _font_name(cs):
+                    if cs:
                         fonts['heading_complex'] = _font_name(cs)
                 
                 if minor:
@@ -711,28 +598,27 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
                     ea = getattr(minor, 'east_asian', None)
                     cs = getattr(minor, 'complex_script', None)
                     
+                    # Precedence: Latin > East Asian > Complex Script
                     body_font = _font_name(latin) or _font_name(ea) or _font_name(cs)
                     if body_font:
                         fonts['body'] = body_font
                     
-                    if ea and _font_name(ea):
+                    # Also capture specific scripts if available
+                    if ea:
                         fonts['body_east_asian'] = _font_name(ea)
-                    if cs and _font_name(cs):
+                    if cs:
                         fonts['body_complex'] = _font_name(cs)
 
-        # Fallback: detect from shapes if theme API failed
         if not fonts:
+            # Try to detect from shapes if theme API failed
             for shape in slide_master.shapes:
-                if hasattr(shape, 'text_frame') and shape.text_frame:
-                    try:
-                        for paragraph in shape.text_frame.paragraphs:
-                            if paragraph.font.name and 'heading' not in fonts:
-                                fonts['heading'] = paragraph.font.name
-                                break
-                    except Exception:
-                        pass
-                if 'heading' in fonts:
-                    break
+                if hasattr(shape, 'text_frame') and shape.text_frame.paragraphs:
+                    for paragraph in shape.text_frame.paragraphs:
+                        if paragraph.font.name and 'heading' not in fonts:
+                            fonts['heading'] = paragraph.font.name
+                            break
+                    if 'heading' in fonts:
+                        break
         
         if not fonts:
             fallback_used = True
@@ -748,9 +634,6 @@ def extract_theme_fonts(master_or_prs, warnings: List[str]) -> Dict[str, str]:
     
     return fonts
 
-# ============================================================================
-# CAPABILITY ANALYSIS
-# ============================================================================
 
 def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
     """
@@ -770,7 +653,6 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
     layouts_with_slide_number = []
     layouts_with_date = []
     
-    # Find type codes for footer, slide number, date
     footer_type_code = None
     slide_number_type_code = None
     date_type_code = None
@@ -809,59 +691,47 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         layout_has_slide_number = False
         layout_has_date = False
 
-        # Check placeholders for capability types
         if 'placeholders' in layout:
             for ph in layout['placeholders']:
-                ph_type_code = ph.get('type_code')
-                
-                if footer_type_code is not None and ph_type_code == footer_type_code:
+                if footer_type_code and ph.get('type_code') == footer_type_code:
                     has_footer = True
                     layout_has_footer = True
                     if layout_ref not in layouts_with_footer:
                         layouts_with_footer.append(layout_ref)
                 
-                if slide_number_type_code is not None and ph_type_code == slide_number_type_code:
+                if slide_number_type_code and ph.get('type_code') == slide_number_type_code:
                     has_slide_number = True
                     layout_has_slide_number = True
                     if layout_ref not in layouts_with_slide_number:
                         layouts_with_slide_number.append(layout_ref)
                 
-                if date_type_code is not None and ph_type_code == date_type_code:
+                if date_type_code and ph.get('type_code') == date_type_code:
                     has_date = True
                     layout_has_date = True
                     if layout_ref not in layouts_with_date:
                         layouts_with_date.append(layout_ref)
                         
         elif 'placeholder_types' in layout:
-            # Fallback to type names if detailed placeholders not available
             if 'FOOTER' in layout['placeholder_types']:
                 has_footer = True
                 layout_has_footer = True
-                if layout_ref not in layouts_with_footer:
-                    layouts_with_footer.append(layout_ref)
+                layouts_with_footer.append(layout_ref)
             
             if 'SLIDE_NUMBER' in layout['placeholder_types']:
                 has_slide_number = True
                 layout_has_slide_number = True
-                if layout_ref not in layouts_with_slide_number:
-                    layouts_with_slide_number.append(layout_ref)
+                layouts_with_slide_number.append(layout_ref)
             
             if 'DATE' in layout['placeholder_types']:
                 has_date = True
                 layout_has_date = True
-                if layout_ref not in layouts_with_date:
-                    layouts_with_date.append(layout_ref)
+                layouts_with_date.append(layout_ref)
         
-        # Update per-master stats
         if m_idx is not None:
-            if layout_has_footer:
-                per_master_stats[m_idx]["has_footer_layouts"] += 1
-            if layout_has_slide_number:
-                per_master_stats[m_idx]["has_slide_number_layouts"] += 1
-            if layout_has_date:
-                per_master_stats[m_idx]["has_date_layouts"] += 1
+            if layout_has_footer: per_master_stats[m_idx]["has_footer_layouts"] += 1
+            if layout_has_slide_number: per_master_stats[m_idx]["has_slide_number_layouts"] += 1
+            if layout_has_date: per_master_stats[m_idx]["has_date_layouts"] += 1
     
-    # Generate recommendations
     recommendations = []
     
     if not has_footer:
@@ -878,11 +748,6 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         recommendations.append(
             "No slide number placeholders - recommend manual text box for slide numbers"
         )
-    else:
-        layout_names = [l['name'] for l in layouts_with_slide_number]
-        recommendations.append(
-            f"Slide number placeholders available on {len(layouts_with_slide_number)} layout(s): {', '.join(layout_names)}"
-        )
     
     if not has_date:
         recommendations.append(
@@ -892,6 +757,12 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         layout_names = [l['name'] for l in layouts_with_date]
         recommendations.append(
             f"Date placeholders available on {len(layouts_with_date)} layout(s): {', '.join(layout_names)}"
+        )
+
+    if has_slide_number:
+        layout_names = [l['name'] for l in layouts_with_slide_number]
+        recommendations.append(
+            f"Slide number placeholders available on {len(layouts_with_slide_number)} layout(s): {', '.join(layout_names)}"
         )
     
     return {
@@ -909,9 +780,6 @@ def analyze_capabilities(layouts: List[Dict[str, Any]], prs) -> Dict[str, Any]:
         "recommendations": recommendations
     }
 
-# ============================================================================
-# OUTPUT VALIDATION
-# ============================================================================
 
 def validate_output(result: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """
@@ -944,21 +812,14 @@ def validate_output(result: Dict[str, Any]) -> Tuple[bool, List[str]]:
         parts = field_path.split('.')
         current = result
         
-        found = True
         for part in parts:
             if not isinstance(current, dict) or part not in current:
-                found = False
+                missing.append(field_path)
                 break
             current = current[part]
-        
-        if not found:
-            missing.append(field_path)
     
     return (len(missing) == 0, missing)
 
-# ============================================================================
-# MAIN PROBE FUNCTION
-# ============================================================================
 
 def probe_presentation(
     filepath: Path,
@@ -970,75 +831,47 @@ def probe_presentation(
     """
     Probe presentation and return comprehensive capability report.
     
-    Implements the 3-layer probe resilience pattern:
-    - Layer 1: Timeout protection
-    - Layer 2: Transient slide instantiation
-    - Layer 3: Graceful degradation with partial results
-    
     Args:
         filepath: Path to PowerPoint file
         deep: If True, perform deep analysis with transient slide instantiation
         verify_atomic: If True, verify no file mutation occurred
-        max_layouts: Maximum layouts to analyze (None = DEFAULT_MAX_LAYOUTS)
-        timeout_seconds: Maximum seconds for analysis (None = DEFAULT_TIMEOUT_SECONDS)
+        max_layouts: Maximum layouts to analyze (None = all)
         
     Returns:
         Dict with complete capability report
-        
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        PermissionError: If file is locked or inaccessible
-        PowerPointAgentError: If atomic verification fails
     """
-    # Validate inputs
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
     if not filepath.is_file():
         raise ValueError(f"Path is not a file: {filepath}")
     
-    # Check file accessibility
     try:
         with open(filepath, 'rb') as f:
             f.read(1)
     except PermissionError:
         raise PermissionError(f"File is locked or permission denied: {filepath}")
     
-    # Apply defaults
-    if timeout_seconds is None:
-        timeout_seconds = DEFAULT_TIMEOUT_SECONDS
-    if max_layouts is None:
-        max_layouts = DEFAULT_MAX_LAYOUTS
-    
-    # Initialize tracking
     start_time = time.perf_counter()
     operation_id = str(uuid.uuid4())
     warnings = []
     info = []
     
-    # Atomic verification: capture checksum before
     checksum_before = None
     if verify_atomic:
         checksum_before = calculate_file_checksum(filepath)
     
-    # Check library availability
-    if not PPTX_AVAILABLE:
-        raise ImportError("python-pptx library is not installed")
-    
-    # Load presentation
     prs = Presentation(str(filepath))
     
-    # Extract dimensions
     dimensions = detect_slide_dimensions(prs)
+    
     slide_width = dimensions['width_inches']
     slide_height = dimensions['height_inches']
     
-    # Track layout counts
     all_layouts = list(prs.slide_layouts)
     if max_layouts and len(all_layouts) > max_layouts:
         info.append(f"Limited analysis to first {max_layouts} of {len(all_layouts)} layouts")
     
-    # Detect layouts with optional deep analysis
     layouts = detect_layouts_with_instantiation(
         prs, 
         slide_width, 
@@ -1050,14 +883,12 @@ def probe_presentation(
         max_layouts=max_layouts
     )
     
-    # Layer 3: Check if analysis was complete
+    # Check if analysis was cut short by timeout
     analysis_complete = True
-    elapsed = time.perf_counter() - start_time
-    if elapsed > timeout_seconds:
+    if timeout_seconds and (time.perf_counter() - start_time) > timeout_seconds:
         analysis_complete = False
-        info.append(f"Analysis timed out after {elapsed:.2f}s")
     
-    # Extract theme info from primary master
+    # Extract theme info (primary master)
     theme_colors = extract_theme_colors(prs, warnings)
     theme_fonts = extract_theme_fonts(prs, warnings)
     
@@ -1065,71 +896,59 @@ def probe_presentation(
     theme_per_master = []
     try:
         for m_idx, master in enumerate(prs.slide_masters):
-            master_warnings = []
-            m_colors = extract_theme_colors(master, master_warnings)
-            m_fonts = extract_theme_fonts(master, master_warnings)
+            m_colors = extract_theme_colors(master, []) # Don't collect warnings for secondary masters to avoid noise
+            m_fonts = extract_theme_fonts(master, [])
             theme_per_master.append({
                 "master_index": m_idx,
                 "colors": m_colors,
                 "fonts": m_fonts
             })
-    except Exception:
+    except:
         pass
     
-    # Analyze capabilities
     capabilities = analyze_capabilities(layouts, prs)
     capabilities["analysis_complete"] = analysis_complete
     
-    # Calculate duration
     duration_ms = int((time.perf_counter() - start_time) * 1000)
     
-    # Atomic verification: compare checksums
     checksum_after = None
-    atomic_verified = False
     if verify_atomic:
         checksum_after = calculate_file_checksum(filepath)
-        atomic_verified = (checksum_before == checksum_after)
         
-        if not atomic_verified:
+        if checksum_before != checksum_after:
             raise PowerPointAgentError(
                 "File was modified during probe operation! "
                 "This should never happen (atomic read violation). "
                 f"Checksum before: {checksum_before}, after: {checksum_after}"
             )
     
-    # Build master metadata
-    masters_metadata = []
-    try:
-        for m_idx, m in enumerate(prs.slide_masters):
-            master_info = {
-                "master_index": m_idx,
-                "layout_count": len(m.slide_layouts),
-                "name": getattr(m, 'name', f"Master {m_idx}")
-            }
-            if hasattr(m, 'rId'):
-                master_info["rId"] = m.rId
-            masters_metadata.append(master_info)
-    except Exception:
-        pass
+    library_versions = get_library_versions()
     
-    # Construct result
     result = {
         "status": "success",
         "metadata": {
-            "file": str(filepath.resolve()),
+            "file": str(filepath),
             "probed_at": datetime.now().isoformat(),
-            "tool_version": __version__,
-            "schema_version": SCHEMA_VERSION,
+            "tool_version": "1.1.1",
+            "schema_version": "capability_probe.v1.1.1",
             "operation_id": operation_id,
             "deep_analysis": deep,
             "analysis_mode": "deep" if deep else "essential",
-            "atomic_verified": verify_atomic and atomic_verified,
+            "atomic_verified": verify_atomic,
             "duration_ms": duration_ms,
             "timeout_seconds": timeout_seconds,
             "layout_count_total": len(all_layouts),
             "layout_count_analyzed": len(layouts),
             "warnings_count": len(warnings),
-            "masters": masters_metadata,
+            "masters": [
+                {
+                    "master_index": m_idx,
+                    "layout_count": len(m.slide_layouts),
+                    "name": getattr(m, 'name', f"Master {m_idx}"),
+                    "rId": getattr(m, 'rId', None) if hasattr(m, 'rId') else None
+                }
+                for m_idx, m in enumerate(prs.slide_masters)
+            ],
             "library_versions": get_library_versions(),
             "checksum": checksum_before if verify_atomic else "verification_skipped"
         },
@@ -1145,28 +964,27 @@ def probe_presentation(
         "info": info
     }
     
-    # Internal validation
     is_valid, missing_fields = validate_output(result)
     if not is_valid:
-        result["status"] = "warning"
+        result["status"] = "error"
+        result["error_type"] = "SchemaValidationError"
         warnings.append(f"Output validation found missing fields: {', '.join(missing_fields)}")
     
-    # Strict schema validation (optional, graceful if schema missing)
-    if STRICT_VALIDATOR_AVAILABLE:
-        try:
-            schema_path = Path(__file__).parent.parent / "schemas" / "capability_probe.v3.1.0.schema.json"
-            if schema_path.exists():
-                validate_against_schema(result, str(schema_path))
-        except FileNotFoundError:
-            info.append("Schema file not found - skipping strict validation")
-        except Exception as e:
-            warnings.append(f"Strict schema validation failed: {str(e)}")
+    # Strict Schema Validation
+    try:
+        schema_path = Path(__file__).parent.parent / "schemas" / "capability_probe.v1.1.1.schema.json"
+        validate_against_schema(result, str(schema_path))
+    except Exception as e:
+        # If strict validation fails, we still return the result but mark it as error
+        # or just append a warning if we want to be lenient. 
+        # Given "strict" goal, let's mark as error if it wasn't already.
+        if result["status"] == "success":
+            result["status"] = "error"
+            result["error_type"] = "StrictSchemaValidationError"
+        warnings.append(f"Strict schema validation failed: {str(e)}")
     
     return result
 
-# ============================================================================
-# HUMAN-READABLE SUMMARY
-# ============================================================================
 
 def format_summary(probe_result: Dict[str, Any]) -> str:
     """
@@ -1181,101 +999,88 @@ def format_summary(probe_result: Dict[str, Any]) -> str:
     lines = []
     
     lines.append("═══════════════════════════════════════════════════════════════")
-    lines.append(f"PowerPoint Capability Probe Report v{__version__}")
+    lines.append("PowerPoint Capability Probe Report v1.1.1")
     lines.append("═══════════════════════════════════════════════════════════════")
     lines.append("")
     
-    meta = probe_result.get('metadata', {})
-    lines.append(f"File: {meta.get('file', 'unknown')}")
-    lines.append(f"Probed: {meta.get('probed_at', 'unknown')}")
-    lines.append(f"Operation ID: {meta.get('operation_id', 'unknown')}")
-    lines.append(f"Analysis Mode: {'Deep (instantiated positions)' if meta.get('deep_analysis') else 'Essential (template positions)'}")
-    lines.append(f"Duration: {meta.get('duration_ms', 0)}ms")
-    lines.append(f"Atomic Verified: {'✓' if meta.get('atomic_verified') else '✗'}")
+    meta = probe_result['metadata']
+    lines.append(f"File: {meta['file']}")
+    lines.append(f"Probed: {meta['probed_at']}")
+    lines.append(f"Operation ID: {meta['operation_id']}")
+    lines.append(f"Analysis Mode: {'Deep (instantiated positions)' if meta['deep_analysis'] else 'Essential (template positions)'}")
+    lines.append(f"Duration: {meta['duration_ms']}ms")
+    lines.append(f"Atomic Verified: {'✓' if meta['atomic_verified'] else '✗'}")
     lines.append("")
     
-    lib_versions = meta.get('library_versions', {})
-    if lib_versions:
+    if meta.get('library_versions'):
         lines.append("Library Versions:")
-        for lib, ver in lib_versions.items():
+        for lib, ver in meta['library_versions'].items():
             lines.append(f"  {lib}: {ver}")
         lines.append("")
     
-    dims = probe_result.get('slide_dimensions', {})
-    if dims:
-        lines.append("Slide Dimensions:")
-        lines.append(f"  Size: {dims.get('width_inches', 0)}\" × {dims.get('height_inches', 0)}\" ({dims.get('width_pixels', 0)}×{dims.get('height_pixels', 0)}px)")
-        lines.append(f"  Aspect Ratio: {dims.get('aspect_ratio', 'unknown')}")
-        lines.append(f"  DPI Estimate: {dims.get('dpi_estimate', 96)}")
-        lines.append("")
+    dims = probe_result['slide_dimensions']
+    lines.append("Slide Dimensions:")
+    lines.append(f"  Size: {dims['width_inches']}\" × {dims['height_inches']}\" ({dims['width_pixels']}×{dims['height_pixels']}px)")
+    lines.append(f"  Aspect Ratio: {dims['aspect_ratio']}")
+    lines.append(f"  DPI Estimate: {dims['dpi_estimate']}")
+    lines.append("")
     
-    caps = probe_result.get('capabilities', {})
-    if caps:
-        lines.append("Template Capabilities:")
-        lines.append(f"  ✓ Total Layouts: {caps.get('total_layouts', 0)}")
-        lines.append(f"  ✓ Master Slides: {caps.get('total_master_slides', 0)}")
-        lines.append(f"  {'✓' if caps.get('has_footer_placeholders') else '✗'} Footer Placeholders: {len(caps.get('layouts_with_footer', []))} layout(s)")
-        lines.append(f"  {'✓' if caps.get('has_slide_number_placeholders') else '✗'} Slide Number Placeholders: {len(caps.get('layouts_with_slide_number', []))} layout(s)")
-        lines.append(f"  {'✓' if caps.get('has_date_placeholders') else '✗'} Date Placeholders: {len(caps.get('layouts_with_date', []))} layout(s)")
-        lines.append("")
+    caps = probe_result['capabilities']
+    lines.append("Template Capabilities:")
+    lines.append(f"  ✓ Total Layouts: {caps['total_layouts']}")
+    lines.append(f"  ✓ Master Slides: {caps['total_master_slides']}")
+    lines.append(f"  {'✓' if caps['has_footer_placeholders'] else '✗'} Footer Placeholders: {len(caps['layouts_with_footer'])} layout(s)")
+    lines.append(f"  {'✓' if caps['has_slide_number_placeholders'] else '✗'} Slide Number Placeholders: {len(caps['layouts_with_slide_number'])} layout(s)")
+    lines.append(f"  {'✓' if caps['has_date_placeholders'] else '✗'} Date Placeholders: {len(caps['layouts_with_date'])} layout(s)")
+    lines.append("")
 
-        per_master = caps.get('per_master', [])
-        if per_master:
-            lines.append("Master Slides:")
-            for m in per_master:
-                lines.append(f"  Master {m.get('master_index', '?')}: {m.get('layout_count', 0)} layouts")
-                has_footer = 'Yes' if m.get('has_footer_layouts', 0) > 0 else 'No'
-                has_slide_num = 'Yes' if m.get('has_slide_number_layouts', 0) > 0 else 'No'
-                has_date = 'Yes' if m.get('has_date_layouts', 0) > 0 else 'No'
-                lines.append(f"    Footer: {has_footer} | Slide #: {has_slide_num} | Date: {has_date}")
-            lines.append("")
-    
-    layouts = probe_result.get('layouts', [])
-    if layouts:
-        lines.append("Available Layouts:")
-        for layout in layouts:
-            ph_count = layout.get('placeholder_count', 0)
-            display_idx = layout.get('original_index', layout.get('index', 0))
-            lines.append(f"  [{display_idx}] {layout.get('name', 'Unnamed')} ({ph_count} placeholder{'s' if ph_count != 1 else ''})")
-            
-            types = layout.get('placeholder_types', [])
-            if types:
-                lines.append(f"      Types: {', '.join(types)}")
+    if 'per_master' in caps:
+        lines.append("Master Slides:")
+        for m in caps['per_master']:
+            lines.append(f"  Master {m['master_index']}: {m['layout_count']} layouts")
+            lines.append(f"    Footer: {'Yes' if m['has_footer_layouts'] else 'No'} | Slide #: {'Yes' if m['has_slide_number_layouts'] else 'No'} | Date: {'Yes' if m['has_date_layouts'] else 'No'}")
         lines.append("")
+    lines.append("")
     
-    theme = probe_result.get('theme', {})
-    fonts = theme.get('fonts', {})
-    if fonts:
+    lines.append("Available Layouts:")
+    for layout in probe_result['layouts']:
+        ph_count = layout['placeholder_count']
+        display_idx = layout.get('original_index', layout['index'])
+        lines.append(f"  [{display_idx}] {layout['name']} ({ph_count} placeholder{'s' if ph_count != 1 else ''})")
+        
+        if 'placeholder_types' in layout:
+            types_str = ', '.join(layout['placeholder_types'])
+            lines.append(f"      Types: {types_str}")
+    lines.append("")
+    
+    theme = probe_result['theme']
+    if theme['fonts']:
         lines.append("Theme Fonts:")
-        for key, value in fonts.items():
+        for key, value in theme['fonts'].items():
             if not key.startswith('_'):
-                lines.append(f"  {key.replace('_', ' ').title()}: {value}")
+                lines.append(f"  {key.capitalize()}: {value}")
         lines.append("")
     
-    colors = theme.get('colors', {})
-    if colors:
-        color_count = len([k for k in colors.keys() if not k.startswith('_')])
+    if theme['colors']:
+        color_count = len([k for k in theme['colors'].keys() if not k.startswith('_')])
         lines.append(f"Theme Colors: {color_count} defined")
         lines.append("")
     
-    recommendations = caps.get('recommendations', []) if caps else []
-    if recommendations:
+    if caps.get('recommendations'):
         lines.append("Recommendations:")
-        for rec in recommendations:
+        for rec in caps['recommendations']:
             lines.append(f"  • {rec}")
         lines.append("")
     
-    warnings = probe_result.get('warnings', [])
-    if warnings:
+    if probe_result.get('warnings'):
         lines.append("⚠️  Warnings:")
-        for warning in warnings:
+        for warning in probe_result['warnings']:
             lines.append(f"  • {warning}")
         lines.append("")
     
-    info_msgs = probe_result.get('info', [])
-    if info_msgs:
+    if probe_result.get('info'):
         lines.append("ℹ️  Information:")
-        for info_msg in info_msgs:
+        for info_msg in probe_result['info']:
             lines.append(f"  • {info_msg}")
         lines.append("")
     
@@ -1283,13 +1088,10 @@ def format_summary(probe_result: Dict[str, Any]) -> str:
     
     return "\n".join(lines)
 
-# ============================================================================
-# CLI INTERFACE
-# ============================================================================
 
 def main():
     parser = argparse.ArgumentParser(
-        description=f"Probe PowerPoint presentation capabilities (v{__version__})",
+        description="Probe PowerPoint presentation capabilities (v1.1.1)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -1299,14 +1101,45 @@ Examples:
   # Deep probe (accurate positions via transient instantiation)
   uv run tools/ppt_capability_probe.py --file template.pptx --deep --json
   
-  # Human-friendly summary
+  # Human-friendly summary (mutually exclusive with --json)
   uv run tools/ppt_capability_probe.py --file template.pptx --summary
   
-  # Skip atomic verification for speed
+  # Verify atomic read (default, can disable for speed)
   uv run tools/ppt_capability_probe.py --file template.pptx --no-verify-atomic --json
   
-  # Large template with layout limit and custom timeout
-  uv run tools/ppt_capability_probe.py --file big_template.pptx --max-layouts 20 --timeout 30 --json
+  # Large template with layout limit
+  uv run tools/ppt_capability_probe.py --file big_template.pptx --max-layouts 20 --json
+
+Output Schema (v1.1.1):
+  {
+    "status": "success",                    // Always present for automation
+    "metadata": {
+      "file": "...",
+      "operation_id": "uuid",               // Track operations
+      "duration_ms": 487,                   // Performance monitoring
+      "library_versions": {...}             // Debugging context
+    },
+    "slide_dimensions": {...},
+    "layouts": [...],
+    "theme": {...},
+    "capabilities": {...},
+    "warnings": [],                         // Top-level operational signals
+    "info": []
+  }
+
+Changes in v1.1.0:
+  - Fixed JSON contract (status, operation_id, duration, versions)
+  - Fixed placeholder detection (uses python-pptx enum)
+  - Enhanced position accuracy (transient slide instantiation)
+  - Robust theme extraction (font_scheme API)
+  - Precise capability detection (layout indices)
+  - Multiple masters support
+  - Top-level warnings/info arrays
+  - Comprehensive validation
+  - Edge Cases (locked files, large templates, timeouts)
+
+Version: 1.1.1
+Requires: core/powerpoint_agent_core.py v1.1.0+
         """
     )
     
@@ -1326,7 +1159,7 @@ Examples:
     parser.add_argument(
         '--summary',
         action='store_true',
-        help='Output human-friendly summary instead of JSON'
+        help='Output human-friendly summary instead of JSON (mutually exclusive with --json)'
     )
     
     parser.add_argument(
@@ -1347,39 +1180,31 @@ Examples:
     parser.add_argument(
         '--max-layouts',
         type=int,
-        default=DEFAULT_MAX_LAYOUTS,
-        help=f'Maximum layouts to analyze (default: {DEFAULT_MAX_LAYOUTS})'
+        help='Maximum layouts to analyze (for large templates)'
     )
 
     parser.add_argument(
         '--timeout',
         type=int,
-        default=DEFAULT_TIMEOUT_SECONDS,
-        help=f'Timeout in seconds for analysis (default: {DEFAULT_TIMEOUT_SECONDS})'
+        default=30,
+        help='Timeout in seconds for analysis (default: 30)'
     )
     
     parser.add_argument(
         '--json',
         action='store_true',
         dest='output_json',
-        help='Output JSON format (default if --summary not specified)'
+        help='Output JSON format (default if --summary is not used)'
     )
     
     args = parser.parse_args()
     
-    # Default to JSON if neither format specified
+    # Default to JSON if neither is specified
     if not args.summary and not args.output_json:
         args.output_json = True
         
     if args.summary and args.output_json:
-        error_result = {
-            "status": "error",
-            "error": "Cannot use both --summary and --json",
-            "error_type": "ArgumentError",
-            "suggestion": "Choose either --summary for human output or --json for machine output"
-        }
-        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.exit(1)
+        parser.error("Cannot use both --summary and --json")
     
     try:
         result = probe_presentation(
@@ -1391,43 +1216,11 @@ Examples:
         )
         
         if args.summary:
-            sys.stdout.write(format_summary(result) + "\n")
+            print(format_summary(result))
         else:
-            sys.stdout.write(json.dumps(result, indent=2) + "\n")
+            print(json.dumps(result, indent=2))
         
         sys.exit(0)
-        
-    except FileNotFoundError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "FileNotFoundError",
-            "metadata": {
-                "file": str(args.file),
-                "tool_version": __version__,
-                "operation_id": str(uuid.uuid4()),
-                "probed_at": datetime.now().isoformat()
-            },
-            "suggestion": "Verify the file path exists and is accessible"
-        }
-        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.exit(1)
-        
-    except PermissionError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "PermissionError",
-            "metadata": {
-                "file": str(args.file),
-                "tool_version": __version__,
-                "operation_id": str(uuid.uuid4()),
-                "probed_at": datetime.now().isoformat()
-            },
-            "suggestion": "Check if the file is locked by another process or if you have read permissions"
-        }
-        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.exit(1)
         
     except Exception as e:
         error_result = {
@@ -1436,13 +1229,14 @@ Examples:
             "error_type": type(e).__name__,
             "metadata": {
                 "file": str(args.file) if args.file else None,
-                "tool_version": __version__,
+                "tool_version": "1.1.1",
                 "operation_id": str(uuid.uuid4()),
                 "probed_at": datetime.now().isoformat()
             },
             "warnings": []
         }
-        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        
+        print(json.dumps(error_result, indent=2))
         sys.exit(1)
 
 
