@@ -360,7 +360,16 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Your unified/enhanced agent system prompt is good but has a major flaw because the agent is supposed to be an automated autonomous presentation slides generation bot that takes a given text content/material from a chat interface, then analyze how best to present the data given and then generate the actual PowerPoint presentation as the output artifact using the comprehensive set of tools available but without looking at the actual code of the tools, meaning the agent prompt should include the listing of the tools, intelligently merged into the phases and with tools examples. Without tools listing and example of usage, the autonomous agentic process fails. The whole purpose of the project is to craft a set of comprehensive useful tools for use by the autonomous presentation generating AI agent. The current set of tools already created for use by the presentation AI agent (for agentic workflow):
 
-Goal is to provide a unified agent system prompt that explicitly lists the tools and integrates them with the phases of the autonomous presentation generation workflow.
+Goal is to provide a unified agent system prompt that explicitly lists the tools and integrates them with the phases of the autonomous presentation generation workflow. Please deeply and thoroughly explore how to create a comprehensive system prompt for an AI agent meant for PowerPoint presentation slides generation. Attached are
+
+1) A sample/reference agent system prompt structure
+2) A list of actual PowerPoint manipulation tools available. The docstrings/headers of each tool showing their purpose, usage, and capabilities
+
+Your task is to use the Meticulous Approach framework to analyze this and create an optimized, comprehensive agent system prompt that combines:
+
+- LLM-driven content analysis
+- Tool-driven presentation generation
+- Actual tool usage examples
 
 ---
 
