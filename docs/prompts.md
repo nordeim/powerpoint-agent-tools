@@ -346,6 +346,10 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Based on the original `AGENT_SYSTEM_PROMPT.md` shared in my second prompt which you summarized below. Now, please think deeper and think harder to deeply and thoroughly explore systematically and meticulously how best to re-imagine a complete working replacement `AGENT_SYSTEM_PROMPT.md` that best makes use of the three tools you just created. Key consideration is to maintain compatibility with the project documents while giving the PowerPoint AI agent new capabilities. Then meticulously create an comprehensive implementation plan to create a complete working replacement file for the agent system prompt, include in your plan a checklist for the changes. Review and validate your implementation plan before proceeding meticulously to execute it. Remember to review and validate the newly generated agent system prompt file to ensure that it is complete, correct and accurate.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
