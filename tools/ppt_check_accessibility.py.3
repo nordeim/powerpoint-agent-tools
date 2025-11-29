@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""
+PowerPoint Check Accessibility Tool v3.1.1
+Run WCAG 2.1 accessibility checks on presentation.
+
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.1
+
+Usage:
+    uv run tools/ppt_check_accessibility.py --file presentation.pptx --json
+
+Exit Codes:
+    0: Success (valid JSON returned, check 'status' field for findings)
+    1: Error occurred (file not found, crash)
+
+Changelog v3.1.1:
+    - Added presentation_version tracking for audit trail
+    - Added tool_version to output
+    - Added validated_at timestamp
+    - Added suggestion field to error responses
+    - Ensured status field is always present
+    - Added comprehensive help text with examples
+"""
+
+import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null immediately to prevent library noise.
+# This guarantees that JSON parsers only see valid JSON on stdout.
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
+import json
+import argparse
+import logging
+from pathlib import Path
+from typing import Dict, Any
+from datetime import datetime
+
+# Configure logging to null handler to prevent any output
+logging.basicConfig(level=logging.CRITICAL)
+
+# Add parent directory to path for core import
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+__version__ = "3.1.1"
+
+# ============================================================================
+# IMPORTS
+# ============================================================================
+
+try:
+    from core.powerpoint_agent_core import (
+        PowerPointAgent,
+        PowerPointAgentError
+    )
+    CORE_AVAILABLE = True
+except ImportError:
+    CORE_AVAILABLE = False
+    PowerPointAgent = None
+    PowerPointAgentError = Exception
+
+
+# ============================================================================
+# MAIN LOGIC
+# ============================================================================
+
+def check_accessibility(filepath: Path) -> Dict[str, Any]:
+    """
+    Run WCAG 2.1 accessibility checks on a PowerPoint presentation.
+    
+    This tool checks for common accessibility issues including:
+    - Missing alt text on images
+    - Low color contrast
+    - Small font sizes
+    - Reading order issues
+    - Missing slide titles
+    
+    Args:
+        filepath: Path to PowerPoint file to check
+        
+    Returns:
+        Dict containing:
+            - status: "success", "issues_found", or "error"
+            - file: Absolute path to checked file
+            - presentation_version: State hash for tracking
+            - tool_version: Version of this tool
+            - validated_at: ISO timestamp of validation
+            - issues: Dict of issues by category
+            - summary: Summary statistics
+            
+    Raises:
+        FileNotFoundError: If file doesn't exist
+        PowerPointAgentError: If file cannot be processed
+        
+    Example:
+        >>> result = check_accessibility(Path("presentation.pptx"))
+        >>> print(result["status"])
+        'issues_found'
+        >>> print(result["summary"]["total_issues"])
+        3
+    """
+    if not CORE_AVAILABLE:
+        raise ImportError("PowerPointAgent core is not available")
+    
+    if not filepath.exists():
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    validated_at = datetime.utcnow().isoformat() + "Z"
+    
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath, acquire_lock=False)  # Read-only, no lock needed
+        
+        presentation_version = agent.get_presentation_version()
+        
+        result = agent.check_accessibility()
+    
+    if "status" not in result:
+        total_issues = 0
+        issues = result.get("issues", {})
+        for category in issues.values():
+            if isinstance(category, list):
+                total_issues += len(category)
+        result["status"] = "issues_found" if total_issues > 0 else "success"
+    
+    result["file"] = str(filepath.resolve())
+    result["presentation_version"] = presentation_version
+    result["tool_version"] = __version__
+    result["validated_at"] = validated_at
+    
+    return result
+
+
+# ============================================================================
+# CLI INTERFACE
+# ============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Check PowerPoint accessibility (WCAG 2.1)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Basic accessibility check
+  uv run tools/ppt_check_accessibility.py --file presentation.pptx --json
+
+  # Check and process results
+  uv run tools/ppt_check_accessibility.py --file deck.pptx --json | jq '.issues'
+
+Accessibility Checks Performed:
+  - Missing alt text on images (WCAG 1.1.1)
+  - Low color contrast (WCAG 1.4.3, minimum 4.5:1)
+  - Small font sizes (minimum 10pt recommended)
+  - Missing slide titles (navigation)
+  - Reading order issues (screen reader flow)
+
+Output Format:
+  {
+    "status": "success" | "issues_found",
+    "file": "/path/to/presentation.pptx",
+    "presentation_version": "a1b2c3d4...",
+    "tool_version": "3.1.1",
+    "validated_at": "2024-01-15T10:30:00Z",
+    "issues": {
+      "missing_alt_text": [...],
+      "low_contrast": [...],
+      "small_fonts": [...]
+    },
+    "summary": {
+      "total_issues": 5,
+      "critical": 2,
+      "warnings": 3
+    }
+  }
+
+Remediation Tools:
+  - Missing alt text: ppt_set_image_properties.py --alt-text "..."
+  - Low contrast: ppt_format_text.py --color "#111111"
+  - Missing titles: ppt_set_title.py --title "..."
+
+Exit Codes:
+  0: Success (check status field for issues_found vs success)
+  1: Error (file not found, processing error)
+        """
+    )
+    
+    parser.add_argument(
+        '--file',
+        required=True,
+        type=Path,
+        help='PowerPoint file to check'
+    )
+    
+    parser.add_argument(
+        '--json',
+        action='store_true',
+        default=True,
+        help='Output JSON response (default: true)'
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        if not CORE_AVAILABLE:
+            raise ImportError("PowerPointAgent core library not available")
+        
+        result = check_accessibility(filepath=args.file.resolve())
+        
+        sys.stdout.write(json.dumps(result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(0)
+        
+    except FileNotFoundError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "FileNotFoundError",
+            "suggestion": "Verify the file path exists and is accessible",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    except ImportError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "ImportError",
+            "suggestion": "Ensure core library is properly installed",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    except PowerPointAgentError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "PowerPointAgentError",
+            "suggestion": "Check file integrity and format",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    except Exception as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "suggestion": "Check logs for detailed error information",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
