@@ -373,6 +373,10 @@ Your task is to use the Meticulous Approach framework to analyze this and create
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously review the original agent system prompt below to see whether there are useful details/ideas that you can integrate into your generated system prompt to create a complete enhanced (re-imagined) system prompt ideal for an autonomous AI agent for generating or updating a PowerPoint presentation slides.
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
