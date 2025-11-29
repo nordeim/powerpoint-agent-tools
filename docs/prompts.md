@@ -354,6 +354,14 @@ Awesome job on your meticulous review, analysis and planning! Please keep up the
 
 ---
 
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Below is a list of all the existing files in the project codebase. Now, please think deeper and think harder to deeply and thoroughly explore systematically and meticulously how best to re-imagine a "best-of-both-worlds" agent system prompt that combines the creative design workflow of prompt-1 enhanced with the additional tooling that prompt-2 minus the latter's more restrictive rigidness. I prefer the creativity intelligence guidance approach/aspect of prompt-1 combined with the more prescriptive/structured workflow guidance on the presentation slides generation steps.
+
+---
+
+Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Your unified/enhanced agent system prompt is good but has a major flaw because the agent is supposed to be an automated autonomous presentation slides generation bot that takes a given text content/material from a chat interface, then analyze how best to present the data given and then generate the actual PowerPoint presentation as the output artifact using the comprehensive set of tools available but without looking at the actual code of the tools, meaning the agent prompt should include the listing of the tools, intelligently merged into the phases and with tools examples. Without tools listing and example of usage, the autonomous agentic process fails. The whole purpose of the project is to craft a set of comprehensive useful tools for use by the autonomous presentation generating AI agent. The current set of tools already created for use by the presentation AI agent (for agentic workflow):
+
+---
+
 Awesome job on your meticulous review, analysis and planning! Please keep up the good work in your rigorous and meticulous approach to planning and execution! Now, please meticulously plan and then create all the files you listed in your enhanced `Excel_Agent_Tool` design. Create each file within ```python tags and start each file with a comment line containing the filename of the file with the full (relative) path.
 
 # Recommended project structure:
