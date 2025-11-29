@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-PowerPoint Create New Tool v3.1.1
-Create a new PowerPoint presentation with specified slides.
+PowerPoint Create New Tool v3.1.0
+Create a new PowerPoint presentation with specified slides
 
 Author: PowerPoint Agent Team
 License: MIT
-Version: 3.1.1
+Version: 3.1.0
 
 Usage:
     uv run tools/ppt_create_new.py --output presentation.pptx --slides 5 --layout "Title and Content" --json
@@ -17,12 +17,6 @@ Exit Codes:
 Note:
     For creating presentations from existing templates with branding,
     consider using ppt_create_from_template.py instead.
-
-Changelog v3.1.1:
-    - Added sys.stdout.flush() for pipeline safety
-    - Added suggestion field to all error handlers
-    - Added tool_version to all error responses
-    - Added get_available_layouts() fallback for compatibility
 """
 
 import sys
@@ -46,16 +40,8 @@ from core.powerpoint_agent_core import (
     LayoutNotFoundError
 )
 
-# ============================================================================
-# CONSTANTS
-# ============================================================================
+__version__ = "3.1.0"
 
-__version__ = "3.1.1"
-
-
-# ============================================================================
-# MAIN LOGIC
-# ============================================================================
 
 def create_new_presentation(
     output: Path,
@@ -103,12 +89,14 @@ def create_new_presentation(
         >>> print(result["slides_created"])
         10
     """
+    # Validate slide count
     if slides < 1:
         raise ValueError("Must create at least 1 slide")
     
     if slides > 100:
         raise ValueError("Maximum 100 slides per creation (performance limit)")
     
+    # Validate template if provided
     if template is not None:
         if not template.exists():
             raise FileNotFoundError(f"Template file not found: {template}")
@@ -116,16 +104,16 @@ def create_new_presentation(
             raise ValueError(f"Template must be .pptx file, got: {template.suffix}")
     
     with PowerPointAgent() as agent:
+        # Create from template or blank
         agent.create_new(template=template)
         
-        try:
-            available_layouts = agent.get_available_layouts()
-        except AttributeError:
-            info = agent.get_presentation_info()
-            available_layouts = info.get("layouts", [])
+        # Get available layouts
+        available_layouts = agent.get_available_layouts()
         
+        # Validate and resolve layout
         resolved_layout = layout
         if layout not in available_layouts:
+            # Try to find closest match (case-insensitive partial match)
             layout_lower = layout.lower()
             matched = False
             for avail in available_layouts:
@@ -135,28 +123,35 @@ def create_new_presentation(
                     break
             
             if not matched:
+                # Use first available layout as fallback
                 resolved_layout = available_layouts[0] if available_layouts else "Title Slide"
         
+        # Add requested number of slides
         slide_indices: List[int] = []
         
         for i in range(slides):
+            # First slide uses "Title Slide" if available, others use specified layout
             if i == 0 and "Title Slide" in available_layouts:
                 slide_layout = "Title Slide"
             else:
                 slide_layout = resolved_layout
             
             result = agent.add_slide(layout_name=slide_layout)
+            # Handle both v3.0.x (int) and v3.1.x (Dict) return types
             if isinstance(result, dict):
                 idx = result.get("slide_index", result.get("index", i))
             else:
                 idx = result
             slide_indices.append(idx)
         
+        # Save the presentation
         agent.save(output)
         
+        # Get final presentation info
         info = agent.get_presentation_info()
         presentation_version = info.get("presentation_version", None)
     
+    # Calculate file size
     file_size = output.stat().st_size if output.exists() else 0
     
     return {
@@ -177,10 +172,6 @@ def create_new_presentation(
         "tool_version": __version__
     }
 
-
-# ============================================================================
-# CLI INTERFACE
-# ============================================================================
 
 def main():
     parser = argparse.ArgumentParser(
@@ -235,7 +226,7 @@ Output Format:
     "available_layouts": ["Title Slide", "Title and Content", ...],
     "layout_used": "Title and Content",
     "presentation_version": "a1b2c3d4...",
-    "tool_version": "3.1.1"
+    "tool_version": "3.1.0"
   }
         """
     )
@@ -277,20 +268,20 @@ Output Format:
     args = parser.parse_args()
     
     try:
+        # Ensure output has .pptx extension
         output_path = args.output
         if not output_path.suffix.lower() == '.pptx':
             output_path = output_path.with_suffix('.pptx')
         
         result = create_new_presentation(
-            output=output_path.resolve(),
+            output=output_path,
             slides=args.slides,
-            template=args.template.resolve() if args.template else None,
+            template=args.template,
             layout=args.layout
         )
         
         if args.json:
             sys.stdout.write(json.dumps(result, indent=2) + "\n")
-            sys.stdout.flush()
         else:
             sys.stdout.write(f"Created presentation: {result['file']}\n")
             sys.stdout.write(f"  Slides: {result['slides_created']}\n")
@@ -298,7 +289,6 @@ Output Format:
             sys.stdout.write(f"  Dimensions: {result['slide_dimensions']['aspect_ratio']}\n")
             if args.template:
                 sys.stdout.write(f"  Template: {result['template_used']}\n")
-            sys.stdout.flush()
         
         sys.exit(0)
         
@@ -307,11 +297,9 @@ Output Format:
             "status": "error",
             "error": str(e),
             "error_type": "FileNotFoundError",
-            "suggestion": "Verify the template file path exists and is accessible",
-            "tool_version": __version__
+            "suggestion": "Verify the template file path exists and is accessible"
         }
         sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.stdout.flush()
         sys.exit(1)
         
     except ValueError as e:
@@ -319,23 +307,9 @@ Output Format:
             "status": "error",
             "error": str(e),
             "error_type": "ValueError",
-            "suggestion": "Check slide count (1-100) and template file extension (.pptx)",
-            "tool_version": __version__
+            "suggestion": "Check slide count (1-100) and template file extension (.pptx)"
         }
         sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.stdout.flush()
-        sys.exit(1)
-        
-    except LayoutNotFoundError as e:
-        error_result = {
-            "status": "error",
-            "error": str(e),
-            "error_type": "LayoutNotFoundError",
-            "suggestion": "Use ppt_capability_probe.py to discover available layouts",
-            "tool_version": __version__
-        }
-        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.stdout.flush()
         sys.exit(1)
         
     except PowerPointAgentError as e:
@@ -343,12 +317,9 @@ Output Format:
             "status": "error",
             "error": str(e),
             "error_type": type(e).__name__,
-            "details": getattr(e, 'details', {}),
-            "suggestion": "Check file permissions and template compatibility",
-            "tool_version": __version__
+            "details": getattr(e, 'details', {})
         }
         sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.stdout.flush()
         sys.exit(1)
         
     except Exception as e:
@@ -356,11 +327,9 @@ Output Format:
             "status": "error",
             "error": str(e),
             "error_type": type(e).__name__,
-            "suggestion": "Check logs for detailed error information",
             "tool_version": __version__
         }
         sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
-        sys.stdout.flush()
         sys.exit(1)
 
 
