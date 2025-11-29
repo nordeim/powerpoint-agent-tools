@@ -1,23 +1,43 @@
 #!/usr/bin/env python3
 """
-PowerPoint Export PDF Tool
-Export presentation to PDF format
+PowerPoint Export PDF Tool v3.1.1
+Export presentation to PDF format using LibreOffice.
+
+Author: PowerPoint Agent Team
+License: MIT
+Version: 3.1.1
 
 Usage:
-    uv python ppt_export_pdf.py --file presentation.pptx --output presentation.pdf --json
+    uv run tools/ppt_export_pdf.py --file presentation.pptx --output presentation.pdf --json
 
 Exit Codes:
     0: Success
     1: Error occurred
 
 Requirements:
-    LibreOffice must be installed for PDF export
+    LibreOffice must be installed for PDF export:
     - Linux: sudo apt install libreoffice-impress
     - macOS: brew install --cask libreoffice
     - Windows: Download from https://www.libreoffice.org/
+
+Changelog v3.1.1:
+    - Added hygiene block for JSON pipeline safety
+    - Added presentation_version tracking via PowerPointAgent
+    - Added tool_version and slide_count to output
+    - Added --timeout argument (default: 300s for large presentations)
+    - Fixed cross-filesystem rename with shutil.move
+    - Fixed error response format with suggestions
 """
 
 import sys
+import os
+
+# --- HYGIENE BLOCK START ---
+# CRITICAL: Redirect stderr to /dev/null immediately to prevent library noise.
+# This guarantees that JSON parsers only see valid JSON on stdout.
+sys.stderr = open(os.devnull, 'w')
+# --- HYGIENE BLOCK END ---
+
 import json
 import argparse
 import subprocess
@@ -28,28 +48,64 @@ from typing import Dict, Any
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.powerpoint_agent_core import (
-    PowerPointAgent, PowerPointAgentError
+    PowerPointAgent,
+    PowerPointAgentError
 )
 
+# ============================================================================
+# CONSTANTS
+# ============================================================================
+
+__version__ = "3.1.1"
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
 def check_libreoffice() -> bool:
-    """Check if LibreOffice is installed."""
+    """Check if LibreOffice is installed and accessible."""
     return shutil.which('soffice') is not None or shutil.which('libreoffice') is not None
 
 
+def get_libreoffice_command() -> str:
+    """Get the LibreOffice command for the current system."""
+    if shutil.which('soffice'):
+        return 'soffice'
+    return 'libreoffice'
+
+
+# ============================================================================
+# MAIN LOGIC
+# ============================================================================
+
 def export_pdf(
     filepath: Path,
-    output: Path
+    output: Path,
+    timeout: int = 300
 ) -> Dict[str, Any]:
-    """Export presentation to PDF."""
+    """
+    Export PowerPoint presentation to PDF.
     
+    Args:
+        filepath: Path to PowerPoint file (must be .pptx)
+        output: Output PDF file path
+        timeout: Subprocess timeout in seconds (default: 300)
+        
+    Returns:
+        Dict with export results including file sizes and version info
+        
+    Raises:
+        FileNotFoundError: If input file doesn't exist
+        ValueError: If input is not a .pptx file
+        RuntimeError: If LibreOffice not installed
+        PowerPointAgentError: If export process fails
+    """
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
     
     if not filepath.suffix.lower() == '.pptx':
         raise ValueError(f"Input must be .pptx file, got: {filepath.suffix}")
     
-    # Check LibreOffice
     if not check_libreoffice():
         raise RuntimeError(
             "LibreOffice not found. PDF export requires LibreOffice.\n"
@@ -59,20 +115,36 @@ def export_pdf(
             "  Windows: https://www.libreoffice.org/download/"
         )
     
-    # Ensure output directory exists
+    with PowerPointAgent(filepath) as agent:
+        agent.open(filepath, acquire_lock=False)  # Read-only operation, no lock needed
+        presentation_version = agent.get_presentation_version()
+        slide_count = agent.get_slide_count()
+        presentation_info = agent.get_presentation_info()
+    
     output.parent.mkdir(parents=True, exist_ok=True)
     
-    # Use LibreOffice to convert
-    # Note: --headless runs without GUI, --convert-to pdf exports to PDF
+    lo_command = get_libreoffice_command()
+    
     cmd = [
-        'soffice' if shutil.which('soffice') else 'libreoffice',
+        lo_command,
         '--headless',
         '--convert-to', 'pdf',
-        '--outdir', str(output.parent),
-        str(filepath)
+        '--outdir', str(output.parent.resolve()),
+        str(filepath.resolve())
     ]
     
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+    except subprocess.TimeoutExpired:
+        raise PowerPointAgentError(
+            f"PDF export timed out after {timeout} seconds. "
+            f"Try increasing --timeout for large presentations (100+ slides may need 5+ minutes)."
+        )
     
     if result.returncode != 0:
         raise PowerPointAgentError(
@@ -80,36 +152,46 @@ def export_pdf(
             f"Command: {' '.join(cmd)}"
         )
     
-    # LibreOffice names output file based on input, rename if needed
-    expected_pdf = filepath.parent / f"{filepath.stem}.pdf"
-    if output.parent != filepath.parent:
-        expected_pdf = output.parent / f"{filepath.stem}.pdf"
+    expected_pdf = output.parent / f"{filepath.stem}.pdf"
     
-    if expected_pdf != output and expected_pdf.exists():
-        if output.exists():
-            output.unlink()
-        expected_pdf.rename(output)
-    elif not output.exists() and expected_pdf.exists():
-        expected_pdf.rename(output)
+    if expected_pdf != output:
+        if expected_pdf.exists():
+            if output.exists():
+                output.unlink()
+            shutil.move(str(expected_pdf), str(output))
     
     if not output.exists():
-        raise PowerPointAgentError("PDF export completed but output file not found")
+        if expected_pdf.exists():
+            shutil.move(str(expected_pdf), str(output))
     
-    # Get file sizes
+    if not output.exists():
+        raise PowerPointAgentError(
+            f"PDF export completed but output file not found. "
+            f"Expected at: {output}"
+        )
+    
     input_size = filepath.stat().st_size
     output_size = output.stat().st_size
     
     return {
         "status": "success",
-        "input_file": str(filepath),
-        "output_file": str(output),
+        "tool_version": __version__,
+        "input_file": str(filepath.resolve()),
+        "output_file": str(output.resolve()),
+        "presentation_version": presentation_version,
+        "slide_count": slide_count,
         "input_size_bytes": input_size,
         "input_size_mb": round(input_size / (1024 * 1024), 2),
         "output_size_bytes": output_size,
         "output_size_mb": round(output_size / (1024 * 1024), 2),
-        "size_ratio": round(output_size / input_size, 2) if input_size > 0 else 0
+        "size_ratio": round(output_size / input_size, 2) if input_size > 0 else 0,
+        "compression_percent": round((1 - output_size / input_size) * 100, 1) if input_size > 0 else 0
     }
 
+
+# ============================================================================
+# CLI INTERFACE
+# ============================================================================
 
 def main():
     parser = argparse.ArgumentParser(
@@ -118,69 +200,41 @@ def main():
         epilog="""
 Examples:
   # Basic export
-  uv python ppt_export_pdf.py \\
+  uv run tools/ppt_export_pdf.py \\
     --file presentation.pptx \\
     --output presentation.pdf \\
     --json
   
-  # Export with automatic naming
-  uv python ppt_export_pdf.py \\
-    --file quarterly_report.pptx \\
-    --output reports/q4_report.pdf \\
+  # Large presentation with extended timeout
+  uv run tools/ppt_export_pdf.py \\
+    --file large_deck.pptx \\
+    --output reports/output.pdf \\
+    --timeout 600 \\
     --json
 
 Requirements:
   LibreOffice must be installed:
-  
-  Linux:
-    sudo apt update
-    sudo apt install libreoffice-impress
-  
-  macOS:
-    brew install --cask libreoffice
-  
-  Windows:
-    Download from https://www.libreoffice.org/download/
+  - Linux: sudo apt install libreoffice-impress
+  - macOS: brew install --cask libreoffice
+  - Windows: https://www.libreoffice.org/download/
 
-Verification:
-  # Check LibreOffice installation
-  soffice --version
-  # or
-  libreoffice --version
-
-Use Cases:
-  - Share presentations as PDFs
-  - Archive presentations
-  - Print-ready versions
-  - Email distribution (smaller, universal format)
-  - Document repositories
+Performance Notes:
+  - Small decks (<20 slides): ~10-30 seconds
+  - Medium decks (20-50 slides): ~1-2 minutes
+  - Large decks (100+ slides): ~3-5 minutes
+  - Adjust --timeout accordingly
 
 PDF Benefits:
   - Universal compatibility
   - Prevents editing
-  - Smaller file size typically
+  - Smaller file size (typically 30-50% of .pptx)
   - Better for printing
-  - Preserves layout exactly
 
 Limitations:
   - Animations not preserved
   - Embedded videos become static
-  - No speaker notes in output
+  - Speaker notes not included
   - Transitions removed
-  - Interactive elements static
-
-Performance:
-  - Export time: ~2-5 seconds per slide
-  - Large presentations (100+ slides): ~3-5 minutes
-  - File size typically 30-50% of .pptx
-
-Troubleshooting:
-  If export fails:
-  1. Verify LibreOffice installed: soffice --version
-  2. Check file not corrupted: open in PowerPoint
-  3. Ensure disk space available
-  4. Try shorter timeout for small files
-  5. Check LibreOffice logs
         """
     )
     
@@ -199,45 +253,102 @@ Troubleshooting:
     )
     
     parser.add_argument(
+        '--timeout',
+        type=int,
+        default=300,
+        help='Export timeout in seconds (default: 300)'
+    )
+    
+    parser.add_argument(
         '--json',
         action='store_true',
-        help='Output JSON response'
+        default=True,
+        help='Output JSON response (default: true)'
     )
     
     args = parser.parse_args()
     
     try:
-        # Ensure output has .pdf extension
-        if not args.output.suffix.lower() == '.pdf':
-            args.output = args.output.with_suffix('.pdf')
+        output_path = args.output
+        if not output_path.suffix.lower() == '.pdf':
+            output_path = output_path.with_suffix('.pdf')
         
         result = export_pdf(
-            filepath=args.file,
-            output=args.output
+            filepath=args.file.resolve(),
+            output=output_path.resolve(),
+            timeout=args.timeout
         )
         
         if args.json:
-            print(json.dumps(result, indent=2))
+            sys.stdout.write(json.dumps(result, indent=2) + "\n")
+            sys.stdout.flush()
         else:
             print(f"✅ Exported to PDF: {result['output_file']}")
+            print(f"   Slides: {result['slide_count']}")
             print(f"   Input: {result['input_size_mb']} MB")
             print(f"   Output: {result['output_size_mb']} MB")
-            print(f"   Ratio: {int(result['size_ratio'] * 100)}%")
+            print(f"   Compression: {result['compression_percent']}%")
         
         sys.exit(0)
+        
+    except FileNotFoundError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "FileNotFoundError",
+            "suggestion": "Verify the file path exists and is accessible",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    except ValueError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "ValueError",
+            "suggestion": "Ensure input file is a .pptx PowerPoint file",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    except RuntimeError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "RuntimeError",
+            "suggestion": "Install LibreOffice: sudo apt install libreoffice-impress",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
+        
+    except PowerPointAgentError as e:
+        error_result = {
+            "status": "error",
+            "error": str(e),
+            "error_type": "PowerPointAgentError",
+            "suggestion": "Check LibreOffice installation and try increasing --timeout",
+            "tool_version": __version__
+        }
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
+        sys.exit(1)
         
     except Exception as e:
         error_result = {
             "status": "error",
             "error": str(e),
-            "error_type": type(e).__name__
+            "error_type": type(e).__name__,
+            "suggestion": "Check logs for detailed error information",
+            "tool_version": __version__
         }
-        
-        if args.json:
-            print(json.dumps(error_result, indent=2))
-        else:
-            print(f"❌ Error: {e}", file=sys.stderr)
-        
+        sys.stdout.write(json.dumps(error_result, indent=2) + "\n")
+        sys.stdout.flush()
         sys.exit(1)
 
 

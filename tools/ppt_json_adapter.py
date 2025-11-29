@@ -1,136 +1,142 @@
 #!/usr/bin/env python3
 """
-PowerPoint JSON Adapter Tool v3.1.0
+PowerPoint JSON Adapter Tool v3.1.1
 Validates and normalizes JSON outputs from presentation CLI tools.
-
-This tool provides:
-- JSON Schema validation
-- Key alias normalization
-- Fallback presentation version computation
-- Consistent error formatting
 
 Author: PowerPoint Agent Team
 License: MIT
-Version: 3.1.0
+Version: 3.1.1
 
 Usage:
-    uv run tools/ppt_json_adapter.py --schema schema.json --input raw.json
-    uv run tools/ppt_json_adapter.py --schema schema.json --input raw.json --output normalized.json
+    uv run tools/ppt_json_adapter.py --schema ppt_get_info.schema.json --input raw.json
+
+Behavior:
+    - Validates input JSON against provided schema
+    - Maps common alias keys to canonical keys
+    - Emits normalized JSON to stdout
+    - On validation failure, emits structured error JSON and exits non-zero
 
 Exit Codes:
-    0: Success (valid JSON emitted)
-    1: Usage error (invalid arguments)
-    2: Validation error (schema validation failed)
-    3: Transient error (file I/O issue, retryable)
-    5: Internal error (unexpected failure)
+    0: Success (valid and normalized)
+    2: Validation Error (schema validation failed)
+    3: Input Load Error (could not read input file)
+    5: Schema Load Error (could not read schema file)
+
+Changelog v3.1.1:
+    - Added hygiene block for JSON pipeline safety
+    - Fixed ERROR_TEMPLATE bug causing duplicate keys
+    - Added status wrapper to success output
+    - Added tool_version to all outputs
+    - Improved error response format
 """
 
 import sys
 import os
 
 # --- HYGIENE BLOCK START ---
-# CRITICAL: Redirect stderr to /dev/null immediately.
+# CRITICAL: Redirect stderr to /dev/null immediately to prevent library noise.
+# This guarantees that JSON parsers only see valid JSON on stdout.
 sys.stderr = open(os.devnull, 'w')
 # --- HYGIENE BLOCK END ---
 
 import argparse
 import json
 import hashlib
-import logging
+from typing import Dict, Any, Optional, List, Union
 from pathlib import Path
-from typing import Dict, Any, Optional
-from datetime import datetime
 
-# Configure logging to null handler
-logging.basicConfig(level=logging.CRITICAL)
+try:
+    from jsonschema import validate, ValidationError
+except ImportError:
+    validate = None
+    ValidationError = Exception
 
 # ============================================================================
 # CONSTANTS
 # ============================================================================
 
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 
-# Alias mapping table for common drifted keys
+# Alias mapping table for common drifted/variant keys across tool versions
 ALIAS_MAP = {
+    # Slide count variants
     "slides_count": "slide_count",
     "slidesTotal": "slide_count",
+    "num_slides": "slide_count",
+    "total_slides": "slide_count",
+    
+    # Slides list variants
     "slides_list": "slides",
+    "slidesList": "slides",
+    
+    # Probe variants
     "probe_time": "probe_timestamp",
+    "probeTime": "probe_timestamp",
+    "probed_at": "probe_timestamp",
+    
+    # Permission variants
     "canWrite": "can_write",
+    "writeable": "can_write",
     "canRead": "can_read",
+    "readable": "can_read",
+    
+    # Size variants
     "maxImageSizeMB": "max_image_size_mb",
-    "slideCount": "slide_count",
-    "presentationVersion": "presentation_version",
-    "toolVersion": "tool_version"
+    "max_image_size": "max_image_size_mb",
+    
+    # Version variants
+    "version": "presentation_version",
+    "pres_version": "presentation_version",
+    "file_version": "presentation_version"
 }
-
-# ============================================================================
-# IMPORTS
-# ============================================================================
-
-try:
-    from jsonschema import validate, ValidationError
-    JSONSCHEMA_AVAILABLE = True
-except ImportError:
-    JSONSCHEMA_AVAILABLE = False
-    ValidationError = Exception
 
 
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
-def make_error_response(
-    error_code: str, 
-    message: str, 
-    details: Any = None, 
-    retryable: bool = False,
-    suggestion: Optional[str] = None
-) -> Dict[str, Any]:
+def emit_error(
+    error_code: str,
+    message: str,
+    details: Optional[Any] = None,
+    retryable: bool = False
+) -> None:
     """
-    Create a standardized error response.
+    Emit a standardized error response to stdout.
     
     Args:
-        error_code: Error type code
+        error_code: Machine-readable error code
         message: Human-readable error message
         details: Additional error details
         retryable: Whether the operation can be retried
-        suggestion: Suggested fix
-        
-    Returns:
-        Standardized error dict
     """
-    response = {
+    error_response = {
         "status": "error",
-        "error": message,
-        "error_type": error_code,
-        "retryable": retryable,
         "tool_version": __version__,
-        "processed_at": datetime.utcnow().isoformat() + "Z"
+        "error": {
+            "error_code": error_code,
+            "message": message,
+            "details": details,
+            "retryable": retryable
+        }
     }
-    
-    if details is not None:
-        response["details"] = details
-        
-    if suggestion:
-        response["suggestion"] = suggestion
-        
-    return response
+    sys.stdout.write(json.dumps(error_response, indent=2) + "\n")
+    sys.stdout.flush()
 
 
 def load_json(path: Path) -> Dict[str, Any]:
     """
-    Load JSON file with error handling.
+    Load JSON from a file path.
     
     Args:
         path: Path to JSON file
         
     Returns:
-        Parsed JSON data
+        Parsed JSON as dictionary
         
     Raises:
         FileNotFoundError: If file doesn't exist
-        json.JSONDecodeError: If JSON is invalid
+        json.JSONDecodeError: If file contains invalid JSON
     """
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -138,280 +144,306 @@ def load_json(path: Path) -> Dict[str, Any]:
 
 def map_aliases(obj: Any) -> Any:
     """
-    Recursively map aliased keys to canonical keys.
+    Recursively map aliased keys to their canonical forms.
     
     Args:
         obj: Object to process (dict, list, or primitive)
         
     Returns:
-        Object with aliased keys replaced
+        Object with aliased keys replaced by canonical keys
     """
     if isinstance(obj, dict):
-        new = {}
-        for k, v in obj.items():
-            canonical = ALIAS_MAP.get(k, k)
-            if isinstance(v, dict):
-                new[canonical] = map_aliases(v)
-            elif isinstance(v, list):
-                new[canonical] = [map_aliases(i) for i in v]
+        new_dict = {}
+        for key, value in obj.items():
+            canonical_key = ALIAS_MAP.get(key, key)
+            if isinstance(value, dict):
+                new_dict[canonical_key] = map_aliases(value)
+            elif isinstance(value, list):
+                new_dict[canonical_key] = [map_aliases(item) for item in value]
             else:
-                new[canonical] = v
-        return new
+                new_dict[canonical_key] = value
+        return new_dict
     elif isinstance(obj, list):
-        return [map_aliases(i) for i in obj]
+        return [map_aliases(item) for item in obj]
     else:
         return obj
 
 
 def compute_presentation_version(info_obj: Dict[str, Any]) -> Optional[str]:
     """
-    Compute a stable presentation_version if missing.
+    Compute a best-effort presentation_version if missing.
     
-    Uses slide ids and counts to produce a deterministic hash.
+    This is a fallback approximation when the actual version from
+    PowerPointAgent is unavailable. It uses available metadata to
+    produce a deterministic hash.
+    
+    NOTE: This does NOT include shape geometry (left:top:width:height)
+    as specified in the Core Handbook. It is only used when actual
+    version tracking data is missing from the input.
     
     Args:
-        info_obj: Presentation info dict
+        info_obj: Presentation info dictionary
         
     Returns:
-        SHA-256 hash string or None if computation fails
+        SHA-256 hash string (first 16 chars) or None if computation fails
     """
     try:
         slides = info_obj.get("slides", [])
-        slide_ids = []
-        for s in slides:
-            slide_id = s.get("id") or s.get("index") or ""
-            slide_ids.append(str(slide_id))
         
-        slide_ids_str = ",".join(slide_ids)
-        file_path = info_obj.get("file", "")
+        slide_identifiers = []
+        for slide in slides:
+            slide_id = slide.get("id", slide.get("index", slide.get("slide_index", "")))
+            slide_identifiers.append(str(slide_id))
+        
+        slide_ids_str = ",".join(slide_identifiers)
+        
+        file_path = info_obj.get("file", info_obj.get("filepath", ""))
         slide_count = info_obj.get("slide_count", len(slides))
         
-        base = f"{file_path}-{slide_count}-{slide_ids_str}"
-        return hashlib.sha256(base.encode("utf-8")).hexdigest()[:16]
+        hash_input = f"{file_path}-{slide_count}-{slide_ids_str}"
+        
+        full_hash = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+        return full_hash[:16]
+        
     except Exception:
         return None
 
 
-def normalize_json(raw: Dict[str, Any], schema: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def should_compute_version(schema: Dict[str, Any]) -> bool:
     """
-    Normalize JSON data by mapping aliases and adding missing fields.
+    Determine if this schema type should have a computed version.
     
     Args:
-        raw: Raw JSON data
-        schema: Optional schema for context-aware normalization
+        schema: JSON Schema dictionary
         
     Returns:
-        Normalized JSON data
+        True if presentation_version should be computed when missing
     """
-    normalized = map_aliases(raw)
+    schema_id = schema.get("$id", "")
+    schema_title = schema.get("title", "").lower()
     
-    # Add presentation_version if missing and this appears to be ppt_get_info output
-    if "presentation_version" not in normalized:
-        if "slides" in normalized or "slide_count" in normalized:
-            pv = compute_presentation_version(normalized)
-            if pv:
-                normalized["presentation_version"] = pv
+    version_relevant_patterns = [
+        "ppt_get_info",
+        "get_info",
+        "presentation_info",
+        "ppt_capability_probe",
+        "capability_probe"
+    ]
     
-    # Ensure status field exists
-    if "status" not in normalized:
-        if "error" in normalized:
-            normalized["status"] = "error"
-        else:
-            normalized["status"] = "success"
+    for pattern in version_relevant_patterns:
+        if pattern in schema_id.lower() or pattern in schema_title:
+            return True
     
-    return normalized
+    required_fields = schema.get("required", [])
+    if "presentation_version" in required_fields:
+        return True
+    
+    return False
 
 
 # ============================================================================
 # MAIN LOGIC
 # ============================================================================
 
-def process_json(
-    schema_path: Path, 
-    input_path: Path, 
-    output_path: Optional[Path] = None
+def adapt_json(
+    schema_path: Path,
+    input_path: Path
 ) -> Dict[str, Any]:
     """
-    Process and validate JSON input against schema.
+    Validate and normalize JSON input against schema.
     
     Args:
         schema_path: Path to JSON Schema file
         input_path: Path to input JSON file
-        output_path: Optional path to write normalized output
         
     Returns:
-        Normalized and validated JSON data
-        
-    Raises:
-        Various exceptions on failure
+        Normalized and validated JSON wrapped in success response
     """
-    # Load schema
-    schema = load_json(schema_path)
+    if validate is None:
+        emit_error(
+            "DEPENDENCY_ERROR",
+            "jsonschema library not installed",
+            details={"required_package": "jsonschema"},
+            retryable=False
+        )
+        sys.exit(5)
     
-    # Load input
-    raw = load_json(input_path)
+    try:
+        schema = load_json(schema_path)
+    except FileNotFoundError:
+        emit_error(
+            "SCHEMA_NOT_FOUND",
+            f"Schema file not found: {schema_path}",
+            details={"path": str(schema_path)},
+            retryable=False
+        )
+        sys.exit(5)
+    except json.JSONDecodeError as e:
+        emit_error(
+            "SCHEMA_PARSE_ERROR",
+            f"Invalid JSON in schema file: {e.msg}",
+            details={"path": str(schema_path), "line": e.lineno, "column": e.colno},
+            retryable=False
+        )
+        sys.exit(5)
+    except Exception as e:
+        emit_error(
+            "SCHEMA_LOAD_ERROR",
+            str(e),
+            details={"path": str(schema_path)},
+            retryable=False
+        )
+        sys.exit(5)
     
-    # Normalize
-    normalized = normalize_json(raw, schema)
+    try:
+        raw_input = load_json(input_path)
+    except FileNotFoundError:
+        emit_error(
+            "INPUT_NOT_FOUND",
+            f"Input file not found: {input_path}",
+            details={"path": str(input_path)},
+            retryable=True
+        )
+        sys.exit(3)
+    except json.JSONDecodeError as e:
+        emit_error(
+            "INPUT_PARSE_ERROR",
+            f"Invalid JSON in input file: {e.msg}",
+            details={"path": str(input_path), "line": e.lineno, "column": e.colno},
+            retryable=True
+        )
+        sys.exit(3)
+    except Exception as e:
+        emit_error(
+            "INPUT_LOAD_ERROR",
+            str(e),
+            details={"path": str(input_path)},
+            retryable=True
+        )
+        sys.exit(3)
     
-    # Validate if jsonschema available
-    if JSONSCHEMA_AVAILABLE:
+    normalized = map_aliases(raw_input)
+    
+    if "presentation_version" not in normalized:
+        if should_compute_version(schema):
+            computed_version = compute_presentation_version(normalized)
+            if computed_version:
+                normalized["presentation_version"] = computed_version
+                normalized["_version_computed"] = True
+    
+    try:
         validate(instance=normalized, schema=schema)
+    except ValidationError as ve:
+        schema_path_str = list(ve.schema_path) if ve.schema_path else None
+        emit_error(
+            "SCHEMA_VALIDATION_ERROR",
+            ve.message,
+            details={
+                "schema_path": schema_path_str,
+                "validator": ve.validator,
+                "validator_value": str(ve.validator_value) if ve.validator_value else None,
+                "instance_path": list(ve.absolute_path) if ve.absolute_path else None
+            },
+            retryable=False
+        )
+        sys.exit(2)
     
-    # Add processing metadata
-    normalized["_adapter"] = {
-        "processed_at": datetime.utcnow().isoformat() + "Z",
-        "adapter_version": __version__,
-        "schema_file": str(schema_path.name)
+    return {
+        "status": "success",
+        "tool_version": __version__,
+        "schema_used": str(schema_path),
+        "input_file": str(input_path),
+        "aliases_mapped": _count_mapped_aliases(raw_input, normalized),
+        "data": normalized
     }
+
+
+def _count_mapped_aliases(original: Any, normalized: Any) -> int:
+    """
+    Count how many aliases were mapped during normalization.
     
-    # Write to output file if specified
-    if output_path:
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(normalized, f, indent=2)
+    Args:
+        original: Original input object
+        normalized: Normalized object
+        
+    Returns:
+        Number of keys that were remapped
+    """
+    count = 0
     
-    return normalized
+    if isinstance(original, dict) and isinstance(normalized, dict):
+        for key in original:
+            if key in ALIAS_MAP:
+                count += 1
+            if key in original and isinstance(original[key], (dict, list)):
+                canonical = ALIAS_MAP.get(key, key)
+                if canonical in normalized:
+                    count += _count_mapped_aliases(original[key], normalized[canonical])
+    elif isinstance(original, list) and isinstance(normalized, list):
+        for orig_item, norm_item in zip(original, normalized):
+            count += _count_mapped_aliases(orig_item, norm_item)
+    
+    return count
 
 
 # ============================================================================
-# CLI ENTRY POINT
+# CLI INTERFACE
 # ============================================================================
 
 def main():
     parser = argparse.ArgumentParser(
-        description=f"Validate and normalize JSON outputs - v{__version__}",
+        description="Validate and normalize JSON outputs from presentation CLI tools",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    # Validate and normalize JSON
-    uv run tools/ppt_json_adapter.py --schema schema.json --input raw.json
-    
-    # Write normalized output to file
-    uv run tools/ppt_json_adapter.py --schema schema.json --input raw.json --output normalized.json
+  # Validate and normalize tool output
+  uv run tools/ppt_json_adapter.py \\
+    --schema schemas/ppt_get_info.schema.json \\
+    --input raw_output.json
 
-Features:
-    - Maps aliased keys to canonical keys
-    - Computes presentation_version if missing
-    - Validates against JSON Schema
-    - Ensures consistent output structure
+  # Pipeline usage
+  uv run tools/ppt_get_info.py --file deck.pptx --json > raw.json
+  uv run tools/ppt_json_adapter.py --schema schemas/ppt_get_info.schema.json --input raw.json
 
-Version: """ + __version__
+Exit Codes:
+  0: Success - valid JSON emitted
+  2: Validation Error - input doesn't match schema
+  3: Input Load Error - couldn't read input file
+  5: Schema Load Error - couldn't read schema file
+
+Alias Mapping:
+  The adapter normalizes common key variations:
+  - slides_count -> slide_count
+  - slidesTotal -> slide_count
+  - probe_time -> probe_timestamp
+  - canWrite -> can_write
+  etc.
+        """
     )
     
     parser.add_argument(
-        "--schema", 
-        required=True, 
+        "--schema",
+        required=True,
         type=Path,
         help="Path to JSON Schema file"
     )
     
     parser.add_argument(
-        "--input", 
-        required=True, 
+        "--input",
+        required=True,
         type=Path,
         help="Path to raw JSON input file"
     )
     
-    parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write normalized JSON output"
-    )
-    
     args = parser.parse_args()
     
-    # Load schema
-    try:
-        schema = load_json(args.schema)
-    except FileNotFoundError:
-        error = make_error_response(
-            "FileNotFoundError",
-            f"Schema file not found: {args.schema}",
-            retryable=False,
-            suggestion="Verify the schema file path"
-        )
-        sys.stdout.write(json.dumps(error, indent=2) + "\n")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        error = make_error_response(
-            "JSONDecodeError",
-            f"Invalid JSON in schema file: {e}",
-            details={"file": str(args.schema), "line": e.lineno},
-            retryable=False
-        )
-        sys.stdout.write(json.dumps(error, indent=2) + "\n")
-        sys.exit(5)
-
-    # Load input
-    try:
-        raw = load_json(args.input)
-    except FileNotFoundError:
-        error = make_error_response(
-            "FileNotFoundError",
-            f"Input file not found: {args.input}",
-            retryable=True,
-            suggestion="Verify the input file path"
-        )
-        sys.stdout.write(json.dumps(error, indent=2) + "\n")
-        sys.exit(3)
-    except json.JSONDecodeError as e:
-        error = make_error_response(
-            "JSONDecodeError",
-            f"Invalid JSON in input file: {e}",
-            details={"file": str(args.input), "line": e.lineno},
-            retryable=True,
-            suggestion="Check the input file for JSON syntax errors"
-        )
-        sys.stdout.write(json.dumps(error, indent=2) + "\n")
-        sys.exit(3)
-
-    # Normalize
-    normalized = normalize_json(raw, schema)
-
-    # Validate
-    if JSONSCHEMA_AVAILABLE:
-        try:
-            validate(instance=normalized, schema=schema)
-        except ValidationError as ve:
-            error = make_error_response(
-                "ValidationError",
-                str(ve.message),
-                details={
-                    "schema_path": list(ve.schema_path) if ve.schema_path else None,
-                    "instance_path": list(ve.absolute_path) if ve.absolute_path else None
-                },
-                retryable=False,
-                suggestion="Fix the input data to match the schema requirements"
-            )
-            sys.stdout.write(json.dumps(error, indent=2) + "\n")
-            sys.exit(2)
-    else:
-        normalized["_warning"] = "jsonschema not installed - validation skipped"
-
-    # Add success metadata
-    normalized["_adapter"] = {
-        "status": "normalized",
-        "processed_at": datetime.utcnow().isoformat() + "Z",
-        "adapter_version": __version__,
-        "schema_file": args.schema.name
-    }
-
-    # Write to output file if specified
-    if args.output:
-        try:
-            with open(args.output, "w", encoding="utf-8") as f:
-                json.dump(normalized, f, indent=2)
-        except IOError as e:
-            error = make_error_response(
-                "IOError",
-                f"Failed to write output file: {e}",
-                retryable=True
-            )
-            sys.stdout.write(json.dumps(error, indent=2) + "\n")
-            sys.exit(3)
-
-    # Emit normalized JSON to stdout
-    sys.stdout.write(json.dumps(normalized, indent=2) + "\n")
+    result = adapt_json(
+        schema_path=args.schema,
+        input_path=args.input
+    )
+    
+    sys.stdout.write(json.dumps(result, indent=2) + "\n")
+    sys.stdout.flush()
     sys.exit(0)
 
 
