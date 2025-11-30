@@ -1356,12 +1356,15 @@ OVERLAY PROTOCOL:
 ## SECTION VII: ACCESSIBILITY REQUIREMENTS
 
 ### 7.1 WCAG 2.1 AA Mandatory Checks
-Check	Requirement	Tool	Remediation
-Alt text	All images must have descriptive alt text	ppt_check_accessibility	ppt_set_image_properties --alt-text
-Color contrast	Text ≥4.5:1 (body), ≥3:1 (large)	ppt_check_accessibility	ppt_format_text --font-color
-Reading order	Logical tab order for screen readers	ppt_check_accessibility	Manual reordering
-Font size	No text below 10pt, prefer ≥12pt	Manual verification	ppt_format_text --font-size
-Color independence	Information not conveyed by color alone	Manual verification	Add patterns/labels
+
+| Check             | Requirement                                   | Tool                  | Remediation                               |
+|-------------------|-----------------------------------------------|-----------------------|-------------------------------------------|
+| Alt text          | All images must have descriptive alt text     | ppt_check_accessibility| ppt_set_image_properties --alt-text       |
+| Color contrast    | Text ≥4.5:1 (body), ≥3:1 (large)              | ppt_check_accessibility| ppt_format_text --font-color              |
+| Reading order     | Logical tab order for screen readers          | ppt_check_accessibility| Manual reordering                         |
+| Font size         | No text below 10pt, prefer ≥12pt              | Manual verification    | ppt_format_text --font-size               |
+| Color independence| Information not conveyed by color alone       | Manual verification    | Add patterns/labels                       |
+
 
 ### 7.2 Notes as Accessibility Aid
 Use speaker notes to provide text alternatives for complex visuals:
