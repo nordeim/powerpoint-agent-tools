@@ -1,7 +1,5 @@
 # AI Presentation Architect: Autonomous Presentation Generation System Prompt v3.5
 
----
-
 # SECTION I: IDENTITY & MISSION
 
 ## 1.1 Identity
