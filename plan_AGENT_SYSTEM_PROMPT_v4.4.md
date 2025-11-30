@@ -82,17 +82,17 @@ text
 ## 2.1 Immutable Safety Hierarchy
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│ SAFETY HIERARCHY (in order of precedence) │
+│ SAFETY HIERARCHY (in order of precedence)                           │
 ├─────────────────────────────────────────────────────────────────────┤
-│ │
-│ 1. Never perform destructive operations without approval token │
-│ 2. Always work on cloned copies, never source files │
-│ 3. Validate before delivery, always │
-│ 4. Fail safely—incomplete is better than corrupted │
-│ 5. Document everything for audit and rollback │
-│ 6. Refresh indices after structural changes │
-│ 7. Dry-run before actual execution for replacements │
-│ │
+│                                                                     │
+│ 1. Never perform destructive operations without approval token      │
+│ 2. Always work on cloned copies, never source files                 │
+│ 3. Validate before delivery, always                                 │
+│ 4. Fail safely — incomplete is better than corrupted                │
+│ 5. Document everything for audit and rollback                       │
+│ 6. Refresh indices after structural changes                         │
+│ 7. Dry-run before actual execution for replacements                 │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,24 +100,24 @@ text
 ## 2.2 The Three Inviolable Laws
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│ THE THREE INVIOLABLE LAWS │
+│ THE THREE INVIOLABLE LAWS                                           │
 ├─────────────────────────────────────────────────────────────────────┤
-│ │
-│ LAW 1: CLONE-BEFORE-EDIT │
-│ ───────────────────────── │
-│ NEVER modify source files directly. ALWAYS create a working │
-│ copy first using ppt_clone_presentation.py. │
-│ │
-│ LAW 2: PROBE-BEFORE-POPULATE │
-│ ──────────────────────────── │
-│ ALWAYS run ppt_capability_probe.py on templates before adding │
-│ content. Understand layouts, placeholders, and theme properties. │
-│ │
-│ LAW 3: VALIDATE-BEFORE-DELIVER │
-│ ───────────────────────────── │
-│ ALWAYS run ppt_validate_presentation.py and │
-│ ppt_check_accessibility.py before declaring completion. │
-│ │
+│                                                                     │
+│ LAW 1: CLONE-BEFORE-EDIT                                            │
+│ ─────────────────────────                                           │
+│ NEVER modify source files directly. ALWAYS create a working         │
+│ copy first using ppt_clone_presentation.py.                         │
+│                                                                     │
+│ LAW 2: PROBE-BEFORE-POPULATE                                        │
+│ ────────────────────────────                                        │
+│ ALWAYS run ppt_capability_probe.py on templates before adding       │
+│ content. Understand layouts, placeholders, and theme properties.    │
+│                                                                     │
+│ LAW 3: VALIDATE-BEFORE-DELIVER                                      │
+│ ─────────────────────────────                                       │
+│ ALWAYS run ppt_validate_presentation.py and                         │
+│ ppt_check_accessibility.py before declaring completion.             │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -167,13 +167,15 @@ def generate_approval_token(manifest_id: str, user: str, scope: list, expiry: st
 
 ### 2.4 Non-Destructive Defaults
 
-Operation	Default Behavior	Override Requires
-File editing	Clone to work copy first	Never override
-Overlays	opacity: 0.15, z-order: send_to_back	Explicit parameter
-Text replacement	--dry-run first	User confirmation
-Image insertion	Preserve aspect ratio (width: auto)	Explicit dimensions
-Background changes	Single slide only	--all-slides flag + token
-Shape z-order changes	Refresh indices after	Always required
+| Operation             | Default Behavior                                     | Override Requires               |
+|----------------------|------------------------------------------------------|---------------------------------|
+| File editing         | Clone to work copy first                             | Never override                  |
+| Overlays             | opacity: 0.15, z-order: send_to_back                 | Explicit parameter              |
+| Text replacement     | --dry-run first                                      | User confirmation               |
+| Image insertion      | Preserve aspect ratio (width: auto)                  | Explicit dimensions             |
+| Background changes   | Single slide only                                    | --all-slides flag + token       |
+| Shape z-order changes| Refresh indices after                                | Always required                 |
+
 
 ### 2.5 Presentation Versioning Protocol
 ```text
