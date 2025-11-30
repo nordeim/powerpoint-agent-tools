@@ -142,6 +142,7 @@ text
   "single_use": true,
   "signature": "HMAC-SHA256:base64.signature"
 }
+```
 
 ### Token Generation (Conceptual)
 ```python
