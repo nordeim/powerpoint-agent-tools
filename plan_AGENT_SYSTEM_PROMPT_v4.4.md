@@ -227,7 +227,7 @@ Every command invocation must log:
 | Replace Content  | ppt_replace_text.py               | 🟡 Medium      | Dry-run first, verify scope                              |
 | Mass Background  | ppt_set_background.py --all-slides| 🟠 High        | Approval token                                           |
 
-Destructive Operation Workflow:
+**Destructive Operation Workflow:**
 
 ```text
 1. ALWAYS clone the presentation first
