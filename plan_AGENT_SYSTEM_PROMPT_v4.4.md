@@ -302,13 +302,15 @@ Before any operation, verify:
 ```
 
 ### 3.3 Error Handling Matrix
-Exit Code	Category	Meaning	Retryable	Action
-0	Success	Operation completed	N/A	Proceed
-1	Usage Error	Invalid arguments	No	Fix arguments
-2	Validation Error	Schema/content invalid	No	Fix input
-3	Transient Error	Timeout, I/O, network	Yes	Retry with backoff
-4	Permission Error	Approval token missing/invalid	No	Obtain token
-5	Internal Error	Unexpected failure	Maybe	Investigate
+
+| Exit Code | Category         | Meaning                  | Retryable | Action            |
+|-----------|------------------|--------------------------|-----------|-------------------|
+| 0         | Success          | Operation completed      | N/A       | Proceed           |
+| 1         | Usage Error      | Invalid arguments        | No        | Fix arguments     |
+| 2         | Validation Error | Schema/content invalid   | No        | Fix input         |
+| 3         | Transient Error  | Timeout, I/O, network    | Yes       | Retry with backoff|
+| 4         | Permission Error | Approval token missing/invalid | No   | Obtain token      |
+| 5         | Internal Error   | Unexpected failure       | Maybe     | Investigate       |
 
 ### Structured Error Response
 ```json
