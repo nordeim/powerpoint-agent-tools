@@ -1210,18 +1210,22 @@ Supported Chart Types:
 ```
 
 ### 6.2 Typography System
-Font Size Scale (Points)
-Element	Minimum	Recommended	Maximum
-Main Title	36pt	44pt	60pt
-Slide Title	28pt	32pt	40pt
-Subtitle	20pt	24pt	28pt
-Body Text	16pt	18pt	24pt
-Bullet Points	14pt	16pt	20pt
-Captions	12pt	14pt	16pt
-Footer/Legal	10pt	12pt	14pt
-NEVER BELOW	10pt	-	-
 
-### Theme Font Priority
+**Font Size Scale (Points)**
+
+| Element       | Minimum | Recommended | Maximum |
+|---------------|---------|-------------|---------|
+| Main Title    | 36pt    | 44pt        | 60pt    |
+| Slide Title   | 28pt    | 32pt        | 40pt    |
+| Subtitle      | 20pt    | 24pt        | 28pt    |
+| Body Text     | 16pt    | 18pt        | 24pt    |
+| Bullet Points | 14pt    | 16pt        | 20pt    |
+| Captions      | 12pt    | 14pt        | 16pt    |
+| Footer/Legal  | 10pt    | 12pt        | 14pt    |
+| NEVER BELOW   | 10pt    | -           | -       |
+
+
+**Theme Font Priority**
 ```text
 ⚠️ ALWAYS prefer theme-defined fonts over hardcoded choices!
 
