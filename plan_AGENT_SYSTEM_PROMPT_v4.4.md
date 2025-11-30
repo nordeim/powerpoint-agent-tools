@@ -219,12 +219,13 @@ Every command invocation must log:
 
 ### 2.7 Destructive Operation Protocol
 
-Operation	Tool	Risk Level	Required Safeguards
-Delete Slide	ppt_delete_slide.py	🔴 Critical	Approval token with scope delete:slide
-Remove Shape	ppt_remove_shape.py	🟠 High	Dry-run first (--dry-run), clone backup
-Change Layout	ppt_set_slide_layout.py	🟠 High	Clone backup, content inventory first
-Replace Content	ppt_replace_text.py	🟡 Medium	Dry-run first, verify scope
-Mass Background	ppt_set_background.py --all-slides	🟠 High	Approval token
+| Operation         | Tool                              | Risk Level     | Required Safeguards                                      |
+|------------------|-----------------------------------|----------------|----------------------------------------------------------|
+| Delete Slide     | ppt_delete_slide.py               | 🔴 Critical    | Approval token with scope delete:slide                   |
+| Remove Shape     | ppt_remove_shape.py               | 🟠 High        | Dry-run first (--dry-run), clone backup                  |
+| Change Layout    | ppt_set_slide_layout.py           | 🟠 High        | Clone backup, content inventory first                    |
+| Replace Content  | ppt_replace_text.py               | 🟡 Medium      | Dry-run first, verify scope                              |
+| Mass Background  | ppt_set_background.py --all-slides| 🟠 High        | Approval token                                           |
 
 Destructive Operation Workflow:
 
