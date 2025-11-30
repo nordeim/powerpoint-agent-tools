@@ -6,25 +6,27 @@ I have conducted a meticulous line-by-line analysis of the original system promp
 
 ## Comparative Analysis Matrix
 
-Section	My v4.0 Prompt	Original Prompt	Integration Decision
-Identity & Mission	Good foundation	Richer philosophy ("narrative vision", "operational resilience")	Merge: Enhance with original's eloquence
-Safety Hierarchy	3 Inviolable Laws	7-point ordered hierarchy	Adopt Original: More comprehensive
-Approval Token System	Basic mention	Full token schema + generation code	Adopt Original: Critical for security
-Presentation Versioning	Not present	Detailed version tracking protocol	Add: Critical gap in my version
-Audit Trail	Basic logging	Full JSON schema for audit	Adopt Original: Essential for governance
-Probe Resilience	Basic probe	Retry/backoff + fallback probes	Adopt Original: Operational resilience
-Preflight Checklist	Not present	Automated 6-point checklist	Add: Important safety gate
-Error Handling Matrix	Basic table	Exit codes 0-5 with actions	Adopt Original: More systematic
-Request Classification	Not present	4-type classification matrix	Add: Excellent triage system
-Change Manifest	Not present	Full v3.0 schema	Add: Critical for complex tasks
-Shape Index Management	Brief mention	Detailed protocol with warnings	Adopt Original: Prevents common errors
-Design Intelligence	Good basics	Visual hierarchy pyramid, detailed systems	Merge: Combine best of both
-Typography System	Basic table	Detailed with min/max/recommended	Adopt Original: More complete
-Color System	Canonical palettes	Theme priority + fallback palettes	Merge: Both valuable
-Overlay Safety	Brief	Detailed protocol with defaults	Adopt Original: Critical for overlays
-Response Protocol	Basic format	Detailed templates with emojis	Adopt Original: Better UX
-Ambiguity Resolution	Not present	6-step protocol	Add: Handles edge cases
-Lessons Learned	Brief	Detailed template	Adopt Original: Continuous improvement
+| Section               | My v3.4 Prompt       | Original Prompt                                           | Integration Decision                          |
+|-----------------------|----------------------|-----------------------------------------------------------|-----------------------------------------------|
+| Identity & Mission    | Good foundation      | Richer philosophy ("narrative vision", "operational resilience") | Merge: Enhance with original's eloquence       |
+| Safety Hierarchy      | 3 Inviolable Laws    | 7-point ordered hierarchy                                 | Adopt Original: More comprehensive            |
+| Approval Token System | Basic mention        | Full token schema + generation code                       | Adopt Original: Critical for security         |
+| Presentation Versioning | Not present        | Detailed version tracking protocol                        | Add: Critical gap in my version               |
+| Audit Trail           | Basic logging        | Full JSON schema for audit                                | Adopt Original: Essential for governance      |
+| Probe Resilience      | Basic probe          | Retry/backoff + fallback probes                           | Adopt Original: Operational resilience        |
+| Preflight Checklist   | Not present          | Automated 6-point checklist                               | Add: Important safety gate                    |
+| Error Handling Matrix | Basic table          | Exit codes 0-5 with actions                               | Adopt Original: More systematic               |
+| Request Classification| Not present          | 4-type classification matrix                              | Add: Excellent triage system                  |
+| Change Manifest       | Not present          | Full v3.0 schema                                          | Add: Critical for complex tasks               |
+| Shape Index Management| Brief mention        | Detailed protocol with warnings                           | Adopt Original: Prevents common errors        |
+| Design Intelligence   | Good basics          | Visual hierarchy pyramid, detailed systems                | Merge: Combine best of both                   |
+| Typography System     | Basic table          | Detailed with min/max/recommended                         | Adopt Original: More complete                 |
+| Color System          | Canonical palettes   | Theme priority + fallback palettes                        | Merge: Both valuable                          |
+| Overlay Safety        | Brief                | Detailed protocol with defaults                           | Adopt Original: Critical for overlays         |
+| Response Protocol     | Basic format         | Detailed templates with emojis                            | Adopt Original: Better UX                     |
+| Ambiguity Resolution  | Not present          | 6-step protocol                                           | Add: Handles edge cases                       |
+| Lessons Learned       | Brief                | Detailed template                                         | Adopt Original: Continuous improvement        |
+
 
 ---
 
